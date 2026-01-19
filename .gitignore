@@ -1,0 +1,56 @@
+# Frontend (Vite/React)
+frontend/dist
+frontend/dist-ssr
+frontend/*.local
+frontend/*.log
+frontend/node_modules/
+frontend/.env.local
+frontend/.env.*.local
+frontend/.vscode/settings.json
+frontend/!.vscode/extensions.json
+
+# Backend (Node.js)
+backend/node_modules/
+backend/dist
+backend/.env
+backend/.env.local
+backend/logs/
+backend/*.log
+backend/npm-debug.log*
+backend/yarn-debug.log*
+backend/yarn-error.log*
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+*~
+.DS_Store
+*.sublime-workspace
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Dependencies
+node_modules/
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Logs
+logs
+*.log
+lerna-debug.log*
+
+# Misc
+dist
+build
+.next
+.cache

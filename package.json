@@ -1,0 +1,30 @@
+{
+  "name": "dcms-dental-clinic",
+  "version": "1.0.0",
+  "description": "Dental Clinic Management System - Full Stack Application",
+  "private": true,
+  "workspaces": [
+    "frontend",
+    "backend"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace=backend & npm run dev --workspace=frontend",
+    "dev:frontend": "npm run dev --workspace=frontend",
+    "dev:backend": "npm run dev --workspace=backend",
+    "build": "npm run build --workspace=frontend && npm run build --workspace=backend",
+    "build:frontend": "npm run build --workspace=frontend",
+    "build:backend": "npm run build --workspace=backend",
+    "lint": "npm run lint --workspace=frontend",
+    "preview": "npm run preview --workspace=frontend",
+    "watch:backend": "npm run watch --workspace=backend",
+    "install-all": "npm install && npm install --workspace=frontend && npm install --workspace=backend"
+  },
+  "keywords": [
+    "dental",
+    "clinic",
+    "management",
+    "system"
+  ],
+  "author": "",
+  "license": "ISC"
+}
