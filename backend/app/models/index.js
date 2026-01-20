@@ -17,5 +17,6 @@ db.appointments = require("./appointment.model.js")
 db.fees = require("./fee.model.js")
 db.remedies = require("./remedy.model.js")
 db.procedures = require("./procedure.model.js")
+db.problems = require("./problem.model.js")
 
 module.exports = db;
