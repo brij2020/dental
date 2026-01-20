@@ -104,6 +104,7 @@ exports.changePassword = async (req, res) => {
 
 // forgot password
 
+const { sendEmail } = require("../services/email.service");
 exports.forgotPassword = async (req, res) => {
   const { email } = req.body;
 
@@ -121,10 +122,19 @@ exports.forgotPassword = async (req, res) => {
 
   await user.save();
 
-  // Send token via email (simulate)
-  logger.info({ email, token }, 'Password reset token generated');
-
-  res.send({ message: "Password reset token sent to your email" });
+  // Send token via email
+  const resetUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/reset-password?token=${token}`;
+  const subject = 'Password Reset Request';
+  const text = `You requested a password reset.\n\nYour reset token: ${token}\n\nOr click the link below to reset your password:\n${resetUrl}\n\nIf you did not request this, please ignore this email.`;
+  const html = `<p>You requested a password reset.</p><p><b>Your reset token:</b> ${token}</p><p>Or click the link below to reset your password:</p><p><a href="${resetUrl}">${resetUrl}</a></p><p>If you did not request this, please ignore this email.</p>`;
+  try {
+    await sendEmail({ to: email, subject, text, html });
+    logger.info({ email, token }, 'Password reset token sent via email');
+    res.send({ message: "Password reset token sent to your email" });
+  } catch (err) {
+    logger.error({ err }, 'Error sending password reset email');
+    res.status(500).send({ message: "Failed to send reset email. Please try again later." });
+  }
 };
 
 
@@ -154,7 +164,9 @@ exports.resetPassword = async (req, res) => {
   user.resetPasswordToken = undefined;
   user.resetPasswordExpires = undefined;
 
+  logger.debug({ beforeSave: user.password }, 'Password before save (should be plain)');
   await user.save();
+  logger.debug({ afterSave: user.password }, 'Password after save (should be hashed)');
 
   res.send({ message: "Password has been reset successfully" });
 };
