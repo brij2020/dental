@@ -2,7 +2,12 @@ const MedicalCondition = require("../models/medicalCondition.model");
 
 exports.getAllConditions = async (clinicId, filters = {}) => {
   try {
-    const query = { clinic_id: clinicId, is_active: true };
+    let query;
+    if (clinicId && clinicId !== 'system') {
+      query = { clinic_id: { $in: [clinicId, 'system'] }, is_active: true };
+    } else {
+      query = { clinic_id: 'system', is_active: true };
+    }
 
     const conditions = await MedicalCondition.find(query)
       .sort({ name: 1 })

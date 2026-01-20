@@ -43,10 +43,14 @@ exports.findByClinicAndName = async (clinic_id, name) => {
   }
 };
 
-// Get all remedies for a clinic
+// Get all remedies for a clinic, including global remedies
 exports.findByClinicId = async (clinic_id) => {
   try {
-    return await Remedy.find({ clinic_id }).sort({ name: 1 });
+    // Return both global and clinic-specific remedies
+    if(clinic_id!='system'){
+      return await Remedy.find({ clinic_id: { $in: [clinic_id, 'system'] } }).sort({ name: 1 });
+    }
+    return await Remedy.find({ clinic_id}).sort({ name: 1 });
   } catch (error) {
     logger.error("Error finding remedies by clinic ID:", error);
     throw error;

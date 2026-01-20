@@ -31,6 +31,13 @@ const medicalConditionSchema = new mongoose.Schema(
       default: null,
       description: "Optional description of the condition"
     }
+     ,
+     sar: {
+       type: String,
+       trim: true,
+       default: null,
+       description: "SAR field for the medical condition (optional)"
+     }
   },
   {
     timestamps: true,

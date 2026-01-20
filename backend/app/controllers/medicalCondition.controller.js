@@ -62,7 +62,7 @@ exports.findOne = async (req, res) => {
 // Create new medical condition
 exports.create = async (req, res) => {
   try {
-    const { clinic_id, name, has_value, description } = req.body;
+    const { clinic_id, name, has_value, description, sar } = req.body;
 
     if (!clinic_id || !name) {
       return res.status(400).json({
@@ -78,6 +78,7 @@ exports.create = async (req, res) => {
       description: description ? description.trim() : null,
       is_active: true,
     };
+    if (sar !== undefined) conditionData.sar = sar ? sar.trim() : null;
 
     const condition = await medicalConditionService.createCondition(conditionData);
 
@@ -109,7 +110,7 @@ exports.create = async (req, res) => {
 exports.update = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, has_value, description, is_active } = req.body;
+    const { name, has_value, description, is_active, sar } = req.body;
 
     if (!id) {
       return res.status(400).json({
@@ -123,6 +124,7 @@ exports.update = async (req, res) => {
     if (has_value !== undefined) updateData.has_value = has_value === true;
     if (description !== undefined) updateData.description = description ? description.trim() : null;
     if (is_active !== undefined) updateData.is_active = is_active === true;
+    if (sar !== undefined) updateData.sar = sar ? sar.trim() : null;
 
     const condition = await medicalConditionService.updateCondition(id, updateData);
 

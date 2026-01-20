@@ -1,5 +1,5 @@
 const remedyService = require("../services/remedy.service");
-const logger = require("../config/logger");
+const { logger } = require("../config/logger");
 
 // POST /api/remedies - Create a new remedy
 exports.create = async (req, res) => {
@@ -34,7 +34,7 @@ exports.create = async (req, res) => {
         message: `Remedy with this ${field} already exists for this clinic.`,
       });
     } else {
-      logger.error("Error creating remedy:", err);
+      // logger.error("Error creating remedy:", err);
       res.status(500).send({ message: err.message });
     }
   }
@@ -93,14 +93,19 @@ exports.update = async (req, res) => {
     if (days !== undefined) updateData.days = days;
     if (note !== undefined) updateData.note = note;
 
-    const remedy = await remedyService.update(req.params.id, updateData);
-
+    // Only allow update if remedy belongs to the clinic
+    const remedy = await remedyService.findById(req.params.id);
     if (!remedy) {
       return res.status(404).send({ message: "Remedy not found" });
     }
+    // Only allow update if remedy is not global or belongs to the clinic
+    if (remedy.clinic_id !== req.user.clinic_id) {
+      return res.status(403).send({ message: "You can only update remedies created by your clinic." });
+    }
 
-    logger.info(`Remedy updated: ${remedy._id}`);
-    res.status(200).send({ success: true, data: remedy });
+    const updatedRemedy = await remedyService.update(req.params.id, updateData);
+    logger.info(`Remedy updated: ${updatedRemedy._id}`);
+    res.status(200).send({ success: true, data: updatedRemedy });
   } catch (err) {
     if (err.code === 11000) {
       const field = Object.keys(err.keyPattern).join(", ");
@@ -162,13 +167,16 @@ exports.updateByClinicAndName = async (req, res) => {
 // DELETE /api/remedies/:id - Delete remedy by ID
 exports.delete = async (req, res) => {
   try {
-    const remedy = await remedyService.delete(req.params.id);
-
+    const remedy = await remedyService.findById(req.params.id);
     if (!remedy) {
       return res.status(404).send({ message: "Remedy not found" });
     }
-
-    logger.info(`Remedy deleted: ${remedy._id}`);
+    // Only allow delete if remedy is not global or belongs to the clinic
+    if (remedy.clinic_id !== req.user.clinic_id) {
+      return res.status(403).send({ message: "You can only delete remedies created by your clinic." });
+    }
+    const deletedRemedy = await remedyService.delete(req.params.id);
+    logger.info(`Remedy deleted: ${deletedRemedy._id}`);
     res.status(200).send({ success: true, message: "Remedy deleted" });
   } catch (err) {
     logger.error("Error deleting remedy:", err);
