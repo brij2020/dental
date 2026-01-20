@@ -45,14 +45,21 @@ exports.login = async (req, res) => {
     try {
         const { email, password } = req.body;
 
-
-
-        const user = await Profile.findOne({ email }).select("+password");
-        console.log("=====user", user);
-        if (!user) return res.status(404).send({ message: "User not found" });
+        if (!email || !password) {
+            return res.status(400).send({ message: "Email and password are required" });
+        }
+        console.log("email password",email,password);
+        const user = await Profile.findOne({ email: email.toLowerCase().trim() }).select("+password");
+        if (!user) {
+            logger.warn({ email }, 'Login failed: user not found');
+            return res.status(401).send({ message: "Invalid email or password" });
+        }
 
         const isMatch = await user.comparePassword(password);
-        if (!isMatch) return res.status(401).send({ message: "Invalid credentials" });
+        if (!isMatch) {
+            logger.warn({ userId: user._id, email }, 'Login failed: invalid password');
+            return res.status(401).send({ message: "Invalid email or password" });
+        }
 
         const token = jwt.sign(
             { id: user._id, role: user.role, clinic_id: user.clinic_id, full_name: user.full_name },
@@ -60,7 +67,8 @@ exports.login = async (req, res) => {
             { expiresIn: "1d" }
         );
 
-        res.send({
+        logger.info({ userId: user._id, email }, 'Login successful');
+        res.status(200).send({
             token,
             role: user.role,
             id: user._id,
@@ -68,7 +76,8 @@ exports.login = async (req, res) => {
             full_name: user.full_name
         });
     } catch (err) {
-        res.status(500).send({ message: err.message });
+        logger.error({ err }, 'Login error');
+        res.status(500).send({ message: "Login failed. Please try again." });
     }
 };
 //change password
@@ -106,67 +115,110 @@ exports.changePassword = async (req, res) => {
 
 const { sendEmail } = require("../services/email.service");
 exports.forgotPassword = async (req, res) => {
-  const { email } = req.body;
-
-  if (!email) return res.status(400).send({ message: "Email is required" });
-
-  const user = await Profile.findOne({ email });
-  if (!user) return res.status(404).send({ message: "User not found" });
-
-  // Generate token
-  const token = crypto.randomBytes(20).toString("hex");
-
-  // Set token & expiration (1 hour)
-  user.resetPasswordToken = crypto.createHash("sha256").update(token).digest("hex");
-  user.resetPasswordExpires = Date.now() + 3600000; // 1 hour
-
-  await user.save();
-
-  // Send token via email
-  const resetUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/reset-password?token=${token}`;
-  const subject = 'Password Reset Request';
-  const text = `You requested a password reset.\n\nYour reset token: ${token}\n\nOr click the link below to reset your password:\n${resetUrl}\n\nIf you did not request this, please ignore this email.`;
-  const html = `<p>You requested a password reset.</p><p><b>Your reset token:</b> ${token}</p><p>Or click the link below to reset your password:</p><p><a href="${resetUrl}">${resetUrl}</a></p><p>If you did not request this, please ignore this email.</p>`;
   try {
-    await sendEmail({ to: email, subject, text, html });
-    logger.info({ email, token }, 'Password reset token sent via email');
-    res.send({ message: "Password reset token sent to your email" });
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).send({ message: "Email is required" });
+    }
+
+    const user = await Profile.findOne({ email: email.toLowerCase().trim() });
+    // Don't reveal if email exists or not (security best practice)
+    if (!user) {
+      logger.warn({ email }, 'Forgot password request for non-existent user');
+      return res.status(200).send({ message: "If that email exists in our system, you will receive a password reset link." });
+    }
+
+    // Generate token
+    const token = crypto.randomBytes(20).toString("hex");
+
+    // Set token & expiration (1 hour)
+    user.resetPasswordToken = crypto.createHash("sha256").update(token).digest("hex");
+    user.resetPasswordExpires = Date.now() + 3600000; // 1 hour
+
+    await user.save();
+
+    // Send token via email
+    const resetUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/reset-password?token=${token}`;
+    const subject = 'Password Reset Request';
+    const text = `You requested a password reset.\n\nYour reset token: ${token}\n\nOr click the link below to reset your password:\n${resetUrl}\n\nThis link will expire in 1 hour.\n\nIf you did not request this, please ignore this email and your password will remain unchanged.`;
+    const html = `<p>You requested a password reset.</p><p><b>Your reset token:</b> ${token}</p><p>Or click the link below to reset your password:</p><p><a href="${resetUrl}">${resetUrl}</a></p><p>This link will expire in 1 hour.</p><p>If you did not request this, please ignore this email and your password will remain unchanged.</p>`;
+    try {
+      await sendEmail({ to: user.email, subject, text, html });
+      logger.info({ email: user.email, tokenGenerated: true }, 'Password reset token sent via email');
+      res.status(200).send({ message: "If that email exists in our system, you will receive a password reset link." });
+    } catch (err) {
+      logger.error({ err, email: user.email }, 'Error sending password reset email');
+      res.status(500).send({ message: "Failed to send reset email. Please try again later." });
+    }
   } catch (err) {
-    logger.error({ err }, 'Error sending password reset email');
-    res.status(500).send({ message: "Failed to send reset email. Please try again later." });
+    logger.error({ err }, 'Error in forgot password');
+    res.status(500).send({ message: "An error occurred. Please try again." });
   }
 };
 
 
 // Step 2: Reset password using token
 exports.resetPassword = async (req, res) => {
-  const { token, newPassword } = req.body;
+  try {
+    const { token, newPassword } = req.body;
 
-  if (!token || !newPassword) {
-    return res.status(400).send({ message: "Token and new password are required" });
+    logger.info({ token: token ? 'provided' : 'missing', newPassword: newPassword ? 'provided' : 'missing' }, 'Reset password request received');
+
+    if (!token || !newPassword) {
+      return res.status(400).send({ message: "Token and new password are required" });
+    }
+
+    // Validate password strength
+    if (newPassword.length < 8) {
+      return res.status(400).send({ message: "Password must be at least 8 characters long" });
+    }
+
+    // Hash the token to compare with DB
+    const hashedToken = crypto.createHash("sha256").update(token).digest("hex");
+    logger.debug({ token, hashedToken }, 'Token hashing for DB lookup');
+
+    // Find user by token and check expiration
+    const user = await Profile.findOne({
+      resetPasswordToken: hashedToken,
+      resetPasswordExpires: { $gt: Date.now() }
+    }).select("+password");
+    
+    if (!user) {
+      logger.warn({ token: hashedToken }, 'Invalid or expired reset token attempted');
+      return res.status(400).send({ message: "Invalid or expired token" });
+    }
+    
+    logger.info({ userId: user._id, email: user.email }, 'User found for password reset');
+
+    // Hash the new password directly (same way as register controller)
+    logger.debug({ passwordLength: newPassword.length }, 'Starting password hash');
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(newPassword, salt);
+    logger.debug({ hashedLength: hashedPassword.length, startsWithHash: hashedPassword.startsWith('$2') }, 'Password hashed successfully');
+    console.log("hashedPassword",  user._id);
+    // Update user directly with hashed password
+    const updatedUser = await Profile.findByIdAndUpdate(
+      user._id,
+      {
+        password: hashedPassword,
+        resetPasswordToken: undefined,
+        resetPasswordExpires: undefined
+      },
+      { new: true }
+    );
+
+    if (!updatedUser) {
+      logger.error({ userId: user._id }, 'Failed to update user with new password');
+      return res.status(500).send({ message: "Failed to save password. Please try again." });
+    }
+
+    logger.info({ userId: user._id, email: user.email }, 'Password reset successfully and verified');
+
+    res.status(200).send({ message: "Password has been reset successfully. Please log in with your new password." });
+  } catch (err) {
+    logger.error({ err, message: err.message, stack: err.stack }, 'Error resetting password');
+    res.status(500).send({ message: "Failed to reset password. Please try again." });
   }
-
-  // Hash the token to compare with DB
-  const hashedToken = crypto.createHash("sha256").update(token).digest("hex");
-
-  // Find user by token and check expiration
-  const user = await Profile.findOne({
-    resetPasswordToken: hashedToken,
-    resetPasswordExpires: { $gt: Date.now() }
-  }).select("+password");
-
-  if (!user) {
-    return res.status(400).send({ message: "Invalid or expired token" });
-  }
-
-  // Update password
-  user.password = newPassword;
-  user.resetPasswordToken = undefined;
-  user.resetPasswordExpires = undefined;
-
-  logger.debug({ beforeSave: user.password }, 'Password before save (should be plain)');
-  await user.save();
-  logger.debug({ afterSave: user.password }, 'Password after save (should be hashed)');
-
-  res.send({ message: "Password has been reset successfully" });
 };
+   

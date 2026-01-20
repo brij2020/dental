@@ -13,6 +13,9 @@ module.exports = app => {
   
   // Appointment Routes
   app.use("/api/appointments", require("./appointment.routes"));
+  
+  // Procedure Routes
+  app.use("/api/procedures", require("./procedure.routes"));
 };
 
 

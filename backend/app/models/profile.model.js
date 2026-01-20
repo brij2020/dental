@@ -114,15 +114,24 @@ const doctorSchema = new mongoose.Schema(
  */
 doctorSchema.pre("save", async function(next) {
   const user = this;
+  const bcrypt = require("bcryptjs");
+  const { logger } = require("../config/logger");
 
   // Only hash if password is new or modified
-  if (!user.isModified("password")) return next();
+  if (!user.isModified("password")) {
+    logger.debug({ userId: user._id }, 'Password not modified, skipping hash');
+    return next();
+  }
 
   try {
+    logger.debug({ userId: user._id, passwordLength: user.password.length }, 'Password hashing started');
     const salt = await bcrypt.genSalt(10);
-    user.password = await bcrypt.hash(user.password, salt);
+    const hashedPassword = await bcrypt.hash(user.password, salt);
+    logger.debug({ userId: user._id, hashedLength: hashedPassword.length, startsWithHash: hashedPassword.startsWith('$2') }, 'Password hashed successfully');
+    user.password = hashedPassword;
     next();
   } catch (err) {
+    logger.error({ userId: user._id, err }, 'Error hashing password');
     next(err);
   }
 });

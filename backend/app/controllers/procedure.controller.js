@@ -1,0 +1,132 @@
+const db = require("../models");
+const Procedure = db.procedures;
+const { logger } = require("../config/logger");
+
+/**
+ * Get all procedures for a clinic
+ */
+exports.getAllProcedures = async (req, res) => {
+  try {
+    const { clinic_id } = req.query;
+
+    if (!clinic_id) {
+      return res.status(400).send({ message: "clinic_id is required" });
+    }
+
+    const procedures = await Procedure.find({ clinic_id }).sort({ created_at: -1 });
+    logger.info({ clinic_id, count: procedures.length }, 'Fetched procedures');
+    res.status(200).send({ data: procedures });
+  } catch (err) {
+    logger.error({ err }, 'Error fetching procedures');
+    res.status(500).send({ message: err.message });
+  }
+};
+
+/**
+ * Get procedure by ID
+ */
+exports.getProcedureById = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const procedure = await Procedure.findById(id);
+    if (!procedure) {
+      return res.status(404).send({ message: "Procedure not found" });
+    }
+
+    res.status(200).send({ data: procedure });
+  } catch (err) {
+    logger.error({ err }, 'Error fetching procedure');
+    res.status(500).send({ message: err.message });
+  }
+};
+
+/**
+ * Create a new procedure
+ */
+exports.createProcedure = async (req, res) => {
+  try {
+    const { clinic_id, name, procedure_type, description, cost, note } = req.body;
+
+    if (!clinic_id || !name) {
+      return res.status(400).send({ message: "clinic_id and name are required" });
+    }
+
+    // Validate cost
+    if (cost !== undefined && (typeof cost !== 'number' || cost < 0)) {
+      return res.status(400).send({ message: "Cost must be a non-negative number" });
+    }
+
+    const procedure = new Procedure({
+      clinic_id,
+      name: name.trim(),
+      procedure_type: procedure_type || "General",
+      description: description?.trim(),
+      cost: cost || 0,
+      note: note?.trim()
+    });
+
+    await procedure.save();
+    logger.info({ procedureId: procedure._id, clinic_id }, 'Procedure created');
+    res.status(201).send({ data: procedure });
+  } catch (err) {
+    logger.error({ err }, 'Error creating procedure');
+    res.status(500).send({ message: err.message });
+  }
+};
+
+/**
+ * Update a procedure
+ */
+exports.updateProcedure = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, procedure_type, description, cost, note, is_active } = req.body;
+
+    // Validate cost
+    if (cost !== undefined && (typeof cost !== 'number' || cost < 0)) {
+      return res.status(400).send({ message: "Cost must be a non-negative number" });
+    }
+
+    const updateData = {};
+    if (name !== undefined) updateData.name = name.trim();
+    if (procedure_type !== undefined) updateData.procedure_type = procedure_type;
+    if (description !== undefined) updateData.description = description?.trim();
+    if (cost !== undefined) updateData.cost = cost;
+    if (note !== undefined) updateData.note = note?.trim();
+    if (is_active !== undefined) updateData.is_active = is_active;
+
+    const procedure = await Procedure.findByIdAndUpdate(id, updateData, { new: true });
+
+    if (!procedure) {
+      return res.status(404).send({ message: "Procedure not found" });
+    }
+
+    logger.info({ procedureId: id }, 'Procedure updated');
+    res.status(200).send({ data: procedure });
+  } catch (err) {
+    logger.error({ err }, 'Error updating procedure');
+    res.status(500).send({ message: err.message });
+  }
+};
+
+/**
+ * Delete a procedure
+ */
+exports.deleteProcedure = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const procedure = await Procedure.findByIdAndDelete(id);
+
+    if (!procedure) {
+      return res.status(404).send({ message: "Procedure not found" });
+    }
+
+    logger.info({ procedureId: id }, 'Procedure deleted');
+    res.status(200).send({ message: "Procedure deleted successfully" });
+  } catch (err) {
+    logger.error({ err }, 'Error deleting procedure');
+    res.status(500).send({ message: err.message });
+  }
+};
