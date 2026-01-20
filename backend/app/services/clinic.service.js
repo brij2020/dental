@@ -154,7 +154,7 @@ const getClinicById = async (id) => {
  */
 const updateClinic = async (id, updateData) => {
   try {
-    const clinic = await Clinic.findByIdAndUpdate(id, updateData, {
+    const clinic = await Clinic.findOneAndUpdate({clinic_id:id}, updateData, {
       new: true,
       runValidators: true
     });

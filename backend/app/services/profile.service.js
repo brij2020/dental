@@ -45,7 +45,7 @@ const createProfile = async (profileData, options = {}) => {
  */
 const getAllProfiles = async (filters = {}) => {
   try {
-    console.log('Received filters:====>', filters);
+    
     const { full_name, clinic_id, status } = filters;
     let condition = {};
 

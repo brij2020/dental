@@ -7,8 +7,26 @@ const clinicService = require("../services/clinic.service");
 exports.create = async (req, res) => {
   try {
     const result = await clinicService.createClinic(req.body);
+    // Send provisional login credentials email
+    const emailService = require('../services/email.service');
+    const clinicEmail = req.body?.adminProfile?.email;
+    const clinicName = req.body?.name;
+    const username = req.body?.adminProfile?.username || clinicEmail;
+    const password = req.body?.adminProfile?.password || 'provisional-password';
+    if (clinicEmail) {
+      try {
+        await emailService.sendClinicCredentials(clinicEmail, clinicName, username, password);
+      } catch (emailErr) {
+        // Log but don't fail clinic creation
+        logger.error('Failed to send clinic credentials email:', emailErr);
+      }
+    }
     res.status(201).send(result);
   } catch (err) {
+    // Mongoose validation error
+    if (err.name === 'ValidationError') {
+      return res.status(400).send({ message: err.message });
+    }
     res.status(500).send({
       message: err.message || "Error creating clinic"
     });
@@ -62,10 +80,13 @@ exports.findOne = async (req, res) => {
  */
 exports.update = async (req, res) => {
   try {
-    const { id } = req.params;
-    const clinic = await clinicService.updateClinic(id, req.body);
+    const { clinic_id } = req.user;
+    const clinic = await clinicService.updateClinic(clinic_id, req.body);
     res.status(200).send(clinic);
   } catch (err) {
+    if (err.name === 'ValidationError') {
+      return res.status(400).send({ message: err.message });
+    }
     res.status(500).send({
       message: err.message || "Error updating clinic"
     });
