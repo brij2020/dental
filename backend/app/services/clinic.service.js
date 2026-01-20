@@ -138,7 +138,7 @@ const getActiveClinics = async () => {
  */
 const getClinicById = async (id) => {
   try {
-    const clinic = await Clinic.findById(id);
+    const clinic = await Clinic.findOne({clinic_id: id});
     if (!clinic) {
       throw new Error("Clinic not found");
     }

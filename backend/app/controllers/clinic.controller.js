@@ -48,7 +48,7 @@ exports.findAllActive = async (req, res) => {
  */
 exports.findOne = async (req, res) => {
   try {
-    const clinic = await clinicService.getClinicById(req.params.id);
+    const clinic = await clinicService.getClinicById(req.user.clinic_id);
     res.status(200).send(clinic);
   } catch (err) {
     res.status(404).send({
