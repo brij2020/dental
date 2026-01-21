@@ -1,0 +1,84 @@
+.dental-chart-container {
+  padding: 1rem;
+  width: 100%;
+  max-width: 800px;
+  margin: auto;
+  box-sizing: border-box;
+}
+
+@media (min-width: 768px) {
+  .dental-chart-container { padding: 2rem; }
+}
+
+.dental-arch-container {
+  position: relative;
+  width: 100%;
+  max-width: 600px;
+  margin-left: auto;
+  margin-right: auto;
+  aspect-ratio: 2 / 1;
+  padding: 1rem;
+  box-sizing: border-box;
+}
+
+.tooth-item {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  transform-origin: center;
+  z-index: 1;
+  transition: z-index 0s 0.2s;
+  cursor: pointer;
+}
+
+.tooth-image {
+  width: 2rem;
+  height: 2rem;
+  transition: transform 0.2s ease-in-out;
+}
+
+.tooth-item:hover {
+  z-index: 10;
+  transition-delay: 0s; 
+}
+
+.tooth-item:hover .tooth-image {
+  transform: scale(1.25);
+}
+
+.tooth-item:hover .tooth-image--flipped {
+  transform: scaleY(-1) scale(1.25);
+}
+
+.tooth-image--flipped {
+  transform: scaleY(-1);
+}
+
+@media (min-width: 768px) {
+  .tooth-image {
+    width: 2.5rem;
+    height: 2.5rem;
+  }
+}
+
+.tooth-image--child {
+  width: 1.6rem;
+  height: 1.6rem;
+}
+
+@media (min-width: 768px) {
+  .tooth-image--child {
+    width: 2rem;
+    height: 2rem;
+  }
+}
+
+.tooth-number {
+  position: absolute;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #222;
+  pointer-events: none;
+  user-select: none;
+}

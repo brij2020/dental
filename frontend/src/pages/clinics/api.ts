@@ -1,0 +1,103 @@
+import apiClient from "../../lib/apiClient";
+
+export interface ClinicFormData {
+  name: string;
+  phone: string;
+  address: {
+    street: string;
+    city: string;
+    state: string;
+    postal_code: string;
+    country: string;
+  };
+  logo?: string;
+  branding_moto: string;
+  location: {
+    latitude: number;
+    longitude: number;
+  };
+  description: string;
+  status: string;
+  adminProfile: {
+    email: string;
+    mobile_number: string;
+    password: string;
+    full_name: string;
+    role: string;
+    status: string;
+    slot_duration_minutes: number;
+    profile_pic?: string;
+    education?: string[];
+    years_of_experience?: number;
+    specialization?: string[];
+    bio?: string;
+    availability?: {
+      [key: string]: string[];
+    };
+  };
+}
+
+export interface ClinicResponse {
+  id: string;
+  name: string;
+  phone: string;
+  address: {
+    street: string;
+    city: string;
+    state: string;
+    postal_code: string;
+    country: string;
+  };
+  logo?: string;
+  branding_moto: string;
+  location: {
+    latitude: number;
+    longitude: number;
+  };
+  description: string;
+  status: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+/**
+ * Create a new clinic with admin profile
+ */
+export const createClinic = async (data: ClinicFormData): Promise<ClinicResponse> => {
+  const response = await apiClient.post("/api/clinics/create", data);
+  return response.data;
+};
+
+/**
+ * Get all clinics for super admin
+ */
+export const getAllClinics = async (): Promise<ClinicResponse[]> => {
+  const response = await apiClient.get("/api/clinics");
+  return response.data;
+};
+
+/**
+ * Get clinic by ID
+ */
+export const getClinicById = async (clinicId: string): Promise<ClinicResponse> => {
+  const response = await apiClient.get(`/clinics/${clinicId}`);
+  return response.data;
+};
+
+/**
+ * Update clinic details
+ */
+export const updateClinic = async (
+  clinicId: string,
+  data: Partial<ClinicFormData>
+): Promise<ClinicResponse> => {
+  const response = await apiClient.put(`/clinics/${clinicId}`, data);
+  return response.data;
+};
+
+/**
+ * Delete clinic
+ */
+export const deleteClinic = async (clinicId: string): Promise<void> => {
+  await apiClient.delete(`/clinics/${clinicId}`);
+};

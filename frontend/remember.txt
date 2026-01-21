@@ -1,0 +1,2 @@
+change the   'Access-Control-Allow-Origin': '*', in the create user function for prod
+In PMS also for create user
