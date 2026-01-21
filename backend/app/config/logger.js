@@ -5,10 +5,10 @@ const path = require('path');
 const isProd = process.env.NODE_ENV === 'production';
 
 // Ensure logs directory exists
-const logsDir = path.join(__dirname, '../../logs');
-if (!fs.existsSync(logsDir)) {
-  fs.mkdirSync(logsDir, { recursive: true });
-}
+// const logsDir = path.join(__dirname, '../../logs');
+// if (!fs.existsSync(logsDir)) {
+//   fs.mkdirSync(logsDir, { recursive: true });
+// }
 
 // Custom format for better visibility
 const customFormat = winston.format.printf(({ level, message, timestamp, ...meta }) => {
@@ -39,29 +39,29 @@ const logger = winston.createLogger({
             customFormat
           )
     }),
-    // Error logs
-    new winston.transports.File({
-      filename: path.join(logsDir, 'error.log'),
-      level: 'error',
-      format: winston.format.combine(
-        winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss.SSS' }),
-        winston.format.errors({ stack: true }),
-        winston.format.json()
-      ),
-      maxsize: 5242880, // 5MB
-      maxFiles: 10,
-    }),
-    // Combined logs
-    new winston.transports.File({
-      filename: path.join(logsDir, 'combined.log'),
-      format: winston.format.combine(
-        winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss.SSS' }),
-        winston.format.errors({ stack: true }),
-        isProd ? winston.format.json() : customFormat
-      ),
-      maxsize: 5242880, // 5MB
-      maxFiles: 10,
-    })
+    // // Error logs
+    // new winston.transports.File({
+    //   filename: path.join(logsDir, 'error.log'),
+    //   level: 'error',
+    //   format: winston.format.combine(
+    //     winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss.SSS' }),
+    //     winston.format.errors({ stack: true }),
+    //     winston.format.json()
+    //   ),
+    //   maxsize: 5242880, // 5MB
+    //   maxFiles: 10,
+    // }),
+    // // Combined logs
+    // new winston.transports.File({
+    //   filename: path.join(logsDir, 'combined.log'),
+    //   format: winston.format.combine(
+    //     winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss.SSS' }),
+    //     winston.format.errors({ stack: true }),
+    //     isProd ? winston.format.json() : customFormat
+    //   ),
+    //   maxsize: 5242880, // 5MB
+    //   maxFiles: 10,
+    // })
   ],
 });
 
