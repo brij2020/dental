@@ -1,14 +1,19 @@
+// Load environment configuration
+require('dotenv').config();
+const config = require('./app/config/environment');
+
 const express = require("express");
 const cors = require("cors");
 const swaggerSetup = require("./swagger");
 const { logger, httpLogger } = require('./app/config/logger');
 const app = express();
 
-var corsOptions = {
-
-origin: 'http://13.201.53.176:5173',
+// CORS Configuration based on environment
+const corsOptions = {
+  origin: config.cors_origin,
+  credentials: true,
+  optionsSuccessStatus: 200
 };
-
 
 app.use(cors(corsOptions));
 
@@ -48,7 +53,10 @@ require("./app/routes")(app);
 
 swaggerSetup(app);
 
-const PORT = process.env.PORT || 8080;
+const PORT = config.port;
 app.listen(PORT, () => {
-  logger.info({ port: PORT }, `Server is running on port ${PORT}.`);
+  logger.info(`🚀 Server started successfully on port ${PORT} in ${config.name} mode`);
+  logger.info(`📊 Environment: ${config.name.toUpperCase()}`);
+  logger.info(`🔗 API URL: ${config.api_url}`);
+  logger.info(`📱 Frontend URL: ${config.frontend_url}`);
 });

@@ -5,8 +5,12 @@
   "main": "server.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "node server.js",
-    "watch": "nodemon --watch . --ext js,json --exec node server.js"
+    "start": "node server.js",
+    "dev": "NODE_ENV=dev node server.js",
+    "dev:watch": "cross-env NODE_ENV=dev nodemon --watch . --ext js,json --exec node server.js",
+    "stg": "NODE_ENV=staging node server.js",
+    "stg:watch": "NODE_ENV=staging nodemon --watch . --ext js,json --exec node server.js",
+    "prod": "NODE_ENV=production node server.js"
   },
   "keywords": [
     "nodejs",
@@ -20,6 +24,7 @@
   "dependencies": {
     "bcryptjs": "^3.0.3",
     "cors": "^2.8.5",
+    "cross-env": "^10.1.0",
     "crypto": "^1.0.1",
     "dotenv": "^17.2.3",
     "express": "^4.18.2",

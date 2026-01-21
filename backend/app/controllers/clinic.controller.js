@@ -75,13 +75,44 @@ exports.findOne = async (req, res) => {
   }
 };
 
+
+exports.findById = async (req, res) => {
+  try {
+    const clinic = await clinicService.getClinicSelfId(req.params.id);
+    res.status(200).send(clinic);
+  } catch (err) {
+    res.status(404).send({
+      message: err.message || "Error retrieving clinic"
+    });
+  }
+}   
+
+/**
+ * Get a single clinic by id
+ */
+exports.findOne = async (req, res) => {
+  try {
+    const clinic = await clinicService.getClinicById(req.user.clinic_id);
+    res.status(200).send(clinic);
+  } catch (err) {
+    res.status(404).send({
+      message: err.message || "Error retrieving clinic"
+    });
+  }
+};
+
 /**
  * Update clinic by id
  */
 exports.update = async (req, res) => {
   try {
-    const { clinic_id } = req.user;
-    const clinic = await clinicService.updateClinic(clinic_id, req.body);
+    const clinicId = req.params.id || req.user.clinic_id;
+    if (!clinicId) {
+      return res.status(400).send({
+        message: "Clinic ID is required"
+      });
+    }
+    const clinic = await clinicService.updateClinic(clinicId, req.body);
     res.status(200).send(clinic);
   } catch (err) {
     if (err.name === 'ValidationError') {

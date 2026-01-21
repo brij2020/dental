@@ -113,7 +113,11 @@ const createClinic = async (clinicData) => {
 const getAllClinics = async () => {
   try {
     const clinics = await Clinic.find({});
-    return clinics;
+    // Transform _id to id for API response
+    return clinics.map(clinic => ({
+      id: clinic._id.toString(),
+      ...clinic.toObject()
+    }));
   } catch (err) {
     logger.error({ err }, 'Error retrieving clinics');
     throw err;
@@ -126,7 +130,11 @@ const getAllClinics = async () => {
 const getActiveClinics = async () => {
   try {
     const clinics = await Clinic.find({ status: "Active" });
-    return clinics;
+    // Transform _id to id for API response
+    return clinics.map(clinic => ({
+      id: clinic._id.toString(),
+      ...clinic.toObject()
+    }));
   } catch (err) {
     logger.error({ err }, 'Error retrieving active clinics');
     throw err;
@@ -148,23 +156,59 @@ const getClinicById = async (id) => {
     throw err;
   }
 };
+/**
+ * Get clinic by ID
+ */
+const getClinicSelfId = async (id) => {
+  try {
+    const clinic = await Clinic.findById(id);
+    if (!clinic) {
+      throw new Error("Clinic not found");
+    }
+    // Transform _id to id for API response
+    return {
+      id: clinic._id.toString(),
+      ...clinic.toObject()
+    };
+  } catch (err) {
+    logger.error({ err }, 'Error retrieving clinic');
+    throw err;
+  }
+};
 
 /**
  * Update clinic
  */
 const updateClinic = async (id, updateData) => {
   try {
-    const clinic = await Clinic.findOneAndUpdate({clinic_id:id}, updateData, {
-      new: true,
-      runValidators: true
-    });
+    let clinic;
+    
+    // Try to find by MongoDB _id first (if it's a valid ObjectID)
+    if (id.match(/^[0-9a-fA-F]{24}$/)) {
+      clinic = await Clinic.findByIdAndUpdate(id, updateData, {
+        new: true,
+        runValidators: true
+      });
+    }
+    
+    // If not found, try clinic_id
+    if (!clinic) {
+      clinic = await Clinic.findOneAndUpdate({clinic_id:id}, updateData, {
+        new: true,
+        runValidators: true
+      });
+    }
 
     if (!clinic) {
       throw new Error("Clinic not found");
     }
 
     logger.info({ clinicId: id }, 'Clinic updated successfully');
-    return clinic;
+    // Transform _id to id for API response
+    return {
+      id: clinic._id.toString(),
+      ...clinic.toObject()
+    };
   } catch (err) {
     logger.error({ err }, 'Error updating clinic');
     throw err;
@@ -176,7 +220,17 @@ const updateClinic = async (id, updateData) => {
  */
 const deleteClinic = async (id) => {
   try {
-    const clinic = await Clinic.findByIdAndRemove(id);
+    let clinic;
+    
+    // Try to find by MongoDB _id first (if it's a valid ObjectID)
+    if (id.match(/^[0-9a-fA-F]{24}$/)) {
+      clinic = await Clinic.findByIdAndDelete(id);
+    }
+    
+    // If not found, try clinic_id
+    if (!clinic) {
+      clinic = await Clinic.findOneAndDelete({clinic_id: id});
+    }
 
     if (!clinic) {
       throw new Error("Clinic not found");
@@ -197,5 +251,6 @@ module.exports = {
   getActiveClinics,
   getClinicById,
   updateClinic,
-  deleteClinic
+  deleteClinic,
+  getClinicSelfId
 };

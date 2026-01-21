@@ -18,6 +18,7 @@ module.exports = app => {
 
   // Retrieve a single clinic by id
   router.get("/information", verifyToken, clinic.findOne);
+  router.get("/:id", verifyToken, clinic.findById);
 
   // Update clinic by id
   router.put("/:id", verifyToken, clinic.update);
