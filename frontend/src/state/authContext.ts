@@ -7,6 +7,7 @@ export type AppUser = {
   email: string;
   role: string;
   clinic_id?: string;
+  full_name?: string;
 };
 
 export type AuthContextValue = {

@@ -1,29 +1,15 @@
-/**
- * Reset password using token
- */
-export const resetPassword = async (token: string, newPassword: string): Promise<AxiosResponse<any>> => {
-  return post('/api/auth/reset-password', { token, newPassword });
-};
-/**
- * Request password reset (forgot password)
- */
-export const forgotPassword = async (emailOrMobile: string): Promise<AxiosResponse<any>> => {
-  // Try to detect if input is email or mobile, send as email for now
-  // Backend expects { email }
-  return post('/api/auth/forgot-password', { email: emailOrMobile });
-};
 import axios, { type AxiosRequestConfig, type AxiosInstance, type AxiosResponse } from 'axios';
+import { environment } from '../config/environment';
 
 // Get bearer token from localStorage (set during login)
 const getAuthToken = (): string => {
   return localStorage.getItem('auth_token') || '';
 };
 
-// Create axios instance with default config
+// Create axios instance with environment-based config
 const apiClient: AxiosInstance = axios.create({
-  baseURL: 'http://13.201.53.176:8080/',
-  // 'http://127.0.0.1:8080',
-  timeout: 10000,
+  baseURL: environment.getApiUrl(),
+  timeout: environment.getApiTimeout(),
   headers: {
     'Content-Type': 'application/json',
     'Authorization': `Bearer ${getAuthToken()}`,
@@ -544,6 +530,20 @@ export const updateProblem = async (id: string, problemData: any): Promise<Axios
  */
 export const deleteProblem = async (id: string): Promise<AxiosResponse<any>> => {
   return del(`/api/problems/${id}`);
+};
+
+/**
+ * Reset password using token
+ */
+export const resetPassword = async (token: string, newPassword: string): Promise<AxiosResponse<any>> => {
+  return post('/api/auth/reset-password', { token, newPassword });
+};
+
+/**
+ * Request password reset (forgot password)
+ */
+export const forgotPassword = async (emailOrMobile: string): Promise<AxiosResponse<any>> => {
+  return post('/api/auth/forgot-password', { email: emailOrMobile });
 };
 
 export default apiClient;

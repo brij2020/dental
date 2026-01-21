@@ -46,6 +46,7 @@ const MenuItem = ({ title, description, icon: Icon, to }: MenuItemProps) => (
 export const SettingsMenu = () => {
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
+  const isSuperAdmin = user?.role === 'super_admin';
 
   return (
     <div className="grid grid-cols-2 gap-6 md:grid-cols-3 lg:grid-cols-4">
@@ -63,30 +64,38 @@ export const SettingsMenu = () => {
         icon={IconLock}
         to="/settings/profile"
       />
-      <MenuItem
-        title="Clinic Information"
-        description="Manage address & contact details."
-        icon={IconBuildingHospital}
-        to="/settings/clinic"
-      />
-      <MenuItem
-        title="Fees"
-        description="Manage consultation & procedure fees."
-        icon={IconCash}
-        to="/settings/fees"
-      />
-      <MenuItem
-        title="Clinic Appointment Timing"
-        description="Configure available slots."
-        icon={IconClock}
-        to="/settings/timings"
-      />
+      {!isSuperAdmin && (
         <MenuItem
-        title="Leave Settings"
-        description="Configure leave ."
-        icon={IconClock}
-        to="/settings/leaves"
-      />
+          title="Clinic Information"
+          description="Manage address & contact details."
+          icon={IconBuildingHospital}
+          to="/settings/clinic"
+        />
+      )}
+      {!isSuperAdmin && (
+        <MenuItem
+          title="Fees"
+          description="Manage consultation & procedure fees."
+          icon={IconCash}
+          to="/settings/fees"
+        />
+      )}
+      {!isSuperAdmin && (
+        <MenuItem
+          title="Clinic Appointment Timing"
+          description="Configure available slots."
+          icon={IconClock}
+          to="/settings/timings"
+        />
+      )}
+      {!isSuperAdmin && (
+        <MenuItem
+          title="Leave Settings"
+          description="Configure leave ."
+          icon={IconClock}
+          to="/settings/leaves"
+        />
+      )}
       <MenuItem
         title="Consent Forms"
         description="Customize patient consent forms."
@@ -123,12 +132,14 @@ export const SettingsMenu = () => {
         icon={IconVideo}
         to="/settings/video-consultation-timings"
       />
-      <MenuItem
-        title="Clinic Panels"
-        description="Manage clinic panel associations."
-        icon={IconBuildingHospital}
-        to="/settings/clinic-panels"
-      />
+      {!isSuperAdmin && (
+        <MenuItem
+          title="Clinic Panels"
+          description="Manage clinic panel associations."
+          icon={IconBuildingHospital}
+          to="/settings/clinic-panels"
+        />
+      )}
     </div>
   );
 };

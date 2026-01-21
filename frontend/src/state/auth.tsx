@@ -53,6 +53,7 @@ const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) => {
         email: email,
         role: response.data.role,
         clinic_id: response.data.clinic_id,
+        full_name: response.data.full_name,
       };
 
       // Store token and user data

@@ -1,23 +1,30 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { getAllClinics } from "./api";
+import { getAllClinics, deactivateClinic } from "./api";
 import type { ClinicResponse } from "./api";
 import {
   IconPlus,
   IconTrash,
   IconEdit,
   IconLoader,
-  IconPhone,
-  IconMapPin,
+  IconArrowUp,
+  IconArrowDown,
 } from "@tabler/icons-react";
+import { toast } from "react-toastify";
+
+type SortField = "name" | "phone" | "city" | "status";
+type SortOrder = "asc" | "desc";
 
 export default function Clinics() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [clinics, setClinics] = useState<ClinicResponse[]>([]);
   const [loading, setLoading] = useState(true);
+  const [deleting, setDeleting] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(searchParams.get("success") === "true");
+  const [sortField, setSortField] = useState<SortField>("name");
+  const [sortOrder, setSortOrder] = useState<SortOrder>("asc");
 
   useEffect(() => {
     if (success) {
@@ -42,6 +49,73 @@ export default function Clinics() {
     fetchClinics();
   }, []);
 
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortOrder(sortOrder === "asc" ? "desc" : "asc");
+    } else {
+      setSortField(field);
+      setSortOrder("asc");
+    }
+  };
+
+  const getSortedClinics = () => {
+    const sorted = [...clinics].sort((a, b) => {
+      let aVal: any;
+      let bVal: any;
+
+      if (sortField === "city") {
+        aVal = (a.address?.city || "").toLowerCase();
+        bVal = (b.address?.city || "").toLowerCase();
+      } else if (sortField === "name") {
+        aVal = (a.name || "").toLowerCase();
+        bVal = (b.name || "").toLowerCase();
+      } else if (sortField === "phone") {
+        aVal = (a.phone || "").toLowerCase();
+        bVal = (b.phone || "").toLowerCase();
+      } else if (sortField === "status") {
+        aVal = (a.status || "").toLowerCase();
+        bVal = (b.status || "").toLowerCase();
+      }
+
+      if (aVal < bVal) return sortOrder === "asc" ? -1 : 1;
+      if (aVal > bVal) return sortOrder === "asc" ? 1 : -1;
+      return 0;
+    });
+
+    return sorted;
+  };
+
+  const SortIcon = ({ field }: { field: SortField }) => {
+    if (sortField !== field) return null;
+    return sortOrder === "asc" ? 
+      <IconArrowUp size={16} className="inline ml-1" /> : 
+      <IconArrowDown size={16} className="inline ml-1" />;
+  };
+
+  const getClinicId = (clinic: ClinicResponse) => {
+    return clinic.id || (clinic as any)._id;
+  };
+
+  const handleDelete = async (clinic: ClinicResponse) => {
+    if (!confirm(`Are you sure you want to deactivate ${clinic.name}?`)) {
+      return;
+    }
+
+    try {
+      const clinicId = getClinicId(clinic);
+      setDeleting(clinicId);
+      await deactivateClinic(clinicId);
+      setClinics(clinics.filter(c => getClinicId(c) !== clinicId));
+      toast.success(`${clinic.name} deactivated successfully`);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : "Failed to deactivate clinic";
+      toast.error(errorMessage);
+      console.error("Deactivate error:", err);
+    } finally {
+      setDeleting(null);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-6">
       <div className="max-w-7xl mx-auto">
@@ -49,7 +123,7 @@ export default function Clinics() {
         <div className="flex justify-between items-center mb-8">
           <div>
             <h1 className="text-4xl font-bold text-slate-900">Manage Clinics</h1>
-            <p className="text-slate-600 mt-2">Create and manage clinics with their admin profiles</p>
+            <p className="text-slate-600 mt-2">{clinics.length} clinic{clinics.length !== 1 ? "s" : ""} registered</p>
           </div>
           <button
             onClick={() => navigate("/clinics/create")}
@@ -84,74 +158,116 @@ export default function Clinics() {
           </div>
         )}
 
-        {/* Clinics Grid */}
+        {/* Table View */}
         {!loading && clinics.length > 0 && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {clinics.map((clinic) => (
-              <div
-                key={clinic.id}
-                className="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow p-6 border border-slate-200"
-              >
-                <div className="mb-4">
-                  <h3 className="text-xl font-semibold text-slate-900 mb-2">
-                    {clinic.name}
-                  </h3>
-                  <p className="text-slate-600 text-sm line-clamp-2">
-                    {clinic.branding_moto}
-                  </p>
-                </div>
-
-                <div className="space-y-3 mb-6">
-                  <div className="flex items-center gap-2 text-slate-700">
-                    <IconPhone size={18} className="text-indigo-600 flex-shrink-0" />
-                    <span className="text-sm">{clinic.phone}</span>
-                  </div>
-                  <div className="flex items-start gap-2 text-slate-700">
-                    <IconMapPin size={18} className="text-indigo-600 flex-shrink-0 mt-0.5" />
-                    <span className="text-sm">
-                      {clinic.address?.city}, {clinic.address?.state}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span
-                      className={`px-3 py-1 rounded-full text-xs font-medium ${
-                        clinic.status === "Active"
-                          ? "bg-green-100 text-green-800"
-                          : "bg-gray-100 text-gray-800"
-                      }`}
-                    >
-                      {clinic.status}
-                    </span>
-                  </div>
-                </div>
-
-                <p className="text-slate-600 text-sm mb-6 line-clamp-2">
-                  {clinic.description}
-                </p>
-
-                <div className="flex gap-3">
-                  <button
-                    onClick={() => navigate(`/clinics/${clinic.id}/edit`)}
-                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2 border border-indigo-300 text-indigo-600 rounded-lg font-medium hover:bg-indigo-50 transition-colors"
-                  >
-                    <IconEdit size={18} />
-                    Edit
-                  </button>
-                  <button
-                    onClick={() => {
-                      if (confirm(`Are you sure you want to delete ${clinic.name}?`)) {
-                        // TODO: Implement delete functionality
-                        console.log("Delete clinic:", clinic.id);
-                      }
-                    }}
-                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2 border border-red-300 text-red-600 rounded-lg font-medium hover:bg-red-50 transition-colors"
-                  >
-                    <IconTrash size={18} />
-                    Delete
-                  </button>
-                </div>
-              </div>
-            ))}
+          <div className="bg-white rounded-lg shadow-md border border-slate-200 overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-slate-50 border-b border-slate-200">
+                  <tr>
+                    <th className="px-6 py-4 text-left">
+                      <button
+                        onClick={() => handleSort("name")}
+                        className="font-semibold text-slate-900 hover:text-indigo-600 transition-colors flex items-center"
+                      >
+                        Clinic Name
+                        <SortIcon field="name" />
+                      </button>
+                    </th>
+                    <th className="px-6 py-4 text-left">
+                      <button
+                        onClick={() => handleSort("phone")}
+                        className="font-semibold text-slate-900 hover:text-indigo-600 transition-colors flex items-center"
+                      >
+                        Phone
+                        <SortIcon field="phone" />
+                      </button>
+                    </th>
+                    <th className="px-6 py-4 text-left">
+                      <button
+                        onClick={() => handleSort("city")}
+                        className="font-semibold text-slate-900 hover:text-indigo-600 transition-colors flex items-center"
+                      >
+                        City
+                        <SortIcon field="city" />
+                      </button>
+                    </th>
+                    <th className="px-6 py-4 text-left">
+                      <button
+                        onClick={() => handleSort("status")}
+                        className="font-semibold text-slate-900 hover:text-indigo-600 transition-colors flex items-center"
+                      >
+                        Status
+                        <SortIcon field="status" />
+                      </button>
+                    </th>
+                    <th className="px-6 py-4 text-left">
+                      <span className="font-semibold text-slate-900">Motto</span>
+                    </th>
+                    <th className="px-6 py-4 text-center">
+                      <span className="font-semibold text-slate-900">Actions</span>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {getSortedClinics().map((clinic) => (
+                    <tr key={clinic.id} className="border-b border-slate-200 hover:bg-slate-50 transition-colors">
+                      <td className="px-6 py-4">
+                        <span className="font-medium text-slate-900">{clinic.name}</span>
+                      </td>
+                      <td className="px-6 py-4 text-slate-600">
+                        {clinic.phone}
+                      </td>
+                      <td className="px-6 py-4 text-slate-600">
+                        {clinic.address?.city || "-"}
+                      </td>
+                      <td className="px-6 py-4">
+                        <span
+                          className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${
+                            clinic.status === "Active"
+                              ? "bg-green-100 text-green-800"
+                              : "bg-gray-100 text-gray-800"
+                          }`}
+                        >
+                          {clinic.status}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-slate-600 truncate max-w-xs">
+                        {clinic.branding_moto || "-"}
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex justify-center gap-2">
+                          <button
+                            onClick={() => navigate(`/clinics/${getClinicId(clinic)}/edit`)}
+                            className="inline-flex items-center gap-1 px-3 py-2 text-sm border border-indigo-300 text-indigo-600 rounded hover:bg-indigo-50 transition-colors"
+                          >
+                            <IconEdit size={16} />
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => handleDelete(clinic)}
+                            disabled={deleting === getClinicId(clinic)}
+                            className="inline-flex items-center gap-1 px-3 py-2 text-sm border border-red-300 text-red-600 rounded hover:bg-red-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            {deleting === clinic.id ? (
+                              <>
+                                <IconLoader size={16} className="animate-spin" />
+                                Deactivating...
+                              </>
+                            ) : (
+                              <>
+                                <IconTrash size={16} />
+                                Deactivate
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
 

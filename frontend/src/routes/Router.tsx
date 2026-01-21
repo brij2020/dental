@@ -15,6 +15,7 @@ const InsightVideos  = lazy(() => import("../pages/insightVideos/InsightVideos")
 const Settings      = lazy(() => import("../pages/settings/Settings"));
 const Clinics       = lazy(() => import("../pages/clinics/Clinics"));
 const CreateClinic  = lazy(() => import("../pages/clinics/CreateClinic"));
+const EditClinic    = lazy(() => import("../pages/clinics/EditClinic"));
 const UserManagementPanel = lazy(() => import("../pages/settings/components/UserManagementPanel"));
 const ProfilePanel        = lazy(() => import("../pages/settings/components/ProfilePanel"));
 const SettingsMenu = lazy(() => import("../pages/settings/components/SettingsMenu"));
@@ -55,6 +56,7 @@ const router = createBrowserRouter([
           { path: "/dashboard",    element: withSuspense(<Dashboard />) },
           { path: "/clinics",      element: withSuspense(<Clinics />) },
           { path: "/clinics/create", element: withSuspense(<CreateClinic />) },
+          { path: "/clinics/:id/edit", element: withSuspense(<EditClinic />) },
           { path: "/patients",     element: withSuspense(<Patients />) },
           { path: "/appointments", element: withSuspense(<Appointments />) },
           { path: "/insight-videos",      element: withSuspense(<InsightVideos />) },

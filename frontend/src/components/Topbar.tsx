@@ -4,7 +4,6 @@ import {
 import { useAuth } from "../state/useAuth";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "../lib/supabaseClient"; // 👈 add this
 
 type Props = { onMenuClick: () => void };
 
@@ -25,31 +24,8 @@ export default function Topbar({ onMenuClick }: Props) {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
 
-  // 👇 new: get full_name from profiles
-  const [fullName, setFullName] = useState<string | null>(null);
-console.log('Auth User in Topbar:', user);
-  useEffect(() => {
-    let alive = true;
-    (async () => {
-      if (!user?.id) { setFullName(null); return; }
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("full_name")
-        .eq("id", user.id)
-        .single();
-      if (!alive) return;
-      if (error) {
-        console.error("profiles select error:", error);
-        setFullName(null);
-        return;
-      }
-      setFullName((data?.full_name ?? "").trim() || null);
-    })();
-    return () => { alive = false; };
-  }, [user?.id]);
-
-  // prefer full_name; fall back to email; then "Guest"
-  const display = fullName || user?.email || "Guest";
+  // Prefer full_name from user; fall back to email; then "Guest"
+  const display = user?.full_name || user?.email || "Guest";
   const initial = (display?.[0] ?? "U").toUpperCase();
 
   const [profileOpen, setProfileOpen] = useState(false);

@@ -30,6 +30,7 @@ export interface ClinicFormData {
     education?: string[];
     years_of_experience?: number;
     specialization?: string[];
+    qualification?: string;
     bio?: string;
     availability?: {
       [key: string]: string[];
@@ -77,10 +78,18 @@ export const getAllClinics = async (): Promise<ClinicResponse[]> => {
 };
 
 /**
+ * Get clinic information by ID
+ */
+export const getClinicInfo = async (clinicId: string): Promise<ClinicResponse> => {
+  const response = await apiClient.get(`/api/clinics/${clinicId}`);
+  return response.data;
+};
+
+/**
  * Get clinic by ID
  */
 export const getClinicById = async (clinicId: string): Promise<ClinicResponse> => {
-  const response = await apiClient.get(`/clinics/${clinicId}`);
+  const response = await apiClient.get(`/api/clinics/${clinicId}`);
   return response.data;
 };
 
@@ -91,7 +100,15 @@ export const updateClinic = async (
   clinicId: string,
   data: Partial<ClinicFormData>
 ): Promise<ClinicResponse> => {
-  const response = await apiClient.put(`/clinics/${clinicId}`, data);
+  const response = await apiClient.put(`/api/clinics/${clinicId}`, data);
+  return response.data;
+};
+
+/**
+ * Deactivate clinic (set status to Inactive)
+ */
+export const deactivateClinic = async (clinicId: string): Promise<ClinicResponse> => {
+  const response = await apiClient.put(`/api/clinics/${clinicId}`, { status: "Inactive" });
   return response.data;
 };
 
@@ -99,5 +116,5 @@ export const updateClinic = async (
  * Delete clinic
  */
 export const deleteClinic = async (clinicId: string): Promise<void> => {
-  await apiClient.delete(`/clinics/${clinicId}`);
+  await apiClient.delete(`/api/clinics/${clinicId}`);
 };

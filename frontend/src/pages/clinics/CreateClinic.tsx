@@ -60,7 +60,7 @@ export default function CreateClinic() {
     }
   };
 
-  const handleAdminChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  const handleAdminChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
 
     if (name.includes(".")) {
@@ -379,6 +379,22 @@ export default function CreateClinic() {
 
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">
+                  Role
+                </label>
+                <select
+                  name="role"
+                  value={formData.adminProfile.role}
+                  onChange={handleAdminChange}
+                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                >
+                  <option value="admin">Admin</option>
+                  <option value="doctor">Doctor</option>
+                  <option value="super_admin">Super Admin</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
                   Password *
                 </label>
                 <input
@@ -419,6 +435,51 @@ export default function CreateClinic() {
                   className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 />
               </div>
+
+              {(formData.adminProfile.role === "doctor" || formData.adminProfile.role === "super_admin") && (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                      Qualification
+                    </label>
+                    <select
+                      name="qualification"
+                      value={(formData.adminProfile as any).qualification || ""}
+                      onChange={handleAdminChange}
+                      className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    >
+                      <option value="">Select Qualification</option>
+                      <option value="BDS">BDS (Bachelor of Dental Surgery)</option>
+                      <option value="MDS">MDS (Master of Dental Surgery)</option>
+                      <option value="PhD">PhD in Dentistry</option>
+                      <option value="PGDIP">PGDIP (Post Graduate Diploma)</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                      Specialization
+                    </label>
+                    <select
+                      name="specialization"
+                      value={(formData.adminProfile as any).specialization || ""}
+                      onChange={handleAdminChange}
+                      className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    >
+                      <option value="">Select Specialization</option>
+                      <option value="General Dentistry">General Dentistry</option>
+                      <option value="Orthodontics">Orthodontics</option>
+                      <option value="Periodontics">Periodontics</option>
+                      <option value="Endodontics">Endodontics</option>
+                      <option value="Prosthodontics">Prosthodontics</option>
+                      <option value="Oral Surgery">Oral Surgery</option>
+                      <option value="Pediatric Dentistry">Pediatric Dentistry</option>
+                      <option value="Cosmetic Dentistry">Cosmetic Dentistry</option>
+                      <option value="Implantology">Implantology</option>
+                    </select>
+                  </div>
+                </>
+              )}
 
               <div className="md:col-span-2">
                 <label className="block text-sm font-medium text-slate-700 mb-2">
