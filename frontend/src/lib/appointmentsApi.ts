@@ -81,6 +81,7 @@ function mapAppointmentData(appointment: any): AppointmentDetails {
   return {
     id: appointment._id || appointment.id,
     appointment_uid: appointment.appointment_uid,
+    file_number: appointment.file_number || undefined,
     full_name: appointment.full_name,
     appointment_date: appointment.appointment_date,
     appointment_time: appointment.appointment_time,

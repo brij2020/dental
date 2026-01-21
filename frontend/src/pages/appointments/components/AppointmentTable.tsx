@@ -180,10 +180,10 @@ export default function AppointmentTable({
       <table className="min-w-full divide-y divide-slate-200">
         <thead className="bg-slate-50">
           <tr>
+            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">File Number</th>
             <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Patient / Doctor</th>
             <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Time</th>
             <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Status</th>
-            {/* New Column Header */}
             <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Patient Note</th>
             <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-slate-500 uppercase tracking-wider">Conditions</th>
             <th scope="col" className="relative px-6 py-3">
@@ -194,6 +194,7 @@ export default function AppointmentTable({
         <tbody className="bg-white divide-y divide-slate-200">
           {appointments.map((appt) => (
             <tr key={appt.id}>
+              <td className="px-6 py-4 whitespace-nowrap font-mono text-xs text-slate-700">{appt.file_number || '-'}</td>
               <td className="px-6 py-4 whitespace-nowrap">
                 <div className="text-sm font-medium text-slate-900">{appt.full_name}</div>
                 <div className="text-sm text-slate-500">{appt.doctor?.full_name ?? 'N/A'}</div>
@@ -229,7 +230,7 @@ export default function AppointmentTable({
                                 onClick={() => setNoteOpenId(null)}
                                 className="text-slate-400 hover:text-slate-600"
                              >
-                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor" fill="none" strokeLinecap="round" strokeLinejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M18 6l-12 12" /><path d="M6 6l12 12" /></svg>
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor" fill="none" strokeLinecap="round" strokeLinejoin="round"><path stroke="none" d="M0 0h24v24v0z" fill="none"/><path d="M18 6l-12 12" /><path d="M6 6l12 12" /></svg>
                              </button>
                           </div>
                           <p className="text-sm text-slate-800 whitespace-pre-wrap leading-relaxed">

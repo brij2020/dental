@@ -9,6 +9,13 @@ const appointmentSchema = new mongoose.Schema(
       unique: true,
       index: true,
     },
+    file_number: {
+      type: String,
+      unique: true,
+      sparse: true,
+      trim: true,
+      description: "Auto-generated file number in format: CCYY##### (CC=clinic name first 2 letters, YY=year last 2 digits, #####=5-digit increment)"
+    },
     clinic_id: {
       type: String,
       required: true,
@@ -72,6 +79,56 @@ appointmentSchema.index({ doctor_id: 1, appointment_date: 1, status: 1 });
 
 // Index for clinic-wide queries
 appointmentSchema.index({ clinic_id: 1, appointment_date: 1 });
+
+/**
+ * Pre-save hook to auto-generate File Number if not provided
+ * 
+ * File Number Format: CCYY##### 
+ *   - CC = First 2 letters of clinic name (uppercase)
+ *   - YY = Last 2 digits of current year
+ *   - ##### = 5-digit increment (00001, 00002, etc.)
+ *   Example: MA2600001 (for "Manas Dental", year 2026, 1st appointment)
+ */
+appointmentSchema.pre('save', async function (next) {
+  try {
+    // Generate File Number if not provided and clinic_id exists
+    if (!this.file_number && this.clinic_id) {
+      try {
+        const currentYear = new Date().getFullYear().toString().slice(-2);
+        
+        // Fetch clinic details to get clinic name
+        const Clinic = mongoose.model('Clinic');
+        const clinic = await Clinic.findOne({ clinic_id: this.clinic_id });
+        
+        if (clinic && clinic.name) {
+          // Get first 2 letters of clinic name (uppercase)
+          const clinicPrefix = clinic.name.substring(0, 2).toUpperCase();
+          
+          // Get count of appointments for this clinic in current year
+          const startOfYear = new Date(new Date().getFullYear(), 0, 1);
+          const appointmentCountThisYear = await mongoose.model('Appointment').countDocuments({
+            clinic_id: this.clinic_id,
+            createdAt: { $gte: startOfYear }
+          });
+          
+          // Generate 5-digit sequence
+          const sequence = String(appointmentCountThisYear + 1).padStart(5, '0');
+          
+          // Format: CCYY#####
+          this.file_number = `${clinicPrefix}${currentYear}${sequence}`;
+        }
+      } catch (clinicError) {
+        console.warn('Could not generate appointment file number:', clinicError.message);
+        // File number is optional, don't block appointment creation
+      }
+    }
+    
+    next();
+  } catch (error) {
+    console.error('Error in appointment pre-save hook:', error);
+    next(error);
+  }
+});
 
 const Appointment = mongoose.model('Appointment', appointmentSchema);
 

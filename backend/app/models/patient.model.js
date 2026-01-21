@@ -80,41 +80,26 @@ patientSchema.index({ email: 1 });
 patientSchema.index({ full_name: 1 });
 patientSchema.index({ registration_type: 1 });
 
+
 /**
  * Pre-save hook to auto-generate UHID if not provided
- * Format: CLINIC_ID/YY/SEQUENCE (e.g., APO/24/000001) for clinic registrations
- * Format: GLOBAL/YY/SEQUENCE (e.g., GLOBAL/24/000001) for global registrations
+ * Format: <YY><8-digit sequence> (e.g., 2600000001 for first patient in 2026)
  */
 patientSchema.pre("save", async function (next) {
-  // Only generate UHID if not already provided
   if (!this.uhid) {
     try {
       const currentYear = new Date().getFullYear().toString().slice(-2);
-      
-      // Determine the prefix based on registration type
-      let prefix = "GLOBAL";
-      let query = { registration_type: this.registration_type };
-
-      if (this.registration_type === "clinic" && this.clinic_id) {
-        prefix = this.clinic_id;
-        query.clinic_id = this.clinic_id;
-      }
-      
-      // Get the count of patients for this type/clinic to generate sequence
-      const count = await mongoose.model("Patient").countDocuments(query);
-      
-      // Generate sequence (pad with zeros to 6 digits)
-      const sequence = String(count + 1).padStart(6, "0");
-      
-      // Format: PREFIX/YY/SEQUENCE
-      this.uhid = `${prefix}/${currentYear}/${sequence}`;
-      
+      // Count all patients for this year (global sequence)
+      const yearStart = new Date(new Date().getFullYear(), 0, 1);
+      const count = await mongoose.model("Patient").countDocuments({ createdAt: { $gte: yearStart } });
+      // 8-digit sequence, incremented
+      const sequence = String(count + 1).padStart(8, "0");
+      this.uhid = `${currentYear}${sequence}`;
     } catch (error) {
       console.error("Error generating UHID:", error);
       return next(error);
     }
   }
-  
   next();
 });
 

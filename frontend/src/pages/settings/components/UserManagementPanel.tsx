@@ -41,7 +41,9 @@ export default function UserManagementPanel() {
   const [formLoading, setFormLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-console.log('Admin User:', adminUser);
+  const [selectedRole, setSelectedRole] = useState('doctor');
+
+
   useEffect(() => {
     fetchStaff();
   }, [adminUser]);
@@ -76,7 +78,7 @@ console.log('Admin User:', adminUser);
       }
 
       const formData = new FormData(formEl);
-      const newUserPayload = {
+      const newUserPayload: any = {
         email: (formData.get('email') as string)?.trim(),
         password: formData.get('password') as string,
         full_name: (formData.get('full_name') as string)?.trim(),
@@ -84,6 +86,19 @@ console.log('Admin User:', adminUser);
         role: (formData.get('role') as string)?.trim(),
         clinic_id: adminUser.clinic_id
       };
+
+      // Add qualification and specialization if doctor role
+      const qualification = (formData.get('qualification') as string)?.trim();
+      const specialization = (formData.get('specialization') as string)?.trim();
+      
+      if (newUserPayload.role === 'doctor') {
+        if (qualification) newUserPayload.qualification = qualification;
+        if (specialization) newUserPayload.specialization = specialization;
+      } else {
+        // For non-doctor roles, send empty strings to avoid array validation errors
+        newUserPayload.qualification = '';
+        newUserPayload.specialization = '';
+      }
 
       const newUser = async () => {
         const response = await createProfile(newUserPayload);
@@ -228,10 +243,53 @@ console.log('Admin User:', adminUser);
           <Input id="password" name="password" label="Password" type="password" icon={IconKey} placeholder="Minimum 8 characters" required />
           <div>
             <label htmlFor="role" className="block text-sm font-medium text-slate-700 mb-1">Role</label>
-            <select id="role" name="role" required className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-slate-900 outline-none focus:ring-4 focus:ring-sky-300/40 focus:border-sky-400 transition">
+            <select 
+              id="role" 
+              name="role" 
+              required 
+              value={selectedRole}
+              onChange={(e) => {
+                setSelectedRole(e.target.value);
+                const doctorFields = document.getElementById('doctorFields');
+                if (e.target.value === 'doctor') {
+                  doctorFields?.classList.remove('hidden');
+                } else {
+                  doctorFields?.classList.add('hidden');
+                }
+              }}
+              className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-slate-900 outline-none focus:ring-4 focus:ring-sky-300/40 focus:border-sky-400 transition">
               <option value="doctor">Doctor</option>
               <option value="receptionist">Receptionist</option>
             </select>
+          </div>
+
+          <div id="doctorFields" className="space-y-4">
+            <div>
+              <label htmlFor="qualification" className="block text-sm font-medium text-slate-700 mb-1">Qualification</label>
+              <select id="qualification" name="qualification" className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-slate-900 outline-none focus:ring-4 focus:ring-sky-300/40 focus:border-sky-400 transition">
+                <option value="">Select Qualification</option>
+                <option value="BDS">BDS (Bachelor of Dental Surgery)</option>
+                <option value="MDS">MDS (Master of Dental Surgery)</option>
+                <option value="PhD">PhD in Dentistry</option>
+                <option value="PGDIP">PGDIP (Post Graduate Diploma)</option>
+              </select>
+            </div>
+
+            <div>
+              <label htmlFor="specialization" className="block text-sm font-medium text-slate-700 mb-1">Specialization</label>
+              <select id="specialization" name="specialization" className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-slate-900 outline-none focus:ring-4 focus:ring-sky-300/40 focus:border-sky-400 transition">
+                <option value="">Select Specialization</option>
+                <option value="General Dentistry">General Dentistry</option>
+                <option value="Orthodontics">Orthodontics</option>
+                <option value="Periodontics">Periodontics</option>
+                <option value="Endodontics">Endodontics</option>
+                <option value="Prosthodontics">Prosthodontics</option>
+                <option value="Oral Surgery">Oral Surgery</option>
+                <option value="Pediatric Dentistry">Pediatric Dentistry</option>
+                <option value="Cosmetic Dentistry">Cosmetic Dentistry</option>
+                <option value="Implantology">Implantology</option>
+              </select>
+            </div>
           </div>
 
           <div className="flex justify-end gap-3 pt-4">

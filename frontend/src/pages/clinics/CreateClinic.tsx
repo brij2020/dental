@@ -35,7 +35,8 @@ export default function CreateClinic() {
       status: "Active",
       slot_duration_minutes: 20,
       education: [],
-      specialization: [],
+      qualification: "",
+      specialization: "",
       availability: {},
     },
   });
@@ -109,7 +110,17 @@ export default function CreateClinic() {
         throw new Error("Admin full name is required");
       }
 
-      await createClinic(formData);
+      // Prepare data - ensure qualification and specialization are strings, not arrays
+      const dataToSubmit = {
+        ...formData,
+        adminProfile: {
+          ...formData.adminProfile,
+          qualification: formData.adminProfile.qualification || "",
+          specialization: formData.adminProfile.specialization || ""
+        }
+      };
+
+      await createClinic(dataToSubmit);
       navigate("/clinics?success=true");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create clinic");

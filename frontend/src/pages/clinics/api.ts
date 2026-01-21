@@ -29,7 +29,7 @@ export interface ClinicFormData {
     profile_pic?: string;
     education?: string[];
     years_of_experience?: number;
-    specialization?: string[];
+    specialization?: string;
     qualification?: string;
     bio?: string;
     availability?: {

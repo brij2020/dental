@@ -81,12 +81,17 @@ const doctorSchema = new mongoose.Schema(
       type: [String]
     },
 
+    qualification: {
+      type: String,
+      enum: ["BDS", "MDS", "PhD", "PGDIP"]
+    },
+
     years_of_experience: {
       type: Number
     },
 
     specialization: {
-      type: [String]
+      type: String
     },
 
     bio: {
