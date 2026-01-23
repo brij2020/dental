@@ -39,7 +39,7 @@ const createClinic = async (clinicData) => {
 
     // Generate clinic ID
     const generatedClinicId = await generateClinicId(name);
-    console.log('Generated Clinic ID:', generatedClinicId);
+
 
     // Create clinic
     const clinic = new Clinic({
@@ -60,12 +60,30 @@ const createClinic = async (clinicData) => {
     // Try to create admin profile
     let adminProfile;
     try {
-      adminProfile = await profileService.createProfile({
+      // Sanitize admin profile data - remove/convert invalid fields
+      const adminProfileData = {
         status: "Active",
         ...clinicData?.adminProfile,
         clinic_id: generatedClinicId
-      });
+      };
+
+      // Remove array values for string-type fields
+      if (Array.isArray(adminProfileData.specialization) && adminProfileData.specialization.length === 0) {
+        delete adminProfileData.specialization;
+      }
+      if (Array.isArray(adminProfileData.qualification) && adminProfileData.qualification.length === 0) {
+        delete adminProfileData.qualification;
+      }
+
+      adminProfile = await profileService.createProfile(adminProfileData);
       console.log('Admin profile created successfully');
+
+      // Update clinic to add admin to admin_staff
+      clinicSaved = await Clinic.findByIdAndUpdate(
+        clinicSaved._id,
+        { admin_staff: adminProfile._id },
+        { new: true }
+      );
     } catch (adminErr) {
       console.log('Admin profile creation failed, reverting clinic...');
       logger.error({ adminErr }, 'Admin profile creation failed, initiating rollback');
@@ -137,6 +155,47 @@ const getActiveClinics = async () => {
     }));
   } catch (err) {
     logger.error({ err }, 'Error retrieving active clinics');
+    throw err;
+  }
+};
+
+/**
+ * Search clinics by name, state, city, pin, and location
+ */
+const searchClinics = async (filters) => {
+  try {
+    const query = {};
+
+    // Build search query based on provided filters
+    if (filters.name) {
+      query.name = { $regex: filters.name, $options: 'i' }; // Case-insensitive search
+    }
+    if (filters.state) {
+      query['address.state'] = { $regex: filters.state, $options: 'i' };
+    }
+    if (filters.city) {
+      query['address.city'] = { $regex: filters.city, $options: 'i' };
+    }
+    if (filters.pin) {
+      query['address.postal_code'] = filters.pin;
+    }
+    if (filters.location) {
+      // Search in location fields: floor, room_number, wing
+      query.$or = [
+        { 'location.floor': { $regex: filters.location, $options: 'i' } },
+        { 'location.room_number': { $regex: filters.location, $options: 'i' } },
+        { 'location.wing': { $regex: filters.location, $options: 'i' } }
+      ];
+    }
+
+    const clinics = await Clinic.find(query);
+    // Transform _id to id for API response
+    return clinics.map(clinic => ({
+      id: clinic._id.toString(),
+      ...clinic.toObject()
+    }));
+  } catch (err) {
+    logger.error({ err }, 'Error searching clinics');
     throw err;
   }
 };
@@ -244,13 +303,151 @@ const deleteClinic = async (id) => {
   }
 };
 
+/**
+ * Get admin/staff schedules for a clinic
+ */
+const getAdminSchedules = async (clinicId) => {
+  try {
+    // Try to find by MongoDB _id first (if it's a valid ObjectID)
+    let clinic;
+    if (clinicId.match(/^[0-9a-fA-F]{24}$/)) {
+      clinic = await Clinic.findById(clinicId).populate('admin_staff');
+    }
+    
+    // If not found, try clinic_id
+    if (!clinic) {
+      clinic = await Clinic.findOne({ clinic_id: clinicId }).populate('admin_staff');
+    }
+
+    if (!clinic) {
+      throw new Error("Clinic not found");
+    }
+
+    // Return populated admin staff with schedule details
+    if (!clinic.admin_staff) {
+      return null;
+    }
+
+    const admin = clinic.admin_staff;
+    return {
+      id: admin._id.toString(),
+      _id: admin._id.toString(),
+      name: admin.full_name,
+      full_name: admin.full_name,
+      email: admin.email,
+      role: admin.role,
+      clinic_id: admin.clinic_id,
+      availability: admin.availability,
+      slot_duration_minutes: admin.slot_duration_minutes,
+      status: admin.status,
+      ...admin.toObject()
+    };
+  } catch (err) {
+    logger.error({ err }, 'Error retrieving admin schedule');
+    throw err;
+  }
+};
+
+/**
+ * Get doctor schedules for a clinic
+ */
+const getDoctorSchedules = async (clinicId) => {
+  try {
+    // Try to find by MongoDB _id first (if it's a valid ObjectID)
+    let clinic;
+    if (clinicId.match(/^[0-9a-fA-F]{24}$/)) {
+      clinic = await Clinic.findById(clinicId).populate('doctors');
+    }
+    
+    // If not found, try clinic_id
+    if (!clinic) {
+      clinic = await Clinic.findOne({ clinic_id: clinicId }).populate('doctors');
+    }
+
+    if (!clinic) {
+      throw new Error("Clinic not found");
+    }
+
+    // Return populated doctors with schedule details
+    if (!clinic.doctors || clinic.doctors.length === 0) {
+      return [];
+    }
+
+    return clinic.doctors.map(doctor => ({
+      id: doctor._id.toString(),
+      _id: doctor._id.toString(),
+      name: doctor.full_name,
+      full_name: doctor.full_name,
+      email: doctor.email,
+      role: doctor.role,
+      clinic_id: doctor.clinic_id,
+      availability: doctor.availability,
+      slot_duration_minutes: doctor.slot_duration_minutes,
+      status: doctor.status,
+      ...doctor.toObject()
+    }));
+  } catch (err) {
+    logger.error({ err }, 'Error retrieving doctor schedules');
+    throw err;
+  }
+};
+
+/**
+ * Get specific doctor schedule by doctor ID
+ */
+const getDoctorScheduleById = async (clinicId, doctorId) => {
+  try {
+    // Try to find by MongoDB _id first
+    let clinic;
+    if (clinicId.match(/^[0-9a-fA-F]{24}$/)) {
+      clinic = await Clinic.findById(clinicId).populate('doctors');
+    }
+    
+    // If not found, try clinic_id
+    if (!clinic) {
+      clinic = await Clinic.findOne({ clinic_id: clinicId }).populate('doctors');
+    }
+
+    if (!clinic) {
+      throw new Error("Clinic not found");
+    }
+
+    // Find the specific doctor
+    const doctor = clinic.doctors.find(d => d._id.toString() === doctorId);
+    if (!doctor) {
+      throw new Error("Doctor not found in clinic");
+    }
+
+    return {
+      id: doctor._id.toString(),
+      _id: doctor._id.toString(),
+      name: doctor.full_name,
+      full_name: doctor.full_name,
+      email: doctor.email,
+      role: doctor.role,
+      clinic_id: doctor.clinic_id,
+      availability: doctor.availability,
+      slot_duration_minutes: doctor.slot_duration_minutes,
+      status: doctor.status,
+      ...doctor.toObject()
+    };
+  } catch (err) {
+    logger.error({ err }, 'Error retrieving doctor schedule');
+    throw err;
+  }
+};
+
 module.exports = {
   generateClinicId,
   createClinic,
   getAllClinics,
   getActiveClinics,
+  searchClinics,
   getClinicById,
   updateClinic,
   deleteClinic,
-  getClinicSelfId
+  getClinicSelfId,
+  getAdminSchedules,
+  getDoctorSchedules,
+  getDoctorScheduleById
 };

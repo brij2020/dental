@@ -62,6 +62,27 @@ exports.findAllActive = async (req, res) => {
 };
 
 /**
+ * Search clinics by name, state, city, pin, and location
+ */
+exports.search = async (req, res) => {
+  try {
+    const { name, state, city, pin, location } = req.query;
+    const clinics = await clinicService.searchClinics({
+      name,
+      state,
+      city,
+      pin,
+      location
+    });
+    res.status(200).send(clinics);
+  } catch (err) {
+    res.status(500).send({
+      message: err.message || "Error searching clinics"
+    });
+  }
+};
+
+/**
  * Get a single clinic by id
  */
 exports.findOne = async (req, res) => {
@@ -136,6 +157,66 @@ exports.delete = async (req, res) => {
   } catch (err) {
     res.status(404).send({
       message: err.message || "Error deleting clinic"
+    });
+  }
+};
+
+/**
+ * Get admin/staff schedules for a clinic
+ */
+exports.getAdminSchedules = async (req, res) => {
+  try {
+    const clinicId = req.params.id;
+    if (!clinicId) {
+      return res.status(400).send({
+        message: "Clinic ID is required"
+      });
+    }
+    const adminSchedules = await clinicService.getAdminSchedules(clinicId);
+    res.status(200).send(adminSchedules);
+  } catch (err) {
+    res.status(500).send({
+      message: err.message || "Error retrieving admin schedules"
+    });
+  }
+};
+
+/**
+ * Get doctor schedules for a clinic
+ */
+exports.getDoctorSchedules = async (req, res) => {
+  try {
+    const clinicId = req.params.id;
+    if (!clinicId) {
+      return res.status(400).send({
+        message: "Clinic ID is required"
+      });
+    }
+    const doctorSchedules = await clinicService.getDoctorSchedules(clinicId);
+    res.status(200).send(doctorSchedules);
+  } catch (err) {
+    res.status(500).send({
+      message: err.message || "Error retrieving doctor schedules"
+    });
+  }
+};
+
+/**
+ * Get specific doctor schedule by doctor ID
+ */
+exports.getDoctorScheduleById = async (req, res) => {
+  try {
+    const { id: clinicId, doctorId } = req.params;
+    if (!clinicId || !doctorId) {
+      return res.status(400).send({
+        message: "Clinic ID and Doctor ID are required"
+      });
+    }
+    const doctorSchedule = await clinicService.getDoctorScheduleById(clinicId, doctorId);
+    res.status(200).send(doctorSchedule);
+  } catch (err) {
+    res.status(404).send({
+      message: err.message || "Error retrieving doctor schedule"
     });
   }
 };

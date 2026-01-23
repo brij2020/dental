@@ -10,15 +10,27 @@ module.exports = app => {
   // Create clinic (legacy endpoint)
   router.post("/", clinic.create);
 
-  // Retrieve all clinics
-  router.get("/", verifyToken, clinic.findAll);
+  // Retrieve all clinics (public - clinic listing is public data)
+  router.get("/", clinic.findAll);
 
-  // Retrieve all active clinics
+  // Search clinics by name, state, city, pin, location (public)
+  router.get("/search/filter", clinic.search);
+
+  // Retrieve all active clinics (public)
   router.get("/active", clinic.findAllActive);
 
   // Retrieve a single clinic by id
   router.get("/information", verifyToken, clinic.findOne);
   router.get("/:id", verifyToken, clinic.findById);
+
+  // Get admin/staff schedules for a clinic (public)
+  router.get("/:id/admin", clinic.getAdminSchedules);
+
+  // Get doctor schedules for a clinic (public)
+  router.get("/:id/doctors", clinic.getDoctorSchedules);
+
+  // Get specific doctor schedule by doctor ID (public)
+  router.get("/:id/doctors/:doctorId", clinic.getDoctorScheduleById);
 
   // Update clinic by id
   router.put("/:id", verifyToken, clinic.update);

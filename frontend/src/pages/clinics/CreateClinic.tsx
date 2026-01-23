@@ -4,6 +4,17 @@ import { createClinic } from "./api";
 import type { ClinicFormData } from "./api";
 import { IconArrowLeft, IconLoader } from "@tabler/icons-react";
 
+// Helper function to generate random password (8-16 characters)
+const generatePassword = (): string => {
+  const length = Math.floor(Math.random() * (16 - 8 + 1)) + 8; // Random length between 8 and 16
+  const charset = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*";
+  let password = "";
+  for (let i = 0; i < length; i++) {
+    password += charset.charAt(Math.floor(Math.random() * charset.length));
+  }
+  return password;
+};
+
 export default function CreateClinic() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
@@ -29,7 +40,7 @@ export default function CreateClinic() {
     adminProfile: {
       email: "",
       mobile_number: "",
-      password: "",
+      password: generatePassword(), // Initialize with auto-generated password
       full_name: "",
       role: "admin",
       status: "Active",
@@ -87,6 +98,17 @@ export default function CreateClinic() {
     }
   };
 
+  // Helper function to generate random password (8-16 characters)
+  const generatePasswordLocal = (): string => {
+    const length = Math.floor(Math.random() * (16 - 8 + 1)) + 8; // Random length between 8 and 16
+    const charset = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*";
+    let password = "";
+    for (let i = 0; i < length; i++) {
+      password += charset.charAt(Math.floor(Math.random() * charset.length));
+    }
+    return password;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -100,23 +122,26 @@ export default function CreateClinic() {
       if (!formData.adminProfile.email.trim()) {
         throw new Error("Admin email is required");
       }
-      if (!formData.adminProfile.password.trim()) {
-        throw new Error("Admin password is required");
-      }
-      if (formData.adminProfile.password.length < 6) {
-        throw new Error("Password must be at least 6 characters");
-      }
       if (!formData.adminProfile.full_name.trim()) {
         throw new Error("Admin full name is required");
       }
 
-      // Prepare data - ensure qualification and specialization are strings, not arrays
+      // Prepare data - clean up empty arrays and empty strings
       const dataToSubmit = {
         ...formData,
         adminProfile: {
           ...formData.adminProfile,
-          qualification: formData.adminProfile.qualification || "",
-          specialization: formData.adminProfile.specialization || ""
+          // Password is already in form state (auto-generated, user can regenerate)
+          // Always set role to admin for clinic creation
+          role: "admin",
+          // Remove empty arrays
+          education: Array.isArray(formData.adminProfile.education) && formData.adminProfile.education.length > 0 
+            ? formData.adminProfile.education 
+            : undefined,
+          // Only include non-empty strings
+          qualification: formData.adminProfile.qualification?.trim() || undefined,
+          specialization: formData.adminProfile.specialization?.trim() || undefined,
+          bio: formData.adminProfile.bio?.trim() || undefined,
         }
       };
 
@@ -390,107 +415,75 @@ export default function CreateClinic() {
 
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">
-                  Role
+                  Auto-Generated Password
+                  <span className="text-xs text-slate-500 ml-1">(8-16 characters)</span>
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={formData.adminProfile.password}
+                    readOnly
+                    className="flex-1 px-4 py-2 border border-slate-300 rounded-lg bg-slate-50 text-slate-700 font-mono"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const newPassword = generatePasswordLocal();
+                      setFormData(prev => ({
+                        ...prev,
+                        adminProfile: {
+                          ...prev.adminProfile,
+                          password: newPassword
+                        }
+                      }));
+                    }}
+                    className="px-4 py-2 bg-indigo-100 text-indigo-600 rounded-lg font-medium hover:bg-indigo-200 transition-colors"
+                  >
+                    Regenerate
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  Qualification
                 </label>
                 <select
-                  name="role"
-                  value={formData.adminProfile.role}
+                  name="qualification"
+                  value={(formData.adminProfile as any).qualification || ""}
                   onChange={handleAdminChange}
                   className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 >
-                  <option value="admin">Admin</option>
-                  <option value="doctor">Doctor</option>
-                  <option value="super_admin">Super Admin</option>
+                  <option value="">Select Qualification</option>
+                  <option value="BDS">BDS (Bachelor of Dental Surgery)</option>
+                  <option value="MDS">MDS (Master of Dental Surgery)</option>
+                  <option value="PhD">PhD in Dentistry</option>
+                  <option value="PGDIP">PGDIP (Post Graduate Diploma)</option>
                 </select>
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">
-                  Password *
+                  Specialization
                 </label>
-                <input
-                  type="password"
-                  name="password"
-                  value={formData.adminProfile.password}
+                <select
+                  name="specialization"
+                  value={(formData.adminProfile as any).specialization || ""}
                   onChange={handleAdminChange}
-                  placeholder="Enter secure password"
                   className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  required
-                />
+                >
+                  <option value="">Select Specialization</option>
+                  <option value="General Dentistry">General Dentistry</option>
+                  <option value="Orthodontics">Orthodontics</option>
+                  <option value="Periodontics">Periodontics</option>
+                  <option value="Endodontics">Endodontics</option>
+                  <option value="Prosthodontics">Prosthodontics</option>
+                  <option value="Oral Surgery">Oral Surgery</option>
+                  <option value="Pediatric Dentistry">Pediatric Dentistry</option>
+                  <option value="Cosmetic Dentistry">Cosmetic Dentistry</option>
+                  <option value="Implantology">Implantology</option>
+                </select>
               </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
-                  Slot Duration (minutes)
-                </label>
-                <input
-                  type="number"
-                  name="slot_duration_minutes"
-                  value={formData.adminProfile.slot_duration_minutes}
-                  onChange={handleAdminChange}
-                  placeholder="20"
-                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
-                  Years of Experience
-                </label>
-                <input
-                  type="number"
-                  name="years_of_experience"
-                  value={formData.adminProfile.years_of_experience || ""}
-                  onChange={handleAdminChange}
-                  placeholder="12"
-                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                />
-              </div>
-
-              {(formData.adminProfile.role === "doctor" || formData.adminProfile.role === "super_admin") && (
-                <>
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-2">
-                      Qualification
-                    </label>
-                    <select
-                      name="qualification"
-                      value={(formData.adminProfile as any).qualification || ""}
-                      onChange={handleAdminChange}
-                      className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                    >
-                      <option value="">Select Qualification</option>
-                      <option value="BDS">BDS (Bachelor of Dental Surgery)</option>
-                      <option value="MDS">MDS (Master of Dental Surgery)</option>
-                      <option value="PhD">PhD in Dentistry</option>
-                      <option value="PGDIP">PGDIP (Post Graduate Diploma)</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-2">
-                      Specialization
-                    </label>
-                    <select
-                      name="specialization"
-                      value={(formData.adminProfile as any).specialization || ""}
-                      onChange={handleAdminChange}
-                      className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                    >
-                      <option value="">Select Specialization</option>
-                      <option value="General Dentistry">General Dentistry</option>
-                      <option value="Orthodontics">Orthodontics</option>
-                      <option value="Periodontics">Periodontics</option>
-                      <option value="Endodontics">Endodontics</option>
-                      <option value="Prosthodontics">Prosthodontics</option>
-                      <option value="Oral Surgery">Oral Surgery</option>
-                      <option value="Pediatric Dentistry">Pediatric Dentistry</option>
-                      <option value="Cosmetic Dentistry">Cosmetic Dentistry</option>
-                      <option value="Implantology">Implantology</option>
-                    </select>
-                  </div>
-                </>
-              )}
 
               <div className="md:col-span-2">
                 <label className="block text-sm font-medium text-slate-700 mb-2">

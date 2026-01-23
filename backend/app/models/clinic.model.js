@@ -69,7 +69,19 @@ const clinicSchema = new mongoose.Schema(
     description: {
       type: String,
       trim: true
-    }
+    },
+    // Single admin/staff member associated with this clinic
+    admin_staff: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Profile"
+    },
+    // Array of doctors associated with this clinic
+    doctors: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Profile"
+      }
+    ],
   },
   {
     timestamps: true
