@@ -1,0 +1,30 @@
+{
+  "clinics": [
+    { "id": "1", "name": "Clinic_01", "doctorName": "Dr. Smith", "address": "Bangalore, Karnataka", "distance": "2.5 km" },
+    { "id": "2", "name": "Clinic_02", "doctorName": "Dr. Johnson", "address": "Chennai, Tamil Nadu", "distance": "3.2 km" },
+    { "id": "3", "name": "Dental Care Center", "doctorName": "Dr. Williams", "address": "Mumbai, Maharashtra", "distance": "4.1 km" },
+    { "id": "4", "name": "Health Plus Clinic", "doctorName": "Dr. Brown", "address": "Pune, Maharashtra", "distance": "5.3 km" },
+    { "id": "5", "name": "City Medical Center", "doctorName": "Dr. Davis", "address": "Ahmedabad, Gujarat", "distance": "6.0 km" },
+    { "id": "6", "name": "Metro Clinic", "doctorName": "Dr. Miller", "address": "Kochi, Kerala", "distance": "2.8 km" }
+  ],
+  "states": [
+    "Karnataka",
+    "Tamil Nadu",
+    "Maharashtra",
+    "Gujarat",
+    "Kerala",
+    "Delhi",
+    "Punjab",
+    "Rajasthan"
+  ],
+  "cityData": {
+    "Karnataka": ["Bangalore", "Mysore", "Mangalore", "Hubli", "Belgaum"],
+    "Tamil Nadu": ["Chennai", "Coimbatore", "Madurai", "Salem", "Tiruchirappalli"],
+    "Maharashtra": ["Mumbai", "Pune", "Nagpur", "Nashik", "Aurangabad"],
+    "Gujarat": ["Ahmedabad", "Surat", "Vadodara", "Rajkot", "Bhavnagar"],
+    "Kerala": ["Kochi", "Thiruvananthapuram", "Kozhikode", "Thrissur", "Kollam"],
+    "Delhi": ["New Delhi", "Central Delhi", "South Delhi", "North Delhi"],
+    "Punjab": ["Ludhiana", "Amritsar", "Jalandhar", "Patiala", "Bathinda"],
+    "Rajasthan": ["Jaipur", "Jodhpur", "Kota", "Bikaner", "Udaipur"]
+  }
+} 

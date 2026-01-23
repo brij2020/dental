@@ -1,0 +1,122 @@
+import { useState } from "react";
+import { UserProfileCard, UserProfileField } from "@/Components/UserInfoCard";
+import { cn } from "@/lib/utils";
+import EditProfileModal from "@/Components/EditProfileModal";
+import { toast } from "react-toastify";
+import { useProfile } from "@/hooks/useProfile";
+import CustomModal from "@/Components/CustomModal";
+import Loading from "@/Components/Loading";
+import useUpdateProfile from "@/hooks/useUpdateProfile";
+import useAvatarUpload from "@/hooks/useAvatarUpload";
+
+export default function UserInfo() {
+  const { loading, profile } = useProfile();
+  const { updateProfile } = useUpdateProfile();
+  const { uploading, localPreview, fileInputRef, handleFileChange, openFilePicker } = useAvatarUpload();
+  const [openModal, setOpenModal] = useState(false);
+  const [modalScope, setModalScope] = useState<"personal" | "contact">("personal");
+
+  if (loading) {
+    return (
+      <Loading size={"500px"}></Loading>
+    );
+  }
+
+  const openEdit = (scope: "personal" | "contact") => {
+    setModalScope(scope);
+    setOpenModal(true);
+  };
+
+  const handleSave = async (updates: Partial<typeof profile>) => {
+    const res = await updateProfile(updates);
+    if (res.error) {
+      console.error("Failed to save profile:", res.error);
+      toast.error("Failed to save profile:", res.error)
+    } else {
+      toast?.success?.("Profile updated successfully");
+    }
+  };
+
+  const displayedAvatar = profile?.avatar?.trim() ? profile?.avatar : localPreview;
+
+  return (
+    <div className="flex flex-col gap-6 p-0 md:p-4">
+
+
+      <div className="flex flex-col lg:flex-row gap-8 items-start">
+        <div className="flex-shrink-0 self-center lg:self-start">
+          <div className="relative group">
+            
+            {/* Profile Image (click to change) */}
+            <div className="p-1 rounded-full cursor-pointer" onClick={openFilePicker} title="Click to change photo">
+              <div className={cn("relative w-24 h-24 rounded-full overflow-hidden", "border-[5px] border-white")}>
+                {
+                displayedAvatar ? (
+                  <img src={displayedAvatar} alt={profile?.full_name || "avatar"} className="w-full h-full object-cover"/>
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center bg-gray-100">
+                    <span className="text-3xl font-bold text-gray-600 group-hover:text-blue-800 transition-colors">{profile?.full_name?.charAt(0) || "U"}</span>
+                  </div>
+                )}
+
+                {/* optional uploading overlay */}
+                {uploading && (
+                  <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
+                    <span className="text-white text-sm">Uploading...</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className={cn("absolute bottom-1 right-1 cursor-pointer", "bg-blue-600 rounded-full w-8 h-8 shadow-md", "transition-all duration-300", "group-hover:bg-blue-700 group-hover:scale-110", "flex items-center justify-center")} onClick={openFilePicker} title="Change photo">
+              <span className="material-symbols-sharp text-white text-base">photo_camera</span>
+            </div>
+
+            {/* hidden file input */}
+            <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileChange}/>
+          </div>
+        </div>
+
+        {/* Profile Info */}
+        <div className="flex-1 grid gap-6 w-full">
+
+          <UserProfileCard title="Personal Details" openEdit={openEdit}>
+            <UserProfileField label="Full Name" value={profile?.full_name || "N/A"} />
+            <UserProfileField label="Gender" value={profile?.gender?.toUpperCase() || "N/A"} />
+            <UserProfileField
+              label="DOB"
+              value={profile?.date_of_birth || "N/A"
+                //  (${profile?.age || "N/A"} years)
+                }
+            />
+            <UserProfileField label="Address" value={profile?.address || "N/A"} />
+            <UserProfileField label="State" value={profile?.state || "N/A"} />
+            <UserProfileField label="City" value={profile?.city || "N/A"} />
+            <UserProfileField label="Pincode" value={profile?.pincode || "N/A"} />
+          </UserProfileCard>
+
+
+          <UserProfileCard title="Contact Details">
+            <UserProfileField
+              label="Mobile No."
+              value={`(+91) ${profile?.contact_number  || "N/A"}`}
+            />
+            <UserProfileField label="Email" value={profile?.email  || "N/A"} />
+          </UserProfileCard>
+        </div>
+      </div>
+
+      <CustomModal openModal={openModal} setOpenModal={setOpenModal}>
+        <EditProfileModal
+          onClose={() => setOpenModal(false)}
+          profile={profile}
+          onSave={async (updates) => {
+            await handleSave(updates);
+          }}
+          scope={modalScope}
+        />
+      </CustomModal>
+
+    </div>
+  );
+}
