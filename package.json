@@ -5,19 +5,22 @@
   "private": true,
   "workspaces": [
     "frontend",
-    "backend"
+    "backend",
+    "patient"
   ],
   "scripts": {
-    "dev": "npm run dev --workspace=backend & npm run dev --workspace=frontend",
+    "dev": "npm run dev --workspace=backend & npm run dev --workspace=frontend & npm run dev --workspace=patient",
     "dev:frontend": "npm run dev --workspace=frontend",
     "dev:backend": "npm run dev --workspace=backend",
-    "build": "npm run build --workspace=frontend && npm run build --workspace=backend",
+    "dev:patient": "npm run dev --workspace=patient",
+    "build": "npm run build --workspace=frontend && npm run build --workspace=backend && npm run build --workspace=patient",
     "build:frontend": "npm run build --workspace=frontend",
     "build:backend": "npm run build --workspace=backend",
-    "lint": "npm run lint --workspace=frontend",
+    "build:patient": "npm run build --workspace=patient",
+    "lint": "npm run lint --workspace=frontend && npm run lint --workspace=patient",
     "preview": "npm run preview --workspace=frontend",
     "watch:backend": "npm run watch --workspace=backend",
-    "install-all": "npm install && npm install --workspace=frontend && npm install --workspace=backend"
+    "install-all": "npm install && npm install --workspace=frontend && npm install --workspace=backend && npm install --workspace=patient"
   },
   "keywords": [
     "dental",
