@@ -56,6 +56,11 @@ exports.login = async (req, res) => {
             return res.status(401).send({ message: "Invalid email or password" });
         }
 
+        if (!user.password) {
+            logger.warn({ userId: user._id, email }, 'Login failed: no password set');
+            return res.status(401).send({ message: "Invalid email or password" });
+        }
+
         const isMatch = await user.comparePassword(password);
         if (!isMatch) {
             logger.warn({ userId: user._id, email }, 'Login failed: invalid password');
@@ -78,7 +83,7 @@ exports.login = async (req, res) => {
         });
     } catch (err) {
         logger.error({ err }, 'Login error');
-        res.status(500).send({ message: "Login failed. Please try again." });
+        res.status(401).send({ message: "Invalid email or password" });
     }
 };
 
@@ -101,6 +106,15 @@ exports.patientLogin = async (req, res) => {
 
         if (!patient) {
             logger.warn({ email }, 'Patient login failed: patient not found');
+            return res.status(401).json({
+                success: false,
+                message: "Invalid email or password",
+                code: "INVALID_CREDENTIALS"
+            });
+        }
+
+        if (!patient.password) {
+            logger.warn({ patientId: patient._id, email }, 'Patient login failed: no password set');
             return res.status(401).json({
                 success: false,
                 message: "Invalid email or password",
@@ -138,10 +152,10 @@ exports.patientLogin = async (req, res) => {
         });
     } catch (err) {
         logger.error({ err }, 'Patient login error');
-        res.status(500).json({
+        res.status(401).json({
             success: false,
-            message: "Login failed. Please try again.",
-            code: "INTERNAL_SERVER_ERROR"
+            message: "Invalid email or password",
+            code: "INVALID_CREDENTIALS"
         });
     }
 };

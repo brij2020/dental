@@ -13,6 +13,12 @@ module.exports = app => {
   // Retrieve all active profile
   router.get("/active", profile.findAllActive);
 
+  // Get profiles by clinic_id (public - no auth required)
+  router.get("/clinic/:clinicId", profile.findByClinic);
+
+  // Get profiles by clinic_id (legacy route - no auth required)
+  //router.get("/:clinicId", profile.findByClinic);
+
   // Get doctor slots (availability and slot duration)
   router.get("/:id/slots", profile.getSlots);
 

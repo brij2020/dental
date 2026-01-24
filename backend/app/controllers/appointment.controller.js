@@ -444,3 +444,45 @@ exports.delete = async (req, res) => {
     });
   }
 };
+
+// Get appointment history for a patient with a specific doctor
+exports.getDoctorHistory = async (req, res) => {
+  try {
+    const patientId = req.params.patientId;
+    const doctorId = req.query.doctorId;
+
+    // Validate required parameters
+    if (!patientId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Patient ID is required',
+        code: 'MISSING_PATIENT_ID',
+      });
+    }
+
+    if (!doctorId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Doctor ID is required',
+        code: 'MISSING_DOCTOR_ID',
+      });
+    }
+
+    // Get appointment history
+    const appointments = await AppointmentService.getPatientDoctorHistory(patientId, doctorId);
+
+    return res.status(200).json({
+      success: true,
+      data: appointments,
+      count: appointments.length,
+      message: 'Patient doctor history retrieved successfully',
+    });
+  } catch (error) {
+    console.error('Error fetching patient doctor history:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to fetch appointment history',
+      code: 'INTERNAL_SERVER_ERROR',
+    });
+  }
+};

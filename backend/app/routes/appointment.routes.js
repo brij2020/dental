@@ -12,6 +12,9 @@ router.get('/', verifyToken, appointmentController.getByPatient);
 // Get booked slots for a doctor on a specific date (public - needed for slot selection)
 router.get('/booked-slots', appointmentController.getBookedSlots);
 
+// Get patient appointment history with a specific doctor (requires auth)
+router.get('/patient-history/:patientId', verifyToken, appointmentController.getDoctorHistory);
+
 // Get all appointments for a clinic (requires auth)
 router.get('/clinic/:clinic_id', verifyToken, appointmentController.getByClinic);
 

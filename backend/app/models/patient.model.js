@@ -105,6 +105,9 @@ patientSchema.pre("save", async function (next) {
  * Compare password method
  */
 patientSchema.methods.comparePassword = async function (password) {
+  if (!this.password || !password) {
+    throw new Error("Password is missing");
+  }
   return await bcrypt.compare(password, this.password);
 };
 

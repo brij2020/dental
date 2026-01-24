@@ -134,6 +134,16 @@ class AppointmentService {
     return await Appointment.find({ patient_id: patientId })
       .sort({ appointment_date: 1, appointment_time: 1 });
   }
+
+  // Get appointment history for a patient with a specific doctor
+  static async getPatientDoctorHistory(patientId, doctorId) {
+    return await Appointment.find({
+      patient_id: patientId,
+      doctor_id: doctorId,
+    })
+      .sort({ appointment_date: -1, appointment_time: -1 })
+      .lean(); // Use lean() for read-only queries for better performance
+  }
 }
 
 module.exports = AppointmentService;

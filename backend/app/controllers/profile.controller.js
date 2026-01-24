@@ -102,6 +102,30 @@ exports.findAllActive = async (req, res) => {
 };
 
 /**
+ * Get profiles by clinic ID
+ */
+exports.findByClinic = async (req, res) => {
+  try {
+    const clinicId = req.params.clinicId;
+    if (!clinicId) {
+      return res.status(400).send({
+        message: "Clinic ID is required"
+      });
+    }
+
+    const doctors = await profileService.getAllProfiles({ 
+      clinic_id: clinicId,
+      role: { $in: ['admin', 'doctor'] }
+    });
+    res.send(doctors);
+  } catch (err) {
+    res.status(500).send({
+      message: err.message || "Error retrieving doctors for clinic"
+    });
+  }
+};
+
+/**
  * Get doctor slots (availability and slot duration)
  */
 exports.getSlots = async (req, res) => {

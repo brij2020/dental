@@ -21,7 +21,7 @@ const createProfile = async (profileData, options = {}) => {
       role: profileData.role || "doctor",
       clinic_id: profileData.clinic_id,
       status: profileData.status || "Active",
-      availability: profileData.availability || {},
+      availability: profileData.availability,  // ✅ Let Mongoose apply DEFAULT_AVAILABILITY when undefined
       slot_duration_minutes: profileData.slot_duration_minutes || 15,
       profile_pic: profileData.profile_pic,
       education: profileData.education || [],
@@ -46,20 +46,27 @@ const createProfile = async (profileData, options = {}) => {
 const getAllProfiles = async (filters = {}) => {
   try {
     
-    const { full_name, clinic_id, status } = filters;
+    const { full_name, clinic_id, status, role } = filters;
     let condition = {};
 
-    // if (full_name) {
-    //   condition.full_name = { $regex: full_name, $options: "i" };
-    // }
+    if (full_name) {
+      condition.full_name = { $regex: full_name, $options: "i" };
+    }
 
     if (clinic_id) {
       condition.clinic_id = clinic_id;
     }
-console.log('Filter condition:', condition);
-    // if (status) {
-    //   condition.status = status;
-    // }
+
+    if (status) {
+      condition.status = status;
+    }
+
+    // Filter by role - default to 'doctor' or 'admin' if not specified
+    if (role) {
+      condition.role = role;
+    } else {
+      condition.role = { $in: ['doctor', 'admin'] };
+    }
 
     const doctors = await Profile.find(condition);
     return doctors;
@@ -79,6 +86,7 @@ const getProfileById = async (id) => {
     }
 
     const doctor = await Profile.findById(id);
+    console.log('---------------Retrieved doctor profile:', doctor);
     if (!doctor) {
       throw new Error("Doctor not found with id " + id);
     }

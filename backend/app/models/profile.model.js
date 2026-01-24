@@ -145,6 +145,9 @@ doctorSchema.pre("save", async function(next) {
  * Instance method to compare password
  */
 doctorSchema.methods.comparePassword = async function(plainPassword) {
+  if (!this.password || !plainPassword) {
+    throw new Error("Password is missing");
+  }
   return bcrypt.compare(plainPassword, this.password);
 };
 module.exports = mongoose.model("Profile", doctorSchema);
