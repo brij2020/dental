@@ -68,6 +68,11 @@ const appointmentSchema = new mongoose.Schema(
       type: String,
       default: null,
     },
+    clinics: {
+      type: mongoose.Schema.Types.Mixed,
+      default: null,
+      description: "Embedded clinic details snapshot taken at booking time"
+    }
   },
   {
     timestamps: true,

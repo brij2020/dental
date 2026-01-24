@@ -14,6 +14,7 @@ exports.book = async (req, res) => {
       appointment_time,
       doctor_id,
       medical_conditions,
+      clinics,
     } = req.body;
 
     // Validate required fields with detailed error messages
@@ -92,6 +93,7 @@ exports.book = async (req, res) => {
       doctor_id,
       medical_conditions: medical_conditions || [],
       status: 'scheduled',
+      clinics: clinics || null,
     };
 
     const appointment = await AppointmentService.createAppointment(appointmentData);
