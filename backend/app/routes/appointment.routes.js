@@ -3,22 +3,25 @@ const router = express.Router();
 const appointmentController = require('../controllers/appointment.controller');
 const { verifyToken } = require('../middleware/auth.middleware');
 
-// Book an appointment
-router.post('/', verifyToken, appointmentController.book);
+// Book an appointment (public endpoint - patients can book without auth)
+router.post('/', appointmentController.book);
 
-// Get booked slots for a doctor on a specific date
-router.get('/booked-slots', verifyToken, appointmentController.getBookedSlots);
+// Get all appointments for authenticated patient (requires auth)
+router.get('/', verifyToken, appointmentController.getByPatient);
 
-// Get all appointments for a clinic (with optional filters)
+// Get booked slots for a doctor on a specific date (public - needed for slot selection)
+router.get('/booked-slots', appointmentController.getBookedSlots);
+
+// Get all appointments for a clinic (requires auth)
 router.get('/clinic/:clinic_id', verifyToken, appointmentController.getByClinic);
 
-// Get a specific appointment by ID
+// Get a specific appointment by ID (requires auth)
 router.get('/:id', verifyToken, appointmentController.getById);
 
-// Update an appointment
+// Update an appointment (requires auth)
 router.put('/:id', verifyToken, appointmentController.update);
 
-// Delete an appointment
+// Delete an appointment (requires auth)
 router.delete('/:id', verifyToken, appointmentController.delete);
 
 module.exports = router;

@@ -1,31 +1,37 @@
-import { supabase } from "@/lib/supabaseClient";
 import { createContext, useEffect, useState } from "react";
-import { type User } from "@supabase/supabase-js"
+import { api } from "@/lib/apiClient";
 
-interface Profile {
+interface Patient {
     id: string;
+    patient_id: string;
     full_name: string;
-    gender: string;
-    date_of_birth: string;
-    // age: number;
-    address: string;
-    city: string;
-    state: string;
-    pincode: string;
-    contact_number: string;
+    gender?: string;
+    date_of_birth?: string;
+    address?: string;
+    city?: string;
+    state?: string;
+    pincode?: string;
+    contact_number?: string;
     email: string;
-    avatar: string;
+    avatar?: string;
     uhid: string;
-    created_at: string;
-    updated_at: string;
+    created_at?: string;
+    updated_at?: string;
 }
 
+interface AuthSession {
+    token: string;
+    patient_id: string;
+    email: string;
+    full_name: string;
+    uhid: string;
+}
 
 interface UserContextType {
-    user: User | null;
-    setUser: React.Dispatch<React.SetStateAction<User | null>>;
-    profile: Profile | null;
-    setProfile: React.Dispatch<React.SetStateAction<Profile | null>>;
+    user: AuthSession | null;
+    setUser: React.Dispatch<React.SetStateAction<AuthSession | null>>;
+    profile: Patient | null;
+    setProfile: React.Dispatch<React.SetStateAction<Patient | null>>;
     loading: boolean;
 }
 
@@ -33,81 +39,75 @@ interface UserProviderProps {
     children: React.ReactNode;
 }
 
-
 const UserContext = createContext<UserContextType | null>(null);
 
 const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
-    const [user, setUser] = useState<User | null>(null);
-    const [profile, setProfile] = useState<Profile | null>(null);
+    const [user, setUser] = useState<AuthSession | null>(null);
+    const [profile, setProfile] = useState<Patient | null>(null);
     const [loading, setLoading] = useState<boolean>(true);
 
-    const fetchProfile = async (userId: string) => {
-        const { data, error } = await supabase
-            .from("patients")
-            .select("*")
-            .eq("id", userId)
-            .maybeSingle();
-
-        if (error) {
-            console.error("Error fetching profile:", error);
-            return;
+    const fetchProfile = async (patientId: string) => {
+        try {
+            console.log("📋 Fetching patient profile:", patientId);
+            const response: any = await api.get(`/api/patients/${patientId}`);
+            
+            if (response?.data) {
+                console.log("✅ Profile fetched:", response.data);
+                // Handle both nested data structure and direct response
+                const profileData = response.data.data || response.data;
+                setProfile(profileData);
+            }
+        } catch (error) {
+            console.error("❌ Error fetching profile:", error);
+            // Continue anyway - profile is optional, user auth data is already set
         }
-
-        if (data) setProfile(data);
     };
 
     useEffect(() => {
-        const getSession = async () => {
-            const { data } = await supabase.auth.getSession();
-            const sessionUser = data.session?.user || null;
-            setUser(sessionUser);
+        const initializeAuth = async () => {
+            try {
+                // Check if token exists in localStorage
+                const token = localStorage.getItem('authToken') || localStorage.getItem('auth_token');
+                const patient_id = localStorage.getItem('patient_id');
+                const email = localStorage.getItem('patient_email');
+                const full_name = localStorage.getItem('patient_name');
+                const uhid = localStorage.getItem('patient_uhid');
 
-            if (sessionUser) await fetchProfile(sessionUser.id);
-            setLoading(false);
-        };
-
-        getSession();
-
-        const { data: subscription } = supabase.auth.onAuthStateChange((_event, session) => {
-            const sessionUser = session?.user || null;
-            setUser(sessionUser);
-
-            if (sessionUser) fetchProfile(sessionUser.id);
-            else setProfile(null);
-        });
-
-        return () => {
-            if (subscription?.subscription) {
-                subscription.subscription.unsubscribe();
+                if (token && patient_id && email && full_name) {
+                    console.log("🔐 Found existing auth session");
+                    
+                    // Restore user session from localStorage
+                    const authSession: AuthSession = {
+                        token,
+                        patient_id,
+                        email,
+                        full_name,
+                        uhid: uhid || '',
+                    };
+                    
+                    setUser(authSession);
+                    
+                    // Fetch fresh profile data in background (non-blocking)
+                    if (patient_id) {
+                        fetchProfile(patient_id);
+                    }
+                } else {
+                    console.log("❌ No auth session found");
+                    setUser(null);
+                    setProfile(null);
+                }
+            } catch (error) {
+                console.error("❌ Error initializing auth:", error);
+                setUser(null);
+                setProfile(null);
+            } finally {
+                // Always set loading to false immediately
+                setLoading(false);
             }
         };
+
+        initializeAuth();
     }, []);
-
-    useEffect(() => {
-        if (!user) return;
-
-        const channel = supabase
-            .channel(`patients-changes-${user.id}`)
-            .on(
-                "postgres_changes",
-                {
-                    event: "*",
-                    schema: "public",
-                    table: "patients",
-                    filter: `id=eq.${user.id}`,
-                },
-                async (payload) => {
-                    if (payload.new) setProfile(payload.new as Profile);
-                    else await fetchProfile(user.id);
-                }
-            )
-            .subscribe();
-
-        return () => {
-            supabase.removeChannel(channel);
-        };
-    }, [user]);
-
 
     return (
         <UserContext.Provider value={{ user, setUser, profile, setProfile, loading }}>

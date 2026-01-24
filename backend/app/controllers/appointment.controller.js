@@ -1,4 +1,6 @@
 const AppointmentService = require('../services/appointment.service');
+const db = require('../models');
+const Appointment = db.appointments;
 
 exports.book = async (req, res) => {
   try {
@@ -50,6 +52,22 @@ exports.book = async (req, res) => {
         success: false,
         message: 'Invalid appointment_time format. Expected HH:MM',
         code: 'INVALID_TIME_FORMAT',
+      });
+    }
+
+    // Check if patient already has an appointment on the same day at the same clinic
+    const existingPatientAppointment = await Appointment.findOne({
+      patient_id: patient_id,
+      clinic_id: clinic_id,
+      appointment_date: appointment_date,
+      status: { $in: ['scheduled', 'confirmed'] } // Don't count cancelled or completed
+    });
+
+    if (existingPatientAppointment) {
+      return res.status(409).json({
+        success: false,
+        message: 'You already have an appointment scheduled at this clinic for this date. Please cancel it first or choose a different date.',
+        code: 'DUPLICATE_APPOINTMENT_ON_DATE',
       });
     }
 
@@ -235,6 +253,39 @@ exports.getByClinic = async (req, res) => {
   }
 };
 
+exports.getByPatient = async (req, res) => {
+  try {
+    const patientId = req.user?.id || req.user?.patient_id;
+
+    console.log('🔍 Token contents:', req.user);
+    console.log('🔍 PatientId extracted:', patientId);
+
+    if (!patientId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Patient ID not found in token. Please log out and log back in.',
+        code: 'MISSING_PATIENT_ID',
+        debug: { token_data: req.user }
+      });
+    }
+
+    const appointments = await AppointmentService.getPatientAppointments(patientId);
+
+    return res.status(200).json({
+      success: true,
+      data: appointments,
+      message: 'Patient appointments retrieved successfully',
+    });
+  } catch (error) {
+    console.error('Error fetching patient appointments:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to fetch appointments',
+      code: 'INTERNAL_SERVER_ERROR',
+    });
+  }
+};
+
 exports.getById = async (req, res) => {
   try {
     const { id } = req.params;
@@ -294,7 +345,7 @@ exports.update = async (req, res) => {
 
     // Validate status enum if provided
     if (updateData.status) {
-      const validStatuses = ['scheduled', 'confirmed', 'cancelled', 'completed'];
+      const validStatuses = ['scheduled', 'confirmed', 'cancelled', 'completed', 'no-show'];
       if (!validStatuses.includes(updateData.status)) {
         return res.status(422).json({
           success: false,

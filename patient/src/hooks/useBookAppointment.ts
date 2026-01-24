@@ -1,7 +1,6 @@
 import { useState, useCallback } from 'react';
 import type { BookAppointment } from '@/Components/bookAppointments/types';
-import axios from 'axios';
-import { supabase } from '@/lib/supabaseClient';
+import { api } from '@/lib/apiClient';
 
 export default function useBookAppointment() {
     const [loading, setLoading] = useState<boolean>(false);
@@ -10,35 +9,28 @@ export default function useBookAppointment() {
         setLoading(true);
 
         try {
-            const { data: { session } } = await supabase.auth.getSession();
-            const token = session?.access_token;
+            // Log the appointment data being sent
+            console.log('📋 Booking appointment with data:', appointment);
 
-            const { data } = await axios.post(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/book-appointment`,
-                appointment,
-                {
-                    headers: {
-                        Authorization: `Bearer ${token}`,
-                        'Content-Type': 'application/json',
-                    }
-                }
-            )
+            // Call backend API through centralized axios client
+            const response: any = await api.post('/api/appointments', appointment);
 
+            console.log('✅ Appointment booking response:', response);
 
-            if (data && data?.error) {
-                return { success: false, error: data.error };
+            if (!response.success) {
+                return { success: false, error: response.error || 'An error occurred' };
             }
 
             return {
                 success: true,
-                data,
-                message: data?.message ?? 'Appointment booked successfully',
+                data: response.data || {},
+                message: response.data?.message ?? 'Appointment booked successfully',
             };
         } catch (err: unknown) {
+
             let message = 'Failed to book appointment';
 
-            if (axios.isAxiosError(err)) {
-                message = err.response?.data?.error || err.response?.data?.message || err.message || message;
-            } else if (err instanceof Error) {
+            if (err instanceof Error) {
                 message = err.message;
             }
 

@@ -34,13 +34,14 @@ const QuotesIcon = () => {
 
 
 const DashboardLanding = () => {
-	const { loading, profile } = useProfile();
-	const { appointments: { upcoming, previous, missed }, loading: loadingAppointments } = useGetAppointments();
+	const { loading: profileLoading, profile } = useProfile();
+	const { appointments: { upcoming, previous, missed }, loading: appointmentsLoading } = useGetAppointments();
 	console.log(upcoming)
 
 	const countDown = getAppointmentCountdown(upcoming[0]?.appointment_date, upcoming[0]?.appointment_time);
 
-	if (loading || loadingAppointments) {
+	// Only show loading if profile is still loading. Appointments can load in background
+	if (profileLoading) {
 		return (
 			<Loading size={"500px"} />
 		)

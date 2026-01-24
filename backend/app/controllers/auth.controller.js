@@ -1,5 +1,6 @@
 const db = require("../models");
 const Profile = db.profiles;
+const Patient = db.patients;
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const crypto = require("crypto")
@@ -80,6 +81,141 @@ exports.login = async (req, res) => {
         res.status(500).send({ message: "Login failed. Please try again." });
     }
 };
+
+/**
+ * Patient Login
+ */
+exports.patientLogin = async (req, res) => {
+    try {
+        const { email, password } = req.body;
+
+        if (!email || !password) {
+            return res.status(400).json({
+                success: false,
+                message: "Email and password are required",
+                code: "MISSING_CREDENTIALS"
+            });
+        }
+
+        const patient = await Patient.findOne({ email: email.toLowerCase().trim() }).select("+password");
+
+        if (!patient) {
+            logger.warn({ email }, 'Patient login failed: patient not found');
+            return res.status(401).json({
+                success: false,
+                message: "Invalid email or password",
+                code: "INVALID_CREDENTIALS"
+            });
+        }
+
+        const isMatch = await patient.comparePassword(password);
+        if (!isMatch) {
+            logger.warn({ patientId: patient._id, email }, 'Patient login failed: invalid password');
+            return res.status(401).json({
+                success: false,
+                message: "Invalid email or password",
+                code: "INVALID_CREDENTIALS"
+            });
+        }
+
+        const token = jwt.sign(
+            { id: patient._id, patient_id: patient._id, email: patient.email, full_name: patient.full_name, role: "patient" },
+            JWT_SECRET,
+            { expiresIn: "7d" }
+        );
+
+        logger.info({ patientId: patient._id, email }, 'Patient login successful');
+        res.status(200).json({
+            success: true,
+            data: {
+                token,
+                patient_id: patient._id,
+                email: patient.email,
+                full_name: patient.full_name,
+                uhid: patient.uhid
+            },
+            message: "Login successful"
+        });
+    } catch (err) {
+        logger.error({ err }, 'Patient login error');
+        res.status(500).json({
+            success: false,
+            message: "Login failed. Please try again.",
+            code: "INTERNAL_SERVER_ERROR"
+        });
+    }
+};
+
+/**
+ * Patient Register/Signup
+ */
+exports.patientRegister = async (req, res) => {
+    try {
+        const { email, password, full_name, contact_number } = req.body;
+
+        if (!email || !password || !full_name) {
+            return res.status(400).json({
+                success: false,
+                message: "Email, password, and full name are required",
+                code: "MISSING_FIELDS"
+            });
+        }
+
+        
+        // Check if patient already exists
+        const existingPatient = await Patient.findOne({ email: email.toLowerCase().trim() });
+        if (existingPatient) {
+            return res.status(409).json({
+                success: false,
+                message: "Email already registered",
+                code: "EMAIL_EXISTS"
+            });
+        }
+
+        const patient = new Patient({
+            email: email.toLowerCase().trim(),
+            password,
+            full_name: full_name.trim(),
+            contact_number: contact_number || null
+        });
+
+        await patient.save();
+
+        const token = jwt.sign(
+            { id: patient._id, patient_id: patient._id, email: patient.email, full_name: patient.full_name, role: "patient" },
+            JWT_SECRET,
+            { expiresIn: "7d" }
+        );
+
+        logger.info({ patientId: patient._id, email }, 'Patient registered successfully');
+        res.status(201).json({
+            success: true,
+            data: {
+                token,
+                patient_id: patient._id,
+                email: patient.email,
+                full_name: patient.full_name,
+                uhid: patient.uhid
+            },
+            message: "Registration successful"
+        });
+    } catch (err) {
+        if (err.code === 11000) {
+            return res.status(409).json({
+                success: false,
+                message: "Email already registered",
+                code: "DUPLICATE_EMAIL"
+            });
+        }
+        logger.error({ err }, 'Patient registration error');
+        res.status(500).json({
+            success: false,
+            message: "Registration failed. Please try again.",
+            code: "INTERNAL_SERVER_ERROR"
+        });
+    }
+};
+
 //change password
 exports.changePassword = async (req, res) => {
   try {

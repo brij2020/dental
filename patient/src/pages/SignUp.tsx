@@ -2,7 +2,7 @@ import React from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "react-toastify";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "../lib/supabaseClient";
+import { api } from "../lib/apiClient";
 import { states, stateCities } from "../services/locations";
 
 type SignUpFormInputs = {
@@ -34,40 +34,44 @@ const SignUp: React.FC = () => {
     if(isSubmitting) return;
     
     try {
-      // Create user in Supabase Auth
-      const { error: signUpError } =
+      console.log("🚀 Creating patient account:", data.email);
+      
+      const response: any = await api.post("/api/auth/patient-register", {
+        email: data.email,
+        password: data.password,
+        full_name: data.full_name,
+        contact_number: data.contact_number,
+      });
 
-        await supabase.auth.signUp({
-          email: data.email,
-          password: data.password,
-          options: {
-            data: {
-              full_name: data.full_name,
-              gender: data.gender,
-              contact_number: data.contact_number,
-              // age: data.age,
-              date_of_birth: data.date_of_birth,
-              address: data.address,
-              state: data.state,
-              city: data.city,
-              pincode: data.pincode,
-            },
-          },
-        });
+      console.log("📋 API Response:", response);
 
-
-      if (signUpError) {
-        console.error("Signup error:", signUpError.message);
-        toast.error(signUpError.message);
+      if (!response.success) {
+        console.error("❌ Registration failed:", response.error);
+        toast.error(response.error || "Registration failed");
         return;
       }
 
-      toast.success("Account created succesfully!.");
-      reset();
-      navigate("/login");
+      // response.data contains the backend response with patient data
+      const backendData = response.data;
+      
+      if(backendData?.success && backendData?.data) {
+        console.log("✅ Registration successful:", backendData.data);
+        
+        // Store token and patient info
+        localStorage.setItem("authToken", backendData.data.token);
+        localStorage.setItem("patient_id", backendData.data.patient_id);
+        localStorage.setItem("patient_email", backendData.data.email);
+        localStorage.setItem("patient_name", backendData.data.full_name);
+        localStorage.setItem("patient_uhid", backendData.data.uhid);
+        
+        toast.success("Account created successfully!");
+        reset();
+        navigate("/");
+      }
     } catch (error: unknown) {
+      console.error("❌ Unexpected error:", error);
       if (error instanceof Error) {
-        console.error("Signup error:", error.message);
+        console.error("Error message:", error.message);
       }
       toast.error("Something went wrong. Please try again.");
     }

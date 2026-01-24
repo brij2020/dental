@@ -171,6 +171,74 @@ module.exports = app => {
  *         description: Invalid or expired token
  */
   router.post("/reset-password", auth.resetPassword);
+
+  /**
+   * @swagger
+   * /api/auth/patient-login:
+   *   post:
+   *     summary: Patient login
+   *     tags: [Auth]
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             required:
+   *               - email
+   *               - password
+   *             properties:
+   *               email:
+   *                 type: string
+   *                 example: patient@example.com
+   *               password:
+   *                 type: string
+   *                 example: Password@123
+   *     responses:
+   *       200:
+   *         description: Login successful
+   *       401:
+   *         description: Invalid credentials
+   */
+  router.post("/patient-login", auth.patientLogin);
+
+  /**
+   * @swagger
+   * /api/auth/patient-register:
+   *   post:
+   *     summary: Patient registration/signup
+   *     tags: [Auth]
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             required:
+   *               - email
+   *               - password
+   *               - full_name
+   *             properties:
+   *               email:
+   *                 type: string
+   *                 example: patient@example.com
+   *               password:
+   *                 type: string
+   *                 example: Password@123
+   *               full_name:
+   *                 type: string
+   *                 example: John Doe
+   *               contact_number:
+   *                 type: string
+   *                 example: "9876543210"
+   *     responses:
+   *       201:
+   *         description: Registration successful
+   *       409:
+   *         description: Email already registered
+   */
+  router.post("/patient-register", auth.patientRegister);
+
   app.use("/api/auth", router);
 
 };

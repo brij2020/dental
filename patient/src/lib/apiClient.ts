@@ -2,8 +2,9 @@ import axios, { type AxiosRequestConfig, type AxiosInstance, type AxiosResponse 
 import { environment } from '@/config/environment';
 
 // Get bearer token from localStorage (set during login)
+// Supports both 'authToken' (new) and 'auth_token' (legacy) keys
 const getAuthToken = (): string => {
-  return localStorage.getItem('auth_token') || '';
+  return localStorage.getItem('authToken') || localStorage.getItem('auth_token') || '';
 };
 
 // Create axios instance with environment-based config
@@ -19,10 +20,16 @@ const apiClient: AxiosInstance = axios.create({
 // Add request interceptor to include the latest token
 apiClient.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('auth_token');
+    // Support both 'authToken' (new) and 'auth_token' (legacy) keys
+    const token = localStorage.getItem('authToken') || localStorage.getItem('auth_token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+    // Log request details for debugging
+    console.log(`🚀 API Request: ${config.method?.toUpperCase()} ${config.baseURL}${config.url}`, {
+      data: config.data,
+      headers: config.headers,
+    });
     return config;
   },
   (error) => Promise.reject(error)
@@ -36,12 +43,13 @@ apiClient.interceptors.response.use(
     
     // Only logout if explicitly unauthorized (401) AND user is authenticated
     if (error.response?.status === 401) {
-      const token = localStorage.getItem('auth_token');
+      const token = localStorage.getItem('authToken') || localStorage.getItem('auth_token');
       
       // Only logout if we have a token (meaning user was previously logged in)
       // If no token, user was already logged out
       if (token) {
         console.warn('Token expired or invalid. Logging out...');
+        localStorage.removeItem('authToken');
         localStorage.removeItem('auth_token');
         // Use setTimeout to prevent blocking the current navigation
         setTimeout(() => {
@@ -55,11 +63,14 @@ apiClient.interceptors.response.use(
 
 /**
  * Set authorization token
+ * Stores in localStorage with 'authToken' key
  */
 export const setAuthToken = (token: string) => {
   if (token) {
+    localStorage.setItem('authToken', token);
     apiClient.defaults.headers.common['Authorization'] = `Bearer ${token}`;
   } else {
+    localStorage.removeItem('authToken');
     delete apiClient.defaults.headers.common['Authorization'];
   }
 };
@@ -105,5 +116,89 @@ export const del = async <T = any>(
 ): Promise<AxiosResponse<T>> => {
   return apiClient.delete<T>(url, config);
 };
+
+/**
+ * Enhanced API methods with built-in error handling
+ */
+export const api = {
+  get: async <T = any>(url: string, config?: AxiosRequestConfig) => {
+    try {
+      const response = await apiClient.get<T>(url, config);
+      return { success: true, data: response.data, status: response.status };
+    } catch (error) {
+      return handleApiError(error);
+    }
+  },
+
+  post: async <T = any>(url: string, data?: any, config?: AxiosRequestConfig) => {
+    try {
+      const response = await apiClient.post<T>(url, data, config);
+      return { success: true, data: response.data, status: response.status };
+    } catch (error) {
+      return handleApiError(error);
+    }
+  },
+
+  put: async <T = any>(url: string, data?: any, config?: AxiosRequestConfig) => {
+    try {
+      const response = await apiClient.put<T>(url, data, config);
+      return { success: true, data: response.data, status: response.status };
+    } catch (error) {
+      return handleApiError(error);
+    }
+  },
+
+  patch: async <T = any>(url: string, data?: any, config?: AxiosRequestConfig) => {
+    try {
+      const response = await apiClient.patch<T>(url, data, config);
+      return { success: true, data: response.data, status: response.status };
+    } catch (error) {
+      return handleApiError(error);
+    }
+  },
+
+  delete: async <T = any>(url: string, config?: AxiosRequestConfig) => {
+    try {
+      const response = await apiClient.delete<T>(url, config);
+      return { success: true, data: response.data, status: response.status };
+    } catch (error) {
+      return handleApiError(error);
+    }
+  },
+};
+
+/**
+ * Handle API errors with standardized format
+ */
+function handleApiError(error: any) {
+  let message = 'An error occurred';
+  let code = 'UNKNOWN_ERROR';
+  let status = null;
+
+  if (axios.isAxiosError(error)) {
+    message = error.response?.data?.message || error.response?.data?.error || error.message;
+    code = error.response?.data?.code || `HTTP_${error.response?.status}`;
+    status = error.response?.status;
+    
+    // Log detailed error info for debugging
+    console.error('❌ API Error Response:', {
+      status: error.response?.status,
+      message: error.response?.data?.message,
+      error: error.response?.data?.error,
+      code: error.response?.data?.code,
+      fullResponse: error.response?.data,
+    });
+  } else if (error instanceof Error) {
+    message = error.message;
+    console.error('❌ API Error:', error.message);
+  }
+
+  return {
+    success: false,
+    error: message,
+    code,
+    status,
+  };
+}
 
 export default apiClient;

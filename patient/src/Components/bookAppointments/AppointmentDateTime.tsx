@@ -223,43 +223,7 @@ const AppointmentDateTime: React.FC<ConfirmAppointmentProps> = ({ clinic, setOpe
         <div className="p-3 pb-5 flex flex-col gap-4 w-[800px] max-w-full">
 
             {/* Staff Selection */}
-            {loadingStaff ? (
-                <div className="flex justify-center py-4">
-                    <Loading size="50px" />
-                </div>
-            ) : staffProfiles.length > 0 ? (
-                <div className="flex flex-col gap-2">
-                    <h3 className="text-sm font-semibold text-zinc-700">Select Doctor/Staff</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                        {staffProfiles.map((staff) => (
-                            <button
-                                key={staff._id || staff.id}
-                                onClick={() => setSelectedStaff(staff)}
-                                className={`p-3 border rounded-sm text-left transition-all ${
-                                    selectedStaff?._id === staff._id || selectedStaff?.id === staff.id
-                                        ? "border-sky-600 bg-sky-50"
-                                        : "border-zinc-200 hover:border-sky-400 hover:bg-blue-50"
-                                }`}
-                            >
-                                <div className="flex items-center gap-2">
-                                    <span className="material-symbols-outlined text-xl text-sky-600">person</span>
-                                    <div className="flex-1">
-                                        <p className="font-medium text-sm">{staff.full_name || staff.name}</p>
-                                        <p className="text-xs text-zinc-500">{staff.role}</p>
-                                        {staff.specialization && (
-                                            <p className="text-xs text-zinc-400">{staff.specialization}</p>
-                                        )}
-                                    </div>
-                                </div>
-                            </button>
-                        ))}
-                    </div>
-                </div>
-            ) : staffError ? (
-                <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-sm text-xs text-yellow-700">
-                    {staffError}
-                </div>
-            ) : null}
+            
 
             {/* Doctor details */}
             {selectedStaff && (

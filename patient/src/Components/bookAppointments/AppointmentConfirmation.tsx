@@ -3,6 +3,7 @@ import type { Clinic } from './types'
 import { toast } from 'react-toastify';
 import useBookAppointment from '@/hooks/useBookAppointment';
 import { useProfile } from '@/hooks/useProfile';
+import useGetAppointments from '@/hooks/useGetAppointments';
 import formatTime from '@/services/formatTime';
 
 interface AppointmentSummaryProps {
@@ -17,6 +18,7 @@ interface AppointmentSummaryProps {
 const AppointmentConfirmation: React.FC<AppointmentSummaryProps> = ({ selectedClinic, selectedDate, selectedTime, patientNote, setOpenAppointmentDateTime, setOpenAppointmentConfirmation }) => {
     const { bookAppointment, loading: isBooking } = useBookAppointment();
     const { profile } = useProfile();
+    const { appointments } = useGetAppointments();
 
     const formattedDate = selectedDate.toLocaleDateString("en-US", {
         weekday: "short",
@@ -26,6 +28,14 @@ const AppointmentConfirmation: React.FC<AppointmentSummaryProps> = ({ selectedCl
     });
 
     const formattedTime = formatTime(selectedTime)
+
+    // Convert Date to YYYY-MM-DD string for API
+    const appointmentDateForAPI = selectedDate.toISOString().split('T')[0];
+
+    // Get doctor_id - use doctor_id first, fallback to admin_staff
+    const getDoctorId = () => {
+        return selectedClinic?.doctor_id || selectedClinic?.admin_staff;
+    };
 
     const handleBookAppointment = async () => {
         if (isBooking) return;
@@ -39,17 +49,63 @@ const AppointmentConfirmation: React.FC<AppointmentSummaryProps> = ({ selectedCl
             return;
         }
 
-        const response = await bookAppointment({
-            patient_id: profile?.id,
+        // Convert Date to YYYY-MM-DD string for comparison
+        const appointmentDateForAPI = selectedDate.toISOString().split('T')[0];
+
+        // Check if patient already has an appointment on this date
+        const allAppointments = [
+            ...appointments.upcoming,
+            ...appointments.previous,
+            ...appointments.missed
+        ];
+
+        const existingAppointmentOnDate = allAppointments.some(
+            apt => apt?.appointment_date === appointmentDateForAPI && 
+                   apt?.status !== 'cancelled' &&
+                   apt?.status !== 'completed'
+        );
+
+        if (existingAppointmentOnDate) {
+            toast.error("You already have an appointment scheduled for this date. Please cancel it first or choose a different date.");
+            return;
+        }
+
+        // Validate clinic and doctor data
+        if (!selectedClinic?.id) {
+            toast.error("Clinic ID is missing. Please select a clinic again.");
+            console.error('Missing clinic_id in selectedClinic:', selectedClinic);
+            return;
+        }
+
+        const doctorId = getDoctorId();
+        if (!doctorId) {
+            toast.error("Doctor/Staff ID is missing. Please select a clinic with a doctor assigned.");
+            console.error('Missing doctor_id and admin_staff in selectedClinic:', selectedClinic);
+            return;
+        }
+
+        // Get patient_id from localStorage (set during login/signup)
+        const patientId = localStorage.getItem('patient_id');
+        if (!patientId) {
+            toast.error("Patient ID is missing. Please log in again.");
+            return;
+        }
+
+        const appointmentPayload = {
+            patient_id: patientId,
             full_name: profile?.full_name,
-            uhid: profile?.uhid,
-            contact_number: profile?.contact_number,
-            clinic_id: selectedClinic?.id,
-            doctor_id: selectedClinic?.doctor_id,
-            appointment_date: selectedDate,
+            uhid: profile?.uhid || null,
+            contact_number: profile?.contact_number || null,
+            clinic_id: selectedClinic.id,
+            doctor_id: doctorId,
+            appointment_date: appointmentDateForAPI,
             appointment_time: selectedTime,
             patient_note: patientNote?.trim().length > 0 ? patientNote?.trim() : null,
-        })
+        };
+
+        console.log('🔍 Validation passed. Appointment payload:', appointmentPayload);
+
+        const response = await bookAppointment(appointmentPayload);
 
         if (!response.success) {
             toast.error(response.error || "Something went wrong")
@@ -99,14 +155,25 @@ const AppointmentConfirmation: React.FC<AppointmentSummaryProps> = ({ selectedCl
                             <h4 className='font-semibold text-[15px]'>Clinic Information</h4>
                             <div className='text-zinc-700'>
                                 <p className='font-semibold'>{selectedClinic?.name}</p>
-                                <p className='text-xs text-zinc-500'>{selectedClinic?.address}</p>
-                                <p className='text-xs text-zinc-500'>
-                                    {
-                                        [selectedClinic?.city, selectedClinic?.State, selectedClinic?.pincode]
-                                            .filter(Boolean)
-                                            .join(", ")
-                                    }
-                                </p>
+                                {typeof selectedClinic?.address === 'object' && selectedClinic?.address ? (
+                                    <>
+                                        <p className='text-xs text-zinc-500'>{(selectedClinic.address as any).street}</p>
+                                        <p className='text-xs text-zinc-500'>
+                                            {[(selectedClinic.address as any).city, (selectedClinic.address as any).state, (selectedClinic.address as any).postal_code]
+                                                .filter(Boolean)
+                                                .join(", ")}
+                                        </p>
+                                    </>
+                                ) : (
+                                    <>
+                                        <p className='text-xs text-zinc-500'>{typeof selectedClinic?.address === 'string' ? selectedClinic.address : 'N/A'}</p>
+                                        <p className='text-xs text-zinc-500'>
+                                            {[selectedClinic?.city, selectedClinic?.State, selectedClinic?.pincode]
+                                                .filter(Boolean)
+                                                .join(", ")}
+                                        </p>
+                                    </>
+                                )}
                             </div>
                         </div>
                     </div>

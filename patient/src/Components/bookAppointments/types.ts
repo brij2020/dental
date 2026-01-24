@@ -3,13 +3,13 @@ import type { ChangeEvent } from "react";
 export interface BookAppointment {
     full_name: string;
     patient_id: string;
-    uhid: string;
-    contact_number: string;
+    uhid?: string;
+    contact_number?: string;
     clinic_id: string;
     doctor_id: string;
-    appointment_date: Date;
+    appointment_date: string; // YYYY-MM-DD format
     appointment_time?: string;
-    patient_note: string;
+    patient_note?: string | null;
 }
 
 interface dayTime {

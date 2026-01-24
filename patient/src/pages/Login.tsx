@@ -3,7 +3,7 @@ import Input from "../Components/input";
 import { useForm } from "react-hook-form";
 import { toast } from "react-toastify";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "../lib/supabaseClient";
+import { api } from "../lib/apiClient";
 
 type LoginFormInputs = {
   email: string;
@@ -24,23 +24,40 @@ const Login: React.FC = () => {
   const onSubmit = async (data: LoginFormInputs) => {
     if(isSubmitting) return;
     try {
-      const { data: authData, error } = await supabase.auth.signInWithPassword({
+      console.log("🚀 Logging in patient:", data.email);
+      
+      const response: any = await api.post("/api/auth/patient-login", {
         email: data.email,
         password: data.password,
       });
 
-      if (error) {
-        toast.error(error.message);
+      console.log("📋 API Response:", response);
+
+      if (!response.success) {
+        console.error("❌ Login failed:", response.error);
+        toast.error(response.error || "Login failed");
         return;
       }
-      if(authData){
+
+      // response.data contains the backend response with patient data
+      const backendData = response.data;
+      
+      if(backendData?.success && backendData?.data) {
+        console.log("✅ Login successful:", backendData.data);
+        
+        // // Store token and patient info
+        // localStorage.setItem("authToken", backendData.data.token);
+        // localStorage.setItem("patient_id", backendData.data.patient_id);
+        // localStorage.setItem("patient_email", backendData.data.email);
+        // localStorage.setItem("patient_name", backendData.data.full_name);
+        // localStorage.setItem("patient_uhid", backendData.data.uhid);
+        
         toast.success("Login successful!");
         navigate("/");
-
       }
     } catch (err) {
+      console.error("❌ Unexpected error:", err);
       toast.error("An unexpected error occurred");
-      console.error(err);
     }
   };
 

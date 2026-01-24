@@ -34,5 +34,5 @@ module.exports = app => {
   // Bulk delete patients
   router.post("/bulk-delete", verifyToken, patient.bulkDelete);
 
-  app.use("/api/patient", router);
+  app.use("/api/patients", router);
 };

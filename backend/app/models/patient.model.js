@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const bcrypt = require("bcryptjs");
 
 const patientSchema = new mongoose.Schema(
   {
@@ -11,7 +12,14 @@ const patientSchema = new mongoose.Schema(
     email: {
       type: String,
       lowercase: true,
-      trim: true
+      trim: true,
+      unique: true,
+      sparse: true
+    },
+    password: {
+      type: String,
+      select: false,
+      description: "Hashed password for patient login"
     },
     full_name: {
       type: String,
@@ -79,6 +87,26 @@ patientSchema.index({ uhid: 1 });
 patientSchema.index({ email: 1 });
 patientSchema.index({ full_name: 1 });
 patientSchema.index({ registration_type: 1 });
+
+/**
+ * Hash password before saving
+ */
+patientSchema.pre("save", async function (next) {
+  if (!this.isModified("password")) return next();
+  try {
+    this.password = await bcrypt.hash(this.password, 10);
+    next();
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * Compare password method
+ */
+patientSchema.methods.comparePassword = async function (password) {
+  return await bcrypt.compare(password, this.password);
+};
 
 
 /**

@@ -108,7 +108,7 @@ export default function Patients() {
           </div>
 
           <div className="flex items-center gap-3">
-            <button
+            {/* <button
               className="inline-flex items-center justify-center gap-2 px-4 py-2.5 font-medium text-white transition bg-gradient-to-r from-indigo-600 to-sky-500 rounded-xl shadow-sm hover:brightness-105 active:brightness-95 disabled:opacity-60 disabled:cursor-not-allowed"
               onClick={() => setAddOpen(true)}
               disabled={!clinicId}
@@ -116,7 +116,7 @@ export default function Patients() {
             >
               <IconUserPlus size={18} />
               Add Registered Patient
-            </button>
+            </button> */}
             <button
               className="inline-flex items-center justify-center gap-2 px-4 py-2.5 font-medium text-white transition bg-gradient-to-r from-cyan-600 to-teal-500 rounded-xl shadow-sm hover:brightness-105 active:brightness-95 disabled:opacity-60 disabled:cursor-not-allowed"
               onClick={() => setRegOpen(true)}

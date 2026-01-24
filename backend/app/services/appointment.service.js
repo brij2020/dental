@@ -121,6 +121,12 @@ class AppointmentService {
       .sort({ appointment_date: 1, appointment_time: 1 })
       .limit(limit);
   }
+
+  // Get all appointments for a patient (upcoming, previous, missed)
+  static async getPatientAppointments(patientId) {
+    return await Appointment.find({ patient_id: patientId })
+      .sort({ appointment_date: 1, appointment_time: 1 });
+  }
 }
 
 module.exports = AppointmentService;

@@ -30,7 +30,10 @@ const environments = {
     mongodb_uri: process.env.MONGODB_URI || 'mongodb://localhost:27017/dcms',
     db_name: process.env.DB_NAME || 'dcms',
     jwt_secret: process.env.JWT_SECRET || 'local-dev-secret-key-change-in-prod',
-    cors_origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
+    cors_origin: process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(',').map(url => url.trim()) : [
+      'http://localhost:5173',  // frontend
+      'http://localhost:5174'   // patient portal
+    ],
     log_level: process.env.LOG_LEVEL || 'debug',
     is_production: false,
     is_staging: false,
@@ -44,7 +47,10 @@ const environments = {
     mongodb_uri: process.env.MONGODB_URI || 'mongodb://staging-db:27017/dcms_staging',
     db_name: process.env.DB_NAME || 'dcms_staging',
     jwt_secret: process.env.JWT_SECRET || 'staging-secret-key-change-in-prod',
-    cors_origin: process.env.CORS_ORIGIN || 'https://staging.example.com',
+    cors_origin: process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(',').map(url => url.trim()) : [
+      'https://staging.example.com',
+      'https://patient-staging.example.com'
+    ],
     log_level: process.env.LOG_LEVEL || 'info',
     is_production: false,
     is_staging: true,
@@ -58,7 +64,10 @@ const environments = {
     mongodb_uri: process.env.MONGODB_URI || 'mongodb://prod-db:27017/dcms_prod',
     db_name: process.env.DB_NAME || 'dcms_prod',
     jwt_secret: process.env.JWT_SECRET, // MUST be set in environment
-    cors_origin: process.env.CORS_ORIGIN || 'https://example.com',
+    cors_origin: process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(',').map(url => url.trim()) : [
+      'https://example.com',
+      'https://patient.example.com'
+    ],
     log_level: process.env.LOG_LEVEL || 'warn',
     is_production: true,
     is_staging: false,
