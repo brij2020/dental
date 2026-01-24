@@ -6,7 +6,21 @@ export interface Appointment {
     appointment_time: string;
     doctor_id: string;
     clinics: Clinic | null;
+
 }
+export interface Address {
+    street?: string;
+    city?: string;
+    state?: string;
+    postal_code?: string;
+    country?: string;
+}
+
+export interface Location {
+    latitude?: number;
+    longitude?: number;
+}
+
 
 
 export interface Clinic {

@@ -101,6 +101,13 @@ const AppointmentConfirmation: React.FC<AppointmentSummaryProps> = ({ selectedCl
             appointment_date: appointmentDateForAPI,
             appointment_time: selectedTime,
             patient_note: patientNote?.trim().length > 0 ? patientNote?.trim() : null,
+            clinics: {
+                id: selectedClinic._id || selectedClinic.id,
+                name: selectedClinic.name,
+                contact_number: selectedClinic.phone,
+                address: selectedClinic.address,
+                location: selectedClinic.location
+            },
         };
 
         console.log('🔍 Validation passed. Appointment payload:', appointmentPayload);

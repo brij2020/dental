@@ -33,6 +33,23 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({ appointment, appointm
 
     const formattedTime = useMemo(() => formatTime(appointment?.appointment_time), [appointment?.appointment_time]);
 
+    const formattedClinicAddress = useMemo(() => {
+        const address = appointment?.clinics?.address || appointment?.clinics?.address;
+        
+        if (!address) return 'N/A';
+        
+        if (typeof address === 'object' && address !== null) {
+            const street = (address as any).street || '';
+            const city = (address as any).city || '';
+            const state = (address as any).state || '';
+            const postalCode = (address as any).postal_code || '';
+            
+            return [street, city, state, postalCode].filter(Boolean).join(', ');
+        }
+        
+        return String(address);
+    }, [appointment?.clinics?.address]);
+
     return (
         <div className={`flex items-center border border-gray-300 bg-white ${appointmentType === "missed" ? "opacity-65" : ""} rounded-sm py-4 px-4 relative ${className}`}>
             <div className='flex md:items-center flex-col md:flex-row justify-between flex-1'>
@@ -59,7 +76,9 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({ appointment, appointm
                             </div>
                             <div className='flex items-center gap-2'>
                                 <span className="material-symbols-sharp text-[17px] text-zinc-400">location_on</span>
-                                <p className='text-[13px] text-zinc-600 line-clamp-2 text-ellipsis'>{appointment?.clinics?.address}</p>
+                                <p className='text-[13px] text-zinc-600 line-clamp-2 text-ellipsis'>
+                                    {formattedClinicAddress}
+                                </p>
                             </div>
                             <div className='flex items-center gap-2'>
                                 <span className="material-symbols-sharp text-[16px] text-zinc-400">stethoscope</span>
