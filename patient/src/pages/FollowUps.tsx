@@ -1,4 +1,6 @@
 import { useState, useMemo } from 'react';
+import { useFetchClinicsAndDoctors } from '@/hooks/useFetchClinicsAndDoctors';
+import type { Clinic, Doctor } from '@/hooks/useFetchClinicsAndDoctors';
 
 // Import the modular components
 import CareTeamSelection from '@/Components/follow-up/CareTeamSelection';
@@ -7,29 +9,7 @@ import SchedulingSection from '@/Components/follow-up/SchedulingSection';
 import VisitPreparation from '@/Components/follow-up/VisitPreparation';
 import ConfirmationModal from '@/Components/follow-up/ConfirmationModal';
 import CustomModal from '@/Components/CustomModal';
-
-// --- TYPE DEFINITIONS ---
-interface Visit {
-    date: Date;
-    treatment: string;
-    summary: string;
-    fullDetailsLink: string;
-}
-
-interface Doctor {
-    id: number;
-    name: string;
-    specialty: string;
-    photoUrl: string;
-    clinicId: string;
-    lastVisit: Visit;
-}
-
-interface Clinic {
-    id: string;
-    name: string;
-    location: string;
-}
+import Loading from '@/Components/Loading';
 
 // Data structure for the confirmation modal
 interface AppointmentData {
@@ -40,26 +20,13 @@ interface AppointmentData {
     files: string[];
 }
 
-// --- MOCK DATA ---
-const mockClinics: Clinic[] = [
-    { id: "clinic-gurgaon", name: "STOMA AI Clinic - Gurgaon", location: "Gurgaon" },
-    { id: "clinic-south-delhi", name: "STOMA AI Clinic - South Delhi", location: "South Delhi" },
-    { id: "clinic-noida", name: "STOMA AI Clinic - Noida", location: "Noida" }
-];
-
-const mockDoctors: Doctor[] = [
-    { id: 1, name: "Dr. Priya Sharma", specialty: "Orthodontist", photoUrl: "https://images.unsplash.com/photo-1576091160550-2173dba9996a?q=80&w=2070&auto=format&fit=crop", clinicId: "clinic-gurgaon", lastVisit: { date: new Date("2025-05-20T14:30:00Z"), treatment: "Braces Adjustment", summary: "Adjustment went well. Ligatures replaced. Monitor for any discomfort. Next follow-up in 8 weeks.", fullDetailsLink: "/log/visit/67890" } },
-    { id: 2, name: "Dr. Rohan Gupta", specialty: "Endodontist", photoUrl: "https://images.unsplash.com/photo-1537368910025-7003507965b6?q=80&w=2070&auto=format&fit=crop", clinicId: "clinic-gurgaon", lastVisit: { date: new Date("2025-01-15T10:00:00Z"), treatment: "Root Canal Treatment (RCT)", summary: "Phase one of RCT complete. Book follow-up in 6 months for final crown.", fullDetailsLink: "/log/visit/12345" } },
-    { id: 3, name: "Dr. Anjali Mehta", specialty: "General Dentist", photoUrl: "https://images.unsplash.com/photo-1618498082410-b4aa22193b38?q=80&w=2070&auto=format&fit=crop", clinicId: "clinic-south-delhi", lastVisit: { date: new Date("2024-12-10T09:00:00Z"), treatment: "Annual Check-up & Cleaning", summary: "No new issues found. Gums are healthy. See you in one year.", fullDetailsLink: "/log/visit/11223" } },
-    { id: 4, name: "Dr. Vikram Singh", specialty: "Oral Surgeon", photoUrl: "https://images.unsplash.com/photo-1582750433449-648ed127bb54?q=80&w=2070&auto=format&fit=crop", clinicId: "clinic-south-delhi", lastVisit: { date: new Date("2025-03-18T11:00:00Z"), treatment: "Wisdom Tooth Extraction", summary: "Extraction completed successfully. Follow post-operative care instructions.", fullDetailsLink: "/log/visit/45678" } },
-    { id: 5, name: "Dr. Kavita Reddy", specialty: "Pediatric Dentist", photoUrl: "https://images.unsplash.com/photo-1594824694996-73eecd88a18d?q=80&w=2070&auto=format&fit=crop", clinicId: "clinic-noida", lastVisit: { date: new Date("2025-06-12T16:00:00Z"), treatment: "Routine Cleaning & Fluoride", summary: "Excellent oral hygiene maintained. Next visit scheduled in 6 months.", fullDetailsLink: "/log/visit/78901" } }
-];
-
-
 export default function FollowUpPage() {
+    // --- FETCH CLINICS AND DOCTORS ---
+    const { clinics, doctors, loading, error, fetchDoctorsByClinic,fetchPatientHistory } = useFetchClinicsAndDoctors();
+
     // --- STATE MANAGEMENT ---
     const [selectedClinicId, setSelectedClinicId] = useState<string>('');
-    const [selectedDoctorId, setSelectedDoctorId] = useState<number | null>(null);
+    const [selectedDoctorId, setSelectedDoctorId] = useState<string | null>(null);
     const [selectedTimeSlot, setSelectedTimeSlot] = useState<string | null>(null);
     const [notes, setNotes] = useState('');
     const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
@@ -68,31 +35,59 @@ export default function FollowUpPage() {
     const [confirmedAppointmentData, setConfirmedAppointmentData] = useState<AppointmentData | null>(null);
 
     // --- COMPUTED VALUES ---
-    const availableDoctors = useMemo(() => {
-        if (!selectedClinicId) return [];
-        return mockDoctors.filter(doctor => doctor.clinicId === selectedClinicId);
-    }, [selectedClinicId]);
-
-    const selectedDoctor = useMemo(() =>
-        selectedDoctorId ? mockDoctors.find(d => d.id === selectedDoctorId) || null : null,
-        [selectedDoctorId]
-    );
-
     const selectedClinic = useMemo(() =>
-        selectedClinicId ? mockClinics.find(c => c.id === selectedClinicId) || null : null,
-        [selectedClinicId]
+        selectedClinicId ? clinics.find(c => c.id === selectedClinicId || c._id === selectedClinicId) || null : null,
+        [selectedClinicId, clinics]
     );
+
+    const selectedDoctor = useMemo(() => {
+        if (!selectedDoctorId) {
+            return null;
+        }
+        const found = doctors.find(d => d.id === selectedDoctorId || d._id === selectedDoctorId) || null;
+
+        return found;
+    }, [selectedDoctorId, doctors]);
+
+    // Loading state
+    if (loading && clinics.length === 0) {
+        return <Loading size={"500px"} />;
+    }
+
+    // Error state
+    if (error) {
+        return (
+            <div className="flex items-center justify-center min-h-screen">
+                <div className="text-center">
+                    <p className="text-red-600 mb-4">⚠️ Error: {error.message}</p>
+                    <button
+                        onClick={() => window.location.reload()}
+                        className="px-4 py-2 bg-cyan-800 text-white rounded hover:bg-cyan-700"
+                    >
+                        Retry
+                    </button>
+                </div>
+            </div>
+        );
+    }
 
     // --- EVENT HANDLERS ---
-    const handleClinicSelect = (clinicId: string) => {
+    const handleClinicSelect = async (clinicId: string) => {
         setSelectedClinicId(clinicId);
         setSelectedDoctorId(null);
         setSelectedTimeSlot(null);
+        
+        // Fetch doctors for selected clinic
+        await fetchDoctorsByClinic(clinicId);
     };
 
-    const handleDoctorSelect = (doctorId: number) => {
+    const handleDoctorSelect = (doctorId: string) => {
+       
+        const doctor = doctors.find(d => d.id === doctorId || d._id === doctorId);
+     
         setSelectedDoctorId(doctorId);
         setSelectedTimeSlot(null);
+        fetchPatientHistory(doctorId);
     };
 
     const handleConfirm = () => {
@@ -102,7 +97,7 @@ export default function FollowUpPage() {
         }
 
         const appointmentData = {
-            doctor: selectedDoctor.name,
+            doctor: selectedDoctor.full_name || selectedDoctor.name || 'Doctor',
             clinic: selectedClinic.name,
             time: selectedTimeSlot,
             notes: isPreparationRequired ? notes.trim() : '',
@@ -141,14 +136,15 @@ export default function FollowUpPage() {
                 <main className="space-y-4">
                     <section className="grid grid-cols-1 xl:grid-cols-2 gap-4">
                         <CareTeamSelection
-                            clinics={mockClinics}
-                            availableDoctors={availableDoctors}
+                            clinics={clinics}
+                            availableDoctors={doctors}
                             selectedClinicId={selectedClinicId}
                             selectedDoctorId={selectedDoctorId}
                             selectedDoctor={selectedDoctor}
                             selectedClinic={selectedClinic}
                             onClinicSelect={handleClinicSelect}
                             onDoctorSelect={handleDoctorSelect}
+                            loading={loading}
                         />
                         <PatientHistory doctor={selectedDoctor} />
                     </section>

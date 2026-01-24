@@ -3,19 +3,7 @@ import { format } from 'date-fns';
 import CalenderProvider from '@/contexts/Calender';
 import Datepicker from '@/Components/DatePicker';
 import { useCalender } from '@/hooks/useCalender';
-
-// --- TYPE DEFINITIONS ---
-interface Doctor {
-  id: number;
-  name: string;
-  specialty: string;
-  clinicId: string;
-}
-
-interface Clinic {
-  id: string;
-  name: string;
-}
+import type { Doctor, Clinic } from '@/hooks/useFetchClinicsAndDoctors';
 
 // --- ENHANCED SLOT LIST (RESPONSIVE) ---
 const EnhancedSlotList: React.FC<{ onTimeSelect: (time: string | null) => void }> = ({ onTimeSelect }) => {
@@ -117,8 +105,8 @@ const AppointmentSummary: React.FC<{
 
 // --- MAIN COMPONENT PROPS ---
 interface SchedulingSectionProps {
-    selectedDoctor: Doctor;
-    selectedClinic: Clinic;
+    selectedDoctor: any; // Accept any doctor type
+    selectedClinic: any; // Accept any clinic type
     selectedTimeSlot: string | null;
     onTimeSelect: (time: string | null) => void;
 }
@@ -130,8 +118,11 @@ const SchedulingSection: React.FC<SchedulingSectionProps> = ({
     selectedTimeSlot,
     onTimeSelect 
 }) => {
+    const doctorId = selectedDoctor?.id || selectedDoctor?._id || '';
+    const clinicId = selectedDoctor?.clinic_id || selectedClinic?.id || selectedClinic?._id || '';
+    
     return (
-        <CalenderProvider dentistId={selectedDoctor.id.toString()} clinicId={selectedDoctor.clinicId}>
+        <CalenderProvider dentistId={doctorId.toString()} clinicId={clinicId.toString()}>
             <div className="bg-white p-4 rounded-sm border border-gray-300">
                 <h2 className="text-[18px] font-semibold flex items-center gap-2 mb-4 text-cyan-800">
                     <span className="material-symbols-sharp">calendar_month</span>

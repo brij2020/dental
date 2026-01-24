@@ -201,4 +201,32 @@ function handleApiError(error: any) {
   };
 }
 
+/**
+ * Get doctor profile by ID
+ * @param doctorId MongoDB ObjectID of the doctor
+ * @returns Doctor profile with availability and schedule info
+ */
+export const getDoctorProfile = async (doctorId: string) => {
+  try {
+    const response = await apiClient.get(`/api/profile/${doctorId}`);
+    return { success: true, data: response.data, status: response.status };
+  } catch (error) {
+    return handleApiError(error);
+  }
+};
+
+/**
+ * Get all doctor profiles by clinic ID
+ * @param clinicId The clinic ID to fetch profiles for
+ * @returns Array of doctor profiles for the clinic
+ */
+export const getClinicProfiles = async (clinicId: string) => {
+  try {
+    const response = await apiClient.get(`/api/profile/clinic/${clinicId}`);
+    return { success: true, data: response.data, status: response.status };
+  } catch (error) {
+    return handleApiError(error);
+  }
+};
+
 export default apiClient;

@@ -1,16 +1,15 @@
 import React, { useEffect, useState } from "react";
+import { getDoctorProfile } from "@/lib/apiClient";
 import type { Clinic, Slots } from "@/Components/bookAppointments/types";
 import DateSelector from "../DateSelector";
 import CustomModal from "../CustomModal";
 import AppointmentConfirmation from "./AppointmentConfirmation";
-import generateSlots from "@/services/generateTimeSlots";
-import { fetchProfileById } from "@/services/clinicService";
 import Loading from "../Loading";
 
 interface ConfirmAppointmentProps {
     clinic: Clinic;
     setOpenAppointmentDateTime: React.Dispatch<React.SetStateAction<boolean>>;
-};
+}
 
 interface SlotGridProps {
     selectedTime: string;
@@ -21,19 +20,18 @@ interface SlotGridProps {
     errorMessage: string;
 }
 
-interface StaffProfile {
+interface DoctorProfile {
     _id?: string;
     id?: string;
     full_name?: string;
     name?: string;
     email?: string;
     mobile_number?: string;
-    qualification?: string;
-    specialization?: string;
+    specialization?: string | string[];
     role?: string;
-    availability?: string | Record<string, any>;
+    availability?: Array<{ day: string; morning?: { start: string; end: string; is_off: boolean }; evening?: { start: string; end: string; is_off: boolean } }>;
     slot_duration_minutes?: number;
-    slots?: Record<string, any> | null;
+    profile_pic?: string;
     [key: string]: any;
 }
 
@@ -68,73 +66,54 @@ const AppointmentDateTime: React.FC<ConfirmAppointmentProps> = ({ clinic, setOpe
     const [selectedTime, setSelectedTime] = useState<string | null>(null);
     const [patientNote, setPatientNote] = useState<string | null>("");
     const [openAppointmentConfirmation, setOpenAppointmentConfirmation] = useState<boolean>(false);
-    const [staffProfiles, setStaffProfiles] = useState<StaffProfile[]>([]);
-    const [loadingStaff, setLoadingStaff] = useState(false);
-    const [selectedStaff, setSelectedStaff] = useState<StaffProfile | null>(null);
-    const [staffError, setStaffError] = useState<string | null>(null);
+    const [doctor, setDoctor] = useState<DoctorProfile | null>(null);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
 
-    // Fetch admin/doctor profiles using IDs from clinic object
+    // Fetch doctor profile using admin_staff ID from clinic
     useEffect(() => {
-        const fetchStaffProfiles = async () => {
+        const fetchDoctorProfile = async () => {
+            if (!clinic?.admin_staff) {
+                setError("No doctor available for this clinic");
+                return;
+            }
+
             try {
-                setLoadingStaff(true);
-                setStaffError(null);
-                const allProfiles: StaffProfile[] = [];
+                setLoading(true);
+                setError(null);
 
-                // Fetch admin profile if admin_staff ID exists
-                if (clinic?.admin_staff) {
-                    try {
-                        const adminProfile = await fetchProfileById(clinic.admin_staff);
-                        if (adminProfile) {
-                            allProfiles.push(adminProfile);
-                        }
-                    } catch (error) {
-                        console.log("Could not fetch admin profile:", clinic.admin_staff);
-                    }
-                }
+                // Fetch doctor profile using centralized API function
+                const response = await getDoctorProfile(clinic.admin_staff);
 
-                // Fetch doctor profiles if doctors array exists
-                if (clinic?.doctors && Array.isArray(clinic.doctors) && clinic.doctors.length > 0) {
-                    const doctorProfiles = await Promise.all(
-                        clinic.doctors.map(async (doctorId) => {
-                            try {
-                                const profile = await fetchProfileById(doctorId);
-                                return profile;
-                            } catch (error) {
-                                console.log("Could not fetch doctor profile:", doctorId);
-                                return null;
-                            }
-                        })
-                    );
-                    allProfiles.push(...doctorProfiles.filter((p) => p !== null));
-                }
-
-                setStaffProfiles(allProfiles);
-                if (allProfiles.length > 0) {
-                    setSelectedStaff(allProfiles[0]);
+                if (response.success && 'data' in response) {
+                    setDoctor(response.data as DoctorProfile);
+                } else if (!response.success && 'error' in response) {
+                    setError(response.error || "Failed to load doctor profile");
                 } else {
-                    setStaffError("No staff profiles available for this clinic");
+                    setError("Failed to load doctor profile");
                 }
-            } catch (error) {
-                console.error("Error fetching staff profiles:", error);
-                setStaffError("Failed to load staff profiles");
+            } catch (err) {
+                const errorMsg = err instanceof Error ? err.message : "Failed to load doctor profile";
+                setError(errorMsg);
+                console.error("Error fetching doctor profile:", err);
             } finally {
-                setLoadingStaff(false);
+                setLoading(false);
             }
         };
 
         if (clinic) {
-            fetchStaffProfiles();
+            fetchDoctorProfile();
         }
     }, [clinic]);
 
-    // generating slots from selected staff availability
+    // Generate slots from doctor availability
     useEffect(() => {
-        if (selectedStaff?.availability && selectedDate) {
+        if (doctor?.availability && selectedDate) {
             const dayName = selectedDate.toLocaleDateString("en-US", { weekday: "long" });
-            const daySchedule = Array.isArray(selectedStaff.availability) 
-                ? selectedStaff.availability.find((a: any) => a.day === dayName)
-                : selectedStaff.availability[dayName];
+            
+            const daySchedule = Array.isArray(doctor.availability) 
+                ? doctor.availability.find((a: any) => a.day === dayName)
+                : doctor.availability[dayName];
 
             const slots: Slots = { morning: [], evening: [] };
 
@@ -144,7 +123,7 @@ const AppointmentDateTime: React.FC<ConfirmAppointmentProps> = ({ clinic, setOpe
                 return;
             }
 
-            const step = selectedStaff.slot_duration_minutes || 30;
+            const step = doctor?.slot_duration_minutes || 30;
 
             // Helper functions for time conversion
             const timeToMinutes = (time: string) => {
@@ -211,31 +190,34 @@ const AppointmentDateTime: React.FC<ConfirmAppointmentProps> = ({ clinic, setOpe
             setAvailableSlots(null);
         }
         setSelectedTime(null);
-    }, [selectedDate, selectedStaff]);
-
-    console.log(availableSlots);
-
-    console.log(availableSlots);
-
-
+    }, [selectedDate, doctor]);
 
     return (
         <div className="p-3 pb-5 flex flex-col gap-4 w-[800px] max-w-full">
 
-            {/* Staff Selection */}
+            {/* Loading State */}
+            {loading && <Loading size={"200px"} />}
             
+            {/* Error State */}
+            {error && (
+                <div className="p-3 bg-red-50 border border-red-200 rounded-sm text-red-700 text-sm">
+                    {error}
+                </div>
+            )}
 
-            {/* Doctor details */}
-            {selectedStaff && (
+            {/* Doctor Profile Card */}
+            {doctor && (
                 <div className="flex items-center gap-2.5 p-3 bg-blue-50 rounded-sm border border-blue-200">
                     <div className="flex items-center justify-center">
                         <span className="material-symbols-outlined text-[35px] text-sky-700">person_heart</span>
                     </div>
                     <div className="flex flex-col">
-                        <h2 className="font-semibold text-lg">{selectedStaff.full_name || selectedStaff.name}</h2>
+                        <h2 className="font-semibold text-lg">{doctor.full_name || doctor.name}</h2>
                         <p className="text-zinc-500 text-[13px] -mt-1">{clinic?.name}</p>
-                        {selectedStaff.specialization && (
-                            <p className="text-zinc-400 text-[12px]">{selectedStaff.specialization}</p>
+                        {doctor.specialization && (
+                            <p className="text-zinc-400 text-[12px]">
+                                {Array.isArray(doctor.specialization) ? doctor.specialization.join(", ") : doctor.specialization}
+                            </p>
                         )}
                     </div>
                 </div>
