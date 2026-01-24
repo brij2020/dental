@@ -81,7 +81,10 @@ const createClinic = async (clinicData) => {
       // Update clinic to add admin to admin_staff
       clinicSaved = await Clinic.findByIdAndUpdate(
         clinicSaved._id,
-        { admin_staff: adminProfile._id },
+        { 
+          admin_staff: adminProfile._id,
+          admin_staff_name: adminProfile.full_name
+        },
         { new: true }
       );
     } catch (adminErr) {

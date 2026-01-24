@@ -64,6 +64,7 @@ export interface Clinic {
     description?: string;
     branding_moto?: string;
     admin_staff?: string;
+    admin_staff_name?: string;
     doctors?: string[];
 }
 

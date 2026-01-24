@@ -272,7 +272,7 @@ exports.getByPatient = async (req, res) => {
     }
 
     const appointments = await AppointmentService.getPatientAppointments(patientId);
-
+    
     return res.status(200).json({
       success: true,
       data: appointments,

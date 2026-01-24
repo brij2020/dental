@@ -82,7 +82,7 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({ appointment, appointm
                             </div>
                             <div className='flex items-center gap-2'>
                                 <span className="material-symbols-sharp text-[16px] text-zinc-400">stethoscope</span>
-                                <p className='text-[13px] text-zinc-600 text-ellipsis whitespace-nowrap overflow-x-hidden'>{appointment?.clinics?.contact_name}</p>
+                                <p className='text-[13px] text-zinc-600 text-ellipsis whitespace-nowrap overflow-x-hidden'>{appointment?.clinics?.admin_staff_name}</p>
                             </div>
                         </div>
                     </div>

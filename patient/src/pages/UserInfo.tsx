@@ -10,7 +10,7 @@ import useUpdateProfile from "@/hooks/useUpdateProfile";
 import useAvatarUpload from "@/hooks/useAvatarUpload";
 
 export default function UserInfo() {
-  const { loading, profile } = useProfile();
+  const { loading, profile, setProfile } = useProfile();
   const { updateProfile } = useUpdateProfile();
   const { uploading, localPreview, fileInputRef, handleFileChange, openFilePicker } = useAvatarUpload();
   const [openModal, setOpenModal] = useState(false);
@@ -29,15 +29,36 @@ export default function UserInfo() {
 
   const handleSave = async (updates: Partial<typeof profile>) => {
     const res = await updateProfile(updates);
-    if (res.error) {
+    if (!res.success || res.error) {
       console.error("Failed to save profile:", res.error);
-      toast.error("Failed to save profile:", res.error)
+      const errorMessage = res.error instanceof Error 
+        ? res.error.message 
+        : "Failed to save profile. Please try again.";
+      toast.error(errorMessage);
     } else {
-      toast?.success?.("Profile updated successfully");
+      // Sync the updated profile data with the context
+      if (res.data && profile) {
+        setProfile({ ...profile, ...res.data });
+      }
+      toast.success("Profile updated successfully");
     }
   };
 
   const displayedAvatar = profile?.avatar?.trim() ? profile?.avatar : localPreview;
+
+  const formatDate = (dateString: string | null | undefined): string => {
+    if (!dateString) return "N/A";
+    try {
+      const date = new Date(dateString);
+      return date.toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+      });
+    } catch {
+      return dateString;
+    }
+  };
 
   return (
     <div className="flex flex-col gap-6 p-0 md:p-4">
@@ -85,9 +106,7 @@ export default function UserInfo() {
             <UserProfileField label="Gender" value={profile?.gender?.toUpperCase() || "N/A"} />
             <UserProfileField
               label="DOB"
-              value={profile?.date_of_birth || "N/A"
-                //  (${profile?.age || "N/A"} years)
-                }
+              value={formatDate(profile?.date_of_birth)}
             />
             <UserProfileField label="Address" value={profile?.address || "N/A"} />
             <UserProfileField label="State" value={profile?.state || "N/A"} />

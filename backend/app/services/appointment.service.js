@@ -1,10 +1,17 @@
 const Appointment = require('../models/appointment.model');
 
 class AppointmentService {
-  // Create a new appointment
+  // Create a new appointment with clinic and doctor snapshots
   static async createAppointment(appointmentData) {
-    const appointment = new Appointment(appointmentData);
-    return await appointment.save();
+    try {
+    
+
+      const appointment = new Appointment(appointmentData);
+      return await appointment.save();
+    } catch (error) {
+      console.error('Error in createAppointment:', error);
+      throw error;
+    }
   }
 
   // Get booked slots for a specific doctor on a specific date

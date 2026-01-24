@@ -33,4 +33,5 @@ export interface Clinic {
   contact_number: string;   
   contact_name: string;
   doctor_id: string;
+  admin_staff_name: string
 }

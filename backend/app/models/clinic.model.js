@@ -83,6 +83,13 @@ const clinicSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "Profile"
     },
+    admin_staff_name: {
+      type: String,
+      default: null,
+      trim: true,
+      ref: "Profile",
+      description: "Name of the admin staff member"
+    },
     // Array of doctors associated with this clinic
     doctors: [
       {

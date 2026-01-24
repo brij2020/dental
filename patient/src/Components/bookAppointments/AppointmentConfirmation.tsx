@@ -106,7 +106,8 @@ const AppointmentConfirmation: React.FC<AppointmentSummaryProps> = ({ selectedCl
                 name: selectedClinic.name,
                 contact_number: selectedClinic.phone,
                 address: selectedClinic.address,
-                location: selectedClinic.location
+                location: selectedClinic.location,
+                admin_staff_name: selectedClinic.admin_staff_name
             },
         };
 

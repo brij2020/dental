@@ -1,23 +1,23 @@
 import { useState } from "react";
 import { useProfile } from "./useProfile";
-import { supabase } from "@/lib/supabaseClient";
+import { api } from "@/lib/apiClient";
 
 export interface Profile {
-    id: string;
-    full_name: string;
-    gender: string;
-    date_of_birth: string | null;
-    // age: number | null;
-    address: string | null;
-    city: string | null;
-    state: string | null;
-    pincode: string | null;
-    contact_number: string | null;
-    email: string | null;
-    avatar: string | null;
-    uhid: string | null;
-    created_at: string | null;
-    updated_at: string | null;
+    id?: string;
+    patient_id?: string;
+    full_name?: string;
+    gender?: string;
+    date_of_birth?: string | null;
+    address?: string | null;
+    city?: string | null;
+    state?: string | null;
+    pincode?: string | null;
+    contact_number?: string | null;
+    email?: string | null;
+    avatar?: string | null;
+    uhid?: string | null;
+    created_at?: string | null;
+    updated_at?: string | null;
 }
 
 export default function useUpdateProfile() {
@@ -27,43 +27,51 @@ export default function useUpdateProfile() {
     const updateProfile = async (updates: Partial<Profile>) => {
         try {
             setLoading(true);
+            console.log("🔄 Updating profile with patient_id:", user?.patient_id);
 
-            if (!user?.id) {
+            // Validate patient ID before proceeding
+            if (!user?.patient_id) {
                 setLoading(false);
-                return { error: new Error("User ID is required") };
+                const error = new Error("Patient ID is required. Please log in again.");
+                console.error(error.message);
+                return { 
+                    success: false,
+                    error,
+                    data: null
+                };
             }
 
-            // If email is part of updates, update the Auth user first
-            // if (updates.email && updates.email !== user.email) {
-            //     const { error: authError } = await supabase.auth.updateUser({
-            //         email: updates.email,
-            //     });
-            //     if (authError) {
-            //         console.error("Failed to update auth email:", authError);
-            //         setLoading(false);
-            //         return { error: authError };
-            //     }
-            // }
+            // Update patient profile via central axios client
+            const response = await api.put(`/api/patients/${user.patient_id}`, updates);
 
-            // Update patients table
-            const { data, error } = await supabase
-                .from("patients")
-                .update(updates)
-                .eq("id", user.id)
-                .select()
-                .maybeSingle();
-
-            if (error) {
-                console.error("Failed to update profile table:", error);
+            if (!response.success) {
+                const errorMessage = 'error' in response ? response.error : 'Failed to update profile';
+                console.error("Failed to update profile:", response);
                 setLoading(false);
-                return { error };
+                const error = new Error(errorMessage);
+                return { 
+                    success: false,
+                    error,
+                    data: null
+                };
             }
+
             setLoading(false);
-            return { data: data ?? null };
+            const responseData = 'data' in response ? response.data?.data : null;
+            return { 
+                success: true,
+                data: responseData ?? null,
+                error: null
+            };
         } catch (err) {
             console.error("updateProfile caught:", err);
             setLoading(false);
-            return { error: err };
+            const error = err instanceof Error ? err : new Error('Unknown error occurred');
+            return { 
+                success: false,
+                error,
+                data: null
+            };
         }
     }
 
