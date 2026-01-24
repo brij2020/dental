@@ -61,6 +61,14 @@ const clinicSchema = new mongoose.Schema(
     },
 
     location: {
+      latitude: {
+        type: Number,
+        default: null
+      },
+      longitude: {
+        type: Number,
+        default: null
+      },
       floor: String,
       room_number: String,
       wing: String

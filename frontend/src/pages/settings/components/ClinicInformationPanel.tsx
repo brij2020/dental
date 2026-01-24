@@ -91,7 +91,28 @@ export default function ClinicInformationPanel() {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+
+    setFormData(prev => {
+      if (!name.includes('.')) {
+        return { ...prev, [name]: value };
+      }
+
+      const keys = name.split('.');
+      const updated: any = { ...prev };
+      let currentLevel = updated;
+
+      for (let i = 0; i < keys.length - 1; i++) {
+        const key = keys[i];
+        const existingValue = currentLevel[key];
+        currentLevel[key] = typeof existingValue === 'object' && existingValue !== null
+          ? { ...existingValue }
+          : {};
+        currentLevel = currentLevel[key];
+      }
+
+      currentLevel[keys[keys.length - 1]] = value;
+      return updated;
+    });
   };
 
   const handleUpdateClinic = async (e: FormEvent<HTMLFormElement>) => {
