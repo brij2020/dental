@@ -21,7 +21,6 @@ const createProfile = async (profileData, options = {}) => {
       role: profileData.role || "doctor",
       clinic_id: profileData.clinic_id,
       status: profileData.status || "Active",
-      availability: profileData.availability,  // ✅ Let Mongoose apply DEFAULT_AVAILABILITY when undefined
       slot_duration_minutes: profileData.slot_duration_minutes || 15,
       profile_pic: profileData.profile_pic,
       education: profileData.education || [],
