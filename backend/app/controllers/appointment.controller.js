@@ -1,3 +1,4 @@
+// ================== IMPORTS & MODELS ==================
 const AppointmentService = require('../services/appointment.service');
 const db = require('../models');
 const Appointment = db.appointments;
@@ -72,16 +73,35 @@ exports.book = async (req, res) => {
       });
     }
 
-    // Check for duplicate booking (same doctor, date, time)
-    const existingAppointment = await AppointmentService.getBookedSlotsForDoctorOnDate(doctor_id, appointment_date);
-    if (existingAppointment.includes(appointment_time)) {
+
+    // Check for slot capacity (admin can have >1 per slot)
+    const dbModels = require('../models');
+    const Profile = dbModels.profiles;
+    const doctorProfile = await Profile.findById(doctor_id);
+    let slotCapacity = 1;
+    if (doctorProfile && doctorProfile.role === 'admin') {
+      // Parse capacity string like '2x', '3x', fallback to 1
+      const capStr = doctorProfile.capacity || '1x';
+      const match = capStr.match(/(\d+)x/);
+      slotCapacity = match ? parseInt(match[1], 10) : 1;
+    }
+
+    // Count existing bookings for this doctor, date, and time
+    const slotBookingCount = await Appointment.countDocuments({
+      doctor_id,
+      appointment_date,
+      appointment_time,
+      status: { $in: ['scheduled', 'confirmed'] }
+    });
+    console.log("slotBookingCount", slotBookingCount)
+    if (slotBookingCount >= slotCapacity) {
       return res.status(409).json({
         success: false,
-        message: 'This time slot is already booked. Please choose another slot.',
+        message: `This time slot is already fully booked. Max capacity: ${slotCapacity}. Please choose another slot.`,
         code: 'SLOT_ALREADY_BOOKED',
       });
     }
-
+  //  return res.status(201).json({})
     const appointmentData = {
       clinic_id,
       patient_id,
@@ -486,3 +506,60 @@ exports.getDoctorHistory = async (req, res) => {
     });
   }
 };
+
+
+// ================== SLOT STATUS API ===================
+/**
+ * Get slot status for a doctor and date (for frontend slot grayout)
+ * GET /api/appointments/slot-status?doctor_id=...&date=...
+ */
+exports.getSlotStatus = async (req, res) => {
+  try {
+    const { doctor_id, date } = req.query;
+    if (!doctor_id || !date) {
+      return res.status(400).json({ message: 'doctor_id and date are required' });
+    }
+
+    const dbModels = require('../models');
+    const Profile = dbModels.profiles;
+    const Appointment = dbModels.appointments;
+    const doctorProfile = await Profile.findById(doctor_id);
+    let slotCapacity = 1;
+    if (doctorProfile && doctorProfile.role === 'admin') {
+      const capStr = doctorProfile.capacity || '1x';
+      const match = capStr.match(/(\d+)x/);
+      slotCapacity = match ? parseInt(match[1], 10) : 1;
+    }
+
+    // Get all appointments for this doctor and date
+    const appointments = await Appointment.find({
+      doctor_id,
+      appointment_date: date,
+      status: { $in: ['scheduled', 'confirmed'] }
+    });
+
+    // Count bookings per slot time
+    const slotMap = {};
+    appointments.forEach(appt => {
+      const t = appt.appointment_time;
+      slotMap[t] = (slotMap[t] || 0) + 1;
+    });
+
+    // Collect all slot times for the day (from appointments)
+    const allTimes = Array.from(new Set(appointments.map(a => a.appointment_time)));
+
+    // Return status for each slot
+    const result = allTimes.map(time => ({
+      time,
+      booked: slotMap[time] || 0,
+      capacity: slotCapacity
+    }));
+
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ message: err.message || 'Error getting slot status' });
+  }
+};
+
+// ================== APPOINTMENT BOOKING ===================
+

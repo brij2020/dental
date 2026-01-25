@@ -61,7 +61,7 @@ export async function insertClinicPatient(payload: ClinicInsertPayload) {
 // Create a new patient via API
 export async function createNewPatientViaApi(patientData: any) {
   try {
-    const response = await post('/api/patient', patientData);
+    const response = await post('/api/patients', patientData);
     return response.data?.data || response.data;
   } catch (error) {
     console.error('Error creating patient:', error);
@@ -72,7 +72,7 @@ export async function createNewPatientViaApi(patientData: any) {
 // Update patient via API
 export async function updatePatientViaApi(patientId: string, patientData: any) {
   try {
-    const response = await put(`/api/patient/${patientId}`, patientData);
+    const response = await put(`/api/patients/${patientId}`, patientData);
     return response.data?.data || response.data;
   } catch (error) {
     console.error('Error updating patient:', error);
@@ -83,7 +83,7 @@ export async function updatePatientViaApi(patientId: string, patientData: any) {
 // Delete patient via API
 export async function deletePatientViaApi(patientId: string) {
   try {
-    await del(`/api/patient/${patientId}`);
+    await del(`/api/patients/${patientId}`);
     return true;
   } catch (error) {
     console.error('Error deleting patient:', error);

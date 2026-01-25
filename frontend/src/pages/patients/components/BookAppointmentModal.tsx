@@ -1,4 +1,5 @@
 import React, { useState, useEffect, type FormEvent, type ElementType } from 'react';
+import { getClinicById as getClinicInfo } from '../../../lib/apiClient';
 import { toast } from 'react-toastify';
 import { Modal } from '../../../components/Modal';
 import {
@@ -8,7 +9,7 @@ import {
   getBookedSlotsForDoctorOnDate,
   checkDoctorLeaveStatus,
 } from '../api';
-import type { ClinicPatientRow, AppointmentInsertPayload, MedicalCondition } from '../types'; 
+import type { ClinicPatientRow, MedicalCondition } from '../types'; 
 import { IconUser, IconIdBadge, IconPhone, IconCalendar, IconStethoscope } from '@tabler/icons-react';
 
 // ... (Keep your existing Availability types and helper functions: timeStringToMinutes, etc.) ...
@@ -139,6 +140,36 @@ export default function BookAppointmentModal({ open, onClose, onSuccess, patient
   const [leaveReason, setLeaveReason] = useState<string | undefined>(undefined);
   const [checkingLeave, setCheckingLeave] = useState(false);
 
+  // Clinic info state
+  const [clinicInfo, setClinicInfo] = useState<any>(null);
+  // Fetch clinic info when modal opens and clinicId is available
+  useEffect(() => {
+    if (open && clinicId) {
+      setClinicInfo(null);
+      // setClinicInfoLoading(true); // removed unused loading state
+      const fetchClinicInfo = async () => {
+        try {
+          // getClinicInfo expects no argument, so we fetch all and filter by clinicId
+          const res = await getClinicInfo();
+          let clinic = null;
+          if (Array.isArray(res.data)) {
+            clinic = res.data.find((c: any) => c.clinic_id === clinicId || c.id === clinicId);
+          } else if (res.data && (res.data.clinic_id === clinicId || res.data.id === clinicId)) {
+            clinic = res.data;
+          }
+          setClinicInfo(clinic || null);
+        } catch (err) {
+          setClinicInfo(null);
+        } finally {
+          // setClinicInfoLoading(false); // removed unused loading state
+        }
+      };
+      fetchClinicInfo();
+    } else {
+      setClinicInfo(null);
+    }
+  }, [open, clinicId]);
+
   // ... (Keep existing useEffects for slots, booked slots, patient data, and doctors) ...
 
   useEffect(() => {
@@ -207,7 +238,7 @@ export default function BookAppointmentModal({ open, onClose, onSuccess, patient
 
   useEffect(() => {
     if (patient) {
-      setPhone(patient.contact_number ?? '');
+      setPhone(patient?.contact_number ?? '');
       setDate(new Date().toISOString().split('T')[0]);
       setTime('');
       setSelectedConditions([]);
@@ -306,16 +337,39 @@ export default function BookAppointmentModal({ open, onClose, onSuccess, patient
 
     setSaving(true);
     try {
-      const payload: AppointmentInsertPayload = {
+      const payload: any = {
         clinic_id: clinicId,
-        patient_id: patient.id??'null', 
-        uhid: patient.uhid,
-        full_name: patient.full_name,
+        patient_id: patient?.id ?? (patient as any)?._id ?? 'null',
+        uhid: patient?.uhid ?? '',
+        full_name: patient?.full_name ?? '',
         contact_number: phone,
         appointment_date: date,
         appointment_time: time,
         doctor_id: selectedDoctorId,
         medical_conditions: finalConditions, // Use the formatted array
+        clinics: clinicInfo
+          ? {
+              id: clinicInfo.clinic_id || clinicInfo.id || clinicId,
+              name: clinicInfo.name || '',
+              contact_number: clinicInfo.phone || clinicInfo.contact_number || '',
+              address: clinicInfo.address
+                ? (typeof clinicInfo.address === 'string'
+                    ? clinicInfo.address
+                    : [clinicInfo.address.street, clinicInfo.address.city, clinicInfo.address.state, clinicInfo.address.postal_code, clinicInfo.address.country].filter(Boolean).join(', '))
+                : '',
+              location: clinicInfo.location
+                ? [clinicInfo.location.floor, clinicInfo.location.room_number, clinicInfo.location.wing].filter(Boolean).join(', ')
+                : '',
+              admin_staff_name: clinicInfo.admin_staff_name || ''
+            }
+          : {
+              id: clinicId,
+              name: '',
+              contact_number: '',
+              address: '',
+              location: '',
+              admin_staff_name: ''
+            }
       };
       
       // Validate payload before sending
@@ -334,7 +388,7 @@ export default function BookAppointmentModal({ open, onClose, onSuccess, patient
         return;
       }
 
-      console.log('Booking appointment with payload:', payload);
+      
       const confirmation = await bookAppointment(payload);
       
       toast.success(
@@ -367,8 +421,8 @@ setBookedSlots(normalized);
     <Modal isOpen={open} onClose={onClose} title="Book New Appointment">
       <form onSubmit={handleSubmit} className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Input label="Patient Name" id="name" icon={IconUser} value={patient.full_name} disabled />
-            <Input label="UHID" id="uhid" icon={IconIdBadge} value={patient.uhid ?? 'N/A'} disabled />
+            <Input label="Patient Name" id="name" icon={IconUser} value={patient?.full_name ?? ''} disabled />
+            <Input label="UHID" id="uhid" icon={IconIdBadge} value={patient?.uhid ?? 'N/A'} disabled />
         </div>
         <hr/>
          <div className="pt-4">

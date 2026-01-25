@@ -15,9 +15,14 @@ exports.verifyToken = (req, res, next) => {
     const decoded = jwt.verify(token.replace("Bearer ", ""), JWT_SECRET);
     req.user = decoded;
     next();
-   
   } catch (err) {
-     console.log(err)
+    console.log(err);
+    if (err.name === 'TokenExpiredError') {
+      return res.status(401).send({ code: 'TOKEN_EXPIRED', message: 'Token expired' });
+    }
+    if (err.name === 'JsonWebTokenError') {
+      return res.status(401).send({ code: 'INVALID_TOKEN', message: 'Invalid token' });
+    }
     return res.status(401).send({ message: "Unauthorized" });
   }
 };

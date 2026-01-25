@@ -73,7 +73,7 @@ async function checkPatientExistsInClinic(clinicId: string, patientId: string): 
 // Update patient via API
 async function updatePatientViaApi(patientId: string, patientData: any) {
   try {
-    const response = await put(`/api/patient/${patientId}`, patientData);
+    const response = await put(`/api/patients/${patientId}`, patientData);
     return response.data?.data || response.data;
   } catch (error) {
     console.error('Error updating patient:', error);

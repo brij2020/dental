@@ -216,14 +216,14 @@ export const getPanelsWithDentist = async (clinicId: string, dentistId: string):
  * Get all patients with filters and pagination
  */
 export const getAllPatients = async (params?: any): Promise<AxiosResponse<any>> => {
-  return get('/api/patient', { params });
+  return get('/api/patients', { params });
 };
 
 /**
  * Search clinic patients by term (name, UHID, phone, email)
  */
 export const searchClinicPatients = async (clinicId: string, term: string): Promise<AxiosResponse<any>> => {
-  return get('/api/patient', {
+  return get('/api/patients', {
     params: {
       clinic_id: clinicId,
       search: term,
@@ -236,7 +236,7 @@ export const searchClinicPatients = async (clinicId: string, term: string): Prom
  * Get all patients for a clinic with pagination
  */
 export const getClinicPatients = async (clinicId: string, limit: number = 1000): Promise<AxiosResponse<any>> => {
-  return get('/api/patient', {
+  return get('/api/patients', {
     params: {
       clinic_id: clinicId,
       limit
@@ -247,64 +247,62 @@ export const getClinicPatients = async (clinicId: string, limit: number = 1000):
 /**
  * Get patient by ID
  */
-export const getPatientById = async (id: string): Promise<AxiosResponse<any>> => {
-  return get(`/api/patient/${id}`);
-};
+
 
 /**
  * Get patient by UHID
  */
 export const getPatientByUhid = async (uhid: string): Promise<AxiosResponse<any>> => {
-  return get(`/api/patient/uhid/${uhid}`);
+  return get(`/api/patients/uhid/${uhid}`);
 };
 
 /**
  * Get patient by phone number
  */
 export const getPatientByPhone = async (phone: string): Promise<AxiosResponse<any>> => {
-  return get('/api/patient/phone', { params: { phone } });
+  return get('/api/patients/phone', { params: { phone } });
 };
 
 /**
  * Get patient by email
  */
 export const getPatientByEmail = async (email: string): Promise<AxiosResponse<any>> => {
-  return get(`/api/patient/email/${email}`);
+  return get(`/api/patients/email/${email}`);
 };
 
 /**
  * Check if patient exists
  */
 export const checkPatientExists = async (email: string): Promise<AxiosResponse<any>> => {
-  return get('/api/patient/check-exists', { params: { email } });
+  return get('/api/patients/check-exists', { params: { email } });
 };
 
 /**
  * Create a new patient
  */
 export const createPatient = async (patientData: any): Promise<AxiosResponse<any>> => {
-  return post('/api/patient', patientData);
+  return post('/api/patients', patientData);
 };
 
 /**
  * Update patient
  */
 export const updatePatient = async (id: string, patientData: any): Promise<AxiosResponse<any>> => {
-  return put(`/api/patient/${id}`, patientData);
+  return put(`/api/patients/${id}`, patientData);
 };
 
 /**
  * Delete patient
  */
 export const deletePatient = async (id: string): Promise<AxiosResponse<any>> => {
-  return del(`/api/patient/${id}`);
+  return del(`/api/patients/${id}`);
 };
 
 /**
  * Bulk delete patients
  */
 export const bulkDeletePatients = async (ids: string[]): Promise<AxiosResponse<any>> => {
-  return post('/api/patient/bulk-delete', { ids });
+  return post('/api/patients/bulk-delete', { ids });
 };
 
 /**

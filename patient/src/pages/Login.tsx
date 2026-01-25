@@ -44,14 +44,12 @@ const Login: React.FC = () => {
       
       if(backendData?.success && backendData?.data) {
         console.log("✅ Login successful:", backendData.data);
-        
-        // // Store token and patient info
-        // localStorage.setItem("authToken", backendData.data.token);
-        // localStorage.setItem("patient_id", backendData.data.patient_id);
-        // localStorage.setItem("patient_email", backendData.data.email);
-        // localStorage.setItem("patient_name", backendData.data.full_name);
-        // localStorage.setItem("patient_uhid", backendData.data.uhid);
-        
+        // Store token and patient info in localStorage
+        localStorage.setItem("authToken", backendData.data.token);
+        localStorage.setItem("patient_id", backendData.data.patient_id);
+        localStorage.setItem("patient_email", backendData.data.email);
+        localStorage.setItem("patient_name", backendData.data.full_name);
+        localStorage.setItem("patient_uhid", backendData.data.uhid);
         toast.success("Login successful!");
         navigate("/");
       }

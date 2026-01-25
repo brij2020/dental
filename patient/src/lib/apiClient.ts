@@ -40,22 +40,23 @@ apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
     console.error('API Error:', error);
-    
-    // Only logout if explicitly unauthorized (401) AND user is authenticated
-    if (error.response?.status === 401) {
-      const token = localStorage.getItem('authToken') || localStorage.getItem('auth_token');
-      
-      // Only logout if we have a token (meaning user was previously logged in)
-      // If no token, user was already logged out
-      if (token) {
-        console.warn('Token expired or invalid. Logging out...');
-        localStorage.removeItem('authToken');
-        localStorage.removeItem('auth_token');
-        // Use setTimeout to prevent blocking the current navigation
-        setTimeout(() => {
-          window.location.href = '/login';
-        }, 500);
-      }
+    // Only logout if explicitly unauthorized (401) AND token exists AND error indicates token issue
+    const token = localStorage.getItem('authToken') || localStorage.getItem('auth_token');
+    if (
+      error.response?.status === 401 &&
+      token &&
+      (
+        error.response?.data?.code === 'TOKEN_EXPIRED' ||
+        error.response?.data?.code === 'INVALID_TOKEN' ||
+        (typeof error.response?.data?.message === 'string' && error.response?.data?.message.toLowerCase().includes('token'))
+      )
+    ) {
+      console.warn('Token expired or invalid. Logging out...');
+      localStorage.removeItem('authToken');
+      localStorage.removeItem('auth_token');
+      setTimeout(() => {
+        window.location.href = '/login';
+      }, 500);
     }
     throw error;
   }

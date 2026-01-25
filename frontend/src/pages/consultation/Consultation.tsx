@@ -219,7 +219,7 @@ const toggleMedicalCondition = (condition: string) => {
         setPatientLoading(true);
 
         try {
-          const patientResponse = await fetch(`/api/patient/${apptData.patient_id}`, {
+          const patientResponse = await fetch(`/api/patients/${apptData.patient_id}`, {
             method: 'GET',
             headers: {
               'Authorization': `Bearer ${localStorage.getItem('token') || ''}`,
