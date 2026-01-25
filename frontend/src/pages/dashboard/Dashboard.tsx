@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import { DashboardStats } from './DashboardStats';
 import { AppointmentCalendar } from './AppointmentCalendar';
-import { supabase } from '../../lib/supabaseClient';
+import { getTodaysAppointmentCount, getMonthlyAppointmentCount } from '../../lib/apiClient';
 import { useAuth } from '../../state/useAuth';
 
 type Stats = {
@@ -15,33 +15,29 @@ export default function Dashboard() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    // wait until we know clinic_id
-    if (!user?.clinic_id) return;
 
+  useEffect(() => {
+    const clinicId = user?.clinic_id ?? '';
+    if (!clinicId) return;
     const fetchStats = async () => {
       setLoading(true);
-
-      const { data, error } = await supabase.rpc('get_appointment_stats', {
-        p_clinic_id: user.clinic_id,
-        // p_date is optional; DB defaults to current_date
-      });
-
-      if (error) {
-        console.error('Error fetching appointment stats:', error);
-        setStats({ todays_appointments: 0, monthly_appointments: 0 });
-      } else if (data && data.length > 0) {
-        setStats({
-          todays_appointments: Number(data[0].todays_appointments),
-          monthly_appointments: Number(data[0].monthly_appointments),
-        });
-      } else {
+      try {
+        const today = new Date();
+        const yyyy = today.getFullYear();
+        const mm = String(today.getMonth() + 1).padStart(2, '0');
+        const dd = String(today.getDate()).padStart(2, '0');
+        const todayStr = `${yyyy}-${mm}-${dd}`;
+        const startOfMonth = `${yyyy}-${mm}-01`;
+        const endOfMonth = todayStr;
+        const todays_appointments = await getTodaysAppointmentCount(clinicId, todayStr);
+        const monthly_appointments = await getMonthlyAppointmentCount(clinicId, startOfMonth, endOfMonth);
+        setStats({ todays_appointments, monthly_appointments });
+      } catch (err) {
+        console.error('Error fetching appointment stats:', err);
         setStats({ todays_appointments: 0, monthly_appointments: 0 });
       }
-
       setLoading(false);
     };
-
     fetchStats();
   }, [user?.clinic_id]);
 
@@ -54,6 +50,7 @@ export default function Dashboard() {
         monthlyAppointments={stats?.monthly_appointments ?? 0}
         loading={loading}
       />
+
 
       <AppointmentCalendar />
     </div>

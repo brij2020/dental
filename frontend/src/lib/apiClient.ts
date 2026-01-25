@@ -1,3 +1,26 @@
+/**
+ * Get today's appointment count for a clinic
+ */
+export const getTodaysAppointmentCount = async (clinicId: string, today: string): Promise<number> => {
+  const response = await get(`/api/appointments/clinic/${clinicId}`, { params: { date: today } });
+  return response.data?.data?.length ?? 0;
+};
+
+/**
+ * Get monthly appointment count for a clinic
+ */
+export const getMonthlyAppointmentCount = async (clinicId: string, startDate: string, endDate: string): Promise<number> => {
+  const response = await get(`/api/appointments/clinic/${clinicId}`, { params: { startDate, endDate } });
+  return response.data?.data?.length ?? 0;
+};
+
+/**
+ * Get clinic slot/schedule info (admin)
+ */
+export const  getAdminDoctorSlot = async (clinicId: string): Promise<any> => {
+  const response = await get(`/api/profile/${clinicId}`);
+  return response.data;
+};
 import axios, { type AxiosRequestConfig, type AxiosInstance, type AxiosResponse } from 'axios';
 import { environment } from '../config/environment';
 

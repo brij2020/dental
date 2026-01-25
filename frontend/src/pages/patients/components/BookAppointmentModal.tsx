@@ -11,7 +11,7 @@ import {
 } from '../api';
 import type { ClinicPatientRow, MedicalCondition } from '../types'; 
 import { IconUser, IconIdBadge, IconPhone, IconCalendar, IconStethoscope } from '@tabler/icons-react';
-
+import { useAuth } from '../../../state/useAuth';
 // ... (Keep your existing Availability types and helper functions: timeStringToMinutes, etc.) ...
 
 export type AvailabilityPeriod = {
@@ -118,6 +118,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(({ id, label, icon:
 ));
 
 export default function BookAppointmentModal({ open, onClose, onSuccess, patient, clinicId }: Props) {
+  const { user } = useAuth(); 
   const [date, setDate] = useState('');
   const [time, setTime] = useState('');
   const [saving, setSaving] = useState(false);
@@ -336,9 +337,10 @@ export default function BookAppointmentModal({ open, onClose, onSuccess, patient
     });
 
     setSaving(true);
+
     try {
       const payload: any = {
-        clinic_id: clinicId,
+        clinic_id: clinicInfo?.clinic_id,
         patient_id: patient?.id ?? (patient as any)?._id ?? 'null',
         uhid: patient?.uhid ?? '',
         full_name: patient?.full_name ?? '',
@@ -349,7 +351,7 @@ export default function BookAppointmentModal({ open, onClose, onSuccess, patient
         medical_conditions: finalConditions, // Use the formatted array
         clinics: clinicInfo
           ? {
-              id: clinicInfo.clinic_id || clinicInfo.id || clinicId,
+              id: user?.id ?? '',
               name: clinicInfo.name || '',
               contact_number: clinicInfo.phone || clinicInfo.contact_number || '',
               address: clinicInfo.address

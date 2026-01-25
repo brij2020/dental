@@ -21,7 +21,8 @@ import {
 } from "date-fns";
 
 // ⬇️ Supabase (client-side). If you use a different client import, swap this line accordingly.
-import { supabase } from '../../lib/supabaseClient';
+import {  getAdminDoctorSlot, getClinicAppointments } from '../../lib/apiClient';
+import { useAuth } from '../../state/useAuth';
 
 // --- TYPES (kept minimal to avoid UI changes) ---
 type Doctor = { id: string; name: string };
@@ -287,78 +288,44 @@ function DateNavigator({ currentDate, setCurrentDate }: { currentDate: Date; set
 // --- MAIN COMPONENT ---
 export function AppointmentCalendar() {
 
+  const { user } = useAuth();
   const [doctors, setDoctors] = useState<Doctor[]>([]);
   const [selectedDoctor, setSelectedDoctor] = useState<Doctor | null>(null);
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
   const [appointments, setAppointments] = useState<Appointment[]>([]);
-
-  // Store per-doctor metadata we need for slots (availability + slot duration)
   const [doctorMeta, setDoctorMeta] = useState<Record<string, { availability: Availability | null; slotDuration: number }>>({});
+  const [clinicId, setClinicId] = useState<string | null>(null);
 
-  // Load current user's role + doctor list (role-based)
+  // Load doctors and their slot info from backend (Mongo API)
   useEffect(() => {
-    let mounted = true;
+    if (!user?.id) return;
+    setClinicId(user.id);
     (async () => {
-      const { data: auth } = await supabase.auth.getUser();
-      const userId = auth?.user?.id;
-      if (!userId) return;
-
-      // Current user's profile to know role and clinic
-      const { data: me } = await supabase
-        .from("profiles")
-        .select("id, role, clinic_id")
-        .eq("id", userId)
-        .maybeSingle();
-
-      const myRole = me?.role ?? "admin";
-
-      // Helper to stash meta for a list of rows
-      const stashMeta = (rows: any[]) => {
-        const next: Record<string, { availability: Availability | null; slotDuration: number }> = {};
-        for (const r of rows) {
-          next[r.id] = {
-            availability: (r.availability as Availability) ?? null,
-            slotDuration: Number(r.slot_duration_minutes ?? 15),
+      try {
+        const adminSlot = await getAdminDoctorSlot(user.id);
+        // If API returns a single admin, wrap in array for uniformity
+        const doctorArr = Array.isArray(adminSlot) ? adminSlot : [adminSlot];
+        const list = doctorArr.map((d: any) => ({
+          id: d._id || d.id,
+          name: d.full_name || d.name || 'Admin',
+        }));
+        setDoctors(list);
+        if (!selectedDoctor && list.length) setSelectedDoctor(list[0]);
+        // Stash meta
+        const meta: Record<string, { availability: Availability | null; slotDuration: number }> = {};
+        for (const d of doctorArr) {
+          meta[d._id || d.id] = {
+            availability: d.availability ?? null,
+            slotDuration: Number(d.slot_duration_minutes ?? 15),
           };
         }
-        setDoctorMeta((prev) => ({ ...prev, ...next }));
-      };
-
-      if (myRole === "doctor") {
-        // Doctor: only themselves
-        const { data: row } = await supabase
-          .from("profiles")
-          .select("id, full_name, availability, slot_duration_minutes")
-          .eq("id", userId)
-          .single();
-        if (!mounted || !row) return;
-        const only = [{ id: row.id, name: row.full_name ?? "Doctor" }];
-        setDoctors(only);
-        setSelectedDoctor(only[0]);
-        stashMeta([row]);
-      } else {
-        // Admin/Receptionist: show all doctors (optionally same clinic)
-        const q = supabase
-   .from("profiles")
-   .select("id, full_name, role, availability, slot_duration_minutes, clinic_id")
-   .in("role", ["doctor", "admin"])
-   .order("full_name", { ascending: true });
-        const { data: rows } = me?.clinic_id ? await q.eq("clinic_id", me.clinic_id) : await q;
-        if (!mounted || !rows) return;
-const list = rows.map((r) => ({
-   id: r.id as string,
-  name: r.role === "admin"
-     ? `${(r.full_name as string) ?? "Admin"} (Admin)`
-     : ((r.full_name as string) ?? "Doctor"),
- }));        setDoctors(list);
-        if (!selectedDoctor && list.length) setSelectedDoctor(list[0]);
-        stashMeta(rows);
+        setDoctorMeta(meta);
+      } catch (err) {
+        setDoctors([]);
+        setDoctorMeta({});
       }
     })();
-    return () => {
-      mounted = false;
-    };
-  }, [supabase]);
+  }, [user?.clinic_id]);
 
   // Compute availability for the selected day
   const dayKey = useMemo(() => format(currentDate, "EEEE"), [currentDate]);
@@ -389,31 +356,27 @@ const list = rows.map((r) => ({
     return generateTimeSlots(eveningWindow.start, eveningWindow.end, slotInterval);
   }, [eveningWindow, slotInterval]);
 
-  // Load appointments for the current date + selected doctor
+  // Load appointments for the current date + selected doctor (Mongo API)
   useEffect(() => {
-    let mounted = true;
+    if (!clinicId || !selectedDoctor) return;
     (async () => {
-      if (!selectedDoctor) return;
-      const dateStr = format(currentDate, "yyyy-MM-dd");
-      const { data } = await supabase
-        .from("appointments")
-        .select("id, doctor_id, full_name, appointment_time, appointment_date")
-        .eq("doctor_id", selectedDoctor.id)
-        .eq("appointment_date", dateStr);
-
-      if (!mounted || !data) return;
-      const mapped: Appointment[] = data.map((row: any) => ({
-        id: row.id,
-        doctorId: row.doctor_id,
-        patientName: row.full_name ?? "",
-        timeHHmm: String(row.appointment_time).slice(0, 5), // HH:mm from HH:mm:ss
-      }));
-      setAppointments(mapped);
+      try {
+        const dateStr = format(currentDate, "yyyy-MM-dd");
+        const filters = { doctorId: selectedDoctor.id, date: dateStr };
+        const response = await getClinicAppointments(clinicId, filters);
+        const data = response.data?.data || [];
+        const mapped: Appointment[] = data.map((row: any) => ({
+          id: row._id || row.id,
+          doctorId: row.doctor_id,
+          patientName: row.full_name ?? '',
+          timeHHmm: String(row.appointment_time).slice(0, 5),
+        }));
+        setAppointments(mapped);
+      } catch (err) {
+        setAppointments([]);
+      }
     })();
-    return () => {
-      mounted = false;
-    };
-  }, [supabase, currentDate, selectedDoctor?.id]);
+  }, [clinicId, currentDate, selectedDoctor?.id]);
 
   // Index appointments by HH:mm for the selected doctor/day
   const appointmentsByTime = useMemo(() => {
