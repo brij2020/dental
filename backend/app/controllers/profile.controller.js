@@ -20,7 +20,7 @@ exports.create = async (req, res) => {
  */
 exports.findAll = async (req, res) => {
   try {
-    const doctors = await profileService.getAllProfiles(req.user);
+    const doctors = await profileService.getAllProfiles({clinic_id: req.user.clinic_id});
     res.send(doctors);
   } catch (err) {
     res.status(500).send({
