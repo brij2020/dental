@@ -1,11 +1,11 @@
 import React, { useEffect, useState } from "react";                                  
-import { fetchAppointments, type someAppointment } from "@/services/huda_fakeApis";     
+// import { fetchAppointments, type someAppointment } from "@/services/huda_fakeApis";     
 import RecentAppointmentCard from "@/Components/Appointments/RecentAppointmentCard";
 
  const RecentAppointments: React.FC = () => {
 
  // HARDCODED- replaced with dummy API calls 
-  {/* const recentAppointments = [                                    
+  const recentAppointments = [                                    
     {
       date: "16-06-2025",
       clinicName: "SPAI Labs",
@@ -31,15 +31,15 @@ import RecentAppointmentCard from "@/Components/Appointments/RecentAppointmentCa
       status: "completed" as const,
     }
   ]; 
-  */} 
+  
                                                                                 
-  const [appointments, setAppointments] = useState<someAppointment[]>([]);
+  const [appointments, setAppointments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const loadAppointments = async () => {
-      const data = await fetchAppointments();
-      setAppointments(data);
+      // const data = await fetchAppointments();
+      setAppointments(recentAppointments);
       setLoading(false);
     };
     
