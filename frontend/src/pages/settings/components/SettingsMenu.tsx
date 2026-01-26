@@ -126,12 +126,12 @@ export const SettingsMenu = () => {
         icon={IconPill}
         to="/settings/problems"
       />
-      <MenuItem
+      {isSuperAdmin && <MenuItem
         title="Video Consultation Timings"
         description="Configure video call schedules."
         icon={IconVideo}
         to="/settings/video-consultation-timings"
-      />
+      />}
       {!isSuperAdmin && (
         <MenuItem
           title="Clinic Panels"
