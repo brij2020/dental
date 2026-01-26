@@ -420,34 +420,68 @@ export const deleteAppointment = async (id: string): Promise<AxiosResponse<any>>
  */
 
 /**
- * Get fee by clinic ID
+ * Get all fees by clinic ID
  */
-export const getFeeByClinicId = async (clinicId: string): Promise<AxiosResponse<any>> => {
-  return get(`/api/fees/clinic/${clinicId}`);
+export const getAllFeesByClinicId = async (clinicId: string): Promise<AxiosResponse<any>> => {
+  return get(`/api/fees/clinic/${clinicId}/all`);
 };
 
 /**
- * Create or update fee for a clinic
+ * Get fee by clinic ID (backward compatibility)
  */
-export const saveFee = async (feeData: any): Promise<AxiosResponse<any>> => {
-  const { clinic_id } = feeData;
-  // If fee already exists, use PUT; otherwise POST
-  // Server handles upsert logic
+export const getFeeByClinicId = async (clinicId: string, doctorId?: string): Promise<AxiosResponse<any>> => {
+  const params = doctorId ? { doctor_id: doctorId } : {};
+  return get(`/api/fees/clinic/${clinicId}`, { params });
+};
+
+/**
+ * Get fee by ID
+ */
+export const getFeeById = async (feeId: string): Promise<AxiosResponse<any>> => {
+  return get(`/api/fees/${feeId}`);
+};
+
+/**
+ * Create new fee
+ */
+export const createFee = async (feeData: any): Promise<AxiosResponse<any>> => {
   return post('/api/fees', feeData);
 };
 
 /**
- * Update fee by clinic ID
+ * Update fee by ID
+ */
+export const updateFee = async (feeId: string, feeData: any): Promise<AxiosResponse<any>> => {
+  return put(`/api/fees/${feeId}`, feeData);
+};
+
+/**
+ * Delete fee by ID
+ */
+export const deleteFee = async (feeId: string): Promise<AxiosResponse<any>> => {
+  return del(`/api/fees/${feeId}`);
+};
+
+/**
+ * Create or update fee for a clinic (backward compatibility)
+ */
+export const saveFee = async (feeData: any): Promise<AxiosResponse<any>> => {
+  return post('/api/fees/save', feeData);
+};
+
+/**
+ * Update fee by clinic ID (backward compatibility)
  */
 export const updateFeeByClinicId = async (clinicId: string, feeData: any): Promise<AxiosResponse<any>> => {
   return put(`/api/fees/clinic/${clinicId}`, feeData);
 };
 
 /**
- * Delete fee by clinic ID
+ * Delete fee by clinic ID (backward compatibility)
  */
-export const deleteFeeByClinicId = async (clinicId: string): Promise<AxiosResponse<any>> => {
-  return del(`/api/fees/clinic/${clinicId}`);
+export const deleteFeeByClinicId = async (clinicId: string, doctorId?: string): Promise<AxiosResponse<any>> => {
+  const params = doctorId ? { doctor_id: doctorId } : {};
+  return del(`/api/fees/clinic/${clinicId}`, { params });
 };
 
 
