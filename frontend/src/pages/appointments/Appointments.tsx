@@ -4,6 +4,7 @@ import { toast } from 'react-toastify';
 import { useAuth } from '../../state/useAuth';
 import type { AppointmentDetails, MedicalCondition } from './types';
 import AppointmentTable from './components/AppointmentTable';
+import { getTodayISTString } from '../../lib/istDateUtils';
 import {
   getAppointments,
   updateAppointmentStatus,
@@ -61,18 +62,6 @@ export default function Appointments() {
 const [clinicConditions, setClinicConditions] = useState<MedicalCondition[]>([]);
  const [, setConditionsLoading] = useState(false);
 
-  // Returns today's date in IST (Asia/Kolkata) timezone
-  const getTodayDateString = () => {
-    const now = new Date();
-    // Convert to IST by adding 5 hours 30 minutes (330 minutes)
-    const istOffset = 330; // IST is UTC+5:30
-    const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
-    const istTime = new Date(utc + (istOffset * 60000));
-    const year = istTime.getFullYear();
-    const month = String(istTime.getMonth() + 1).padStart(2, '0');
-    const day = String(istTime.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-  };
   useEffect(() => {
     if (!clinicId) return;
     const load = async () => {
@@ -95,7 +84,7 @@ const [clinicConditions, setClinicConditions] = useState<MedicalCondition[]>([])
     }
     setLoading(true);
     try {
-      const today = getTodayDateString();
+      const today = getTodayISTString();
       console.log("Fetching appointments for", clinicId, today, searchTerm);
       const data = await getAppointments(clinicId, today, searchTerm);
       setAppointments(data);

@@ -5,6 +5,7 @@ import useBookAppointment from '@/hooks/useBookAppointment';
 import { useProfile } from '@/hooks/useProfile';
 import useGetAppointments from '@/hooks/useGetAppointments';
 import formatTime from '@/services/formatTime';
+import { getISTDate } from '@/lib/istDateUtils';
 
 interface AppointmentSummaryProps {
     selectedClinic: Clinic;
@@ -20,17 +21,10 @@ const AppointmentConfirmation: React.FC<AppointmentSummaryProps> = ({ selectedCl
     const { profile } = useProfile();
     const { appointments } = useGetAppointments();
 
-    const formattedDate = selectedDate.toLocaleDateString("en-US", {
-        weekday: "short",
-        month: "short",
-        day: "2-digit",
-        year: "numeric",
-    });
 
-    const formattedTime = formatTime(selectedTime)
-
-    // Convert Date to YYYY-MM-DD string for API
-    const appointmentDateForAPI = selectedDate.toISOString().split('T')[0];
+    // Get IST date for both display and API
+    const { display: formattedDate, api: appointmentDateForAPI } = getISTDate(selectedDate);
+    const formattedTime = formatTime(selectedTime);
 
     // Get doctor_id - use doctor_id first, fallback to admin_staff
     const getDoctorId = () => {
@@ -49,8 +43,8 @@ const AppointmentConfirmation: React.FC<AppointmentSummaryProps> = ({ selectedCl
             return;
         }
 
-        // Convert Date to YYYY-MM-DD string for comparison
-        const appointmentDateForAPI = selectedDate.toISOString().split('T')[0];
+        // Use consistent IST date for comparison
+        const { api: dateForComparison } = getISTDate(selectedDate);
 
         // Check if patient already has an appointment on this date
         const allAppointments = [
@@ -60,7 +54,7 @@ const AppointmentConfirmation: React.FC<AppointmentSummaryProps> = ({ selectedCl
         ];
 
         const existingAppointmentOnDate = allAppointments.some(
-            apt => apt?.appointment_date === appointmentDateForAPI && 
+            apt => apt?.appointment_date === dateForComparison && 
                    apt?.status !== 'cancelled' &&
                    apt?.status !== 'completed'
         );
@@ -90,13 +84,14 @@ const AppointmentConfirmation: React.FC<AppointmentSummaryProps> = ({ selectedCl
             toast.error("Patient ID is missing. Please log in again.");
             return;
         }
+  
 
         const appointmentPayload = {
             patient_id: patientId,
             full_name: profile?.full_name,
             uhid: profile?.uhid || null,
             contact_number: profile?.contact_number || null,
-            clinic_id: selectedClinic.id,
+            clinic_id: selectedClinic.clinic_id,
             doctor_id: doctorId,
             appointment_date: appointmentDateForAPI,
             appointment_time: selectedTime,
@@ -110,9 +105,6 @@ const AppointmentConfirmation: React.FC<AppointmentSummaryProps> = ({ selectedCl
                 admin_staff_name: selectedClinic.admin_staff_name
             },
         };
-
-        console.log('🔍 Validation passed. Appointment payload:', appointmentPayload);
-
         const response = await bookAppointment(appointmentPayload);
 
         if (!response.success) {
