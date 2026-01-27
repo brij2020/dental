@@ -51,6 +51,7 @@ exports.login = async (req, res) => {
         }
         console.log("email password",email,password);
         const user = await Profile.findOne({ email: email.toLowerCase().trim() }).select("+password");
+        console.log("user",user);
         if (!user) {
             logger.warn({ email }, 'Login failed: user not found');
             return res.status(401).send({ message: "Invalid email or password" });
@@ -60,7 +61,7 @@ exports.login = async (req, res) => {
             logger.warn({ userId: user._id, email }, 'Login failed: no password set');
             return res.status(401).send({ message: "Invalid email or password" });
         }
-
+        console.log("user.password",user.password);
         const isMatch = await user.comparePassword(password);
         if (!isMatch) {
             logger.warn({ userId: user._id, email }, 'Login failed: invalid password');

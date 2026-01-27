@@ -40,12 +40,12 @@ exports.create = async (req, res) => {
   }
 };
 
-// GET /api/remedies - Get all remedies (or by clinic_id if query param provided)
+// GET /api/remedies - Get all remedies (with optional filters: clinic_id, name, limit)
 exports.findAll = async (req, res) => {
   try {
-    const { clinic_id } = req.query;
-    const remedies = await remedyService.findAll(clinic_id);
-
+    const { clinic_id, name, limit } = req.query;
+    const filters = { clinic_id, name, limit };
+    const remedies = await remedyService.findAllWithFilters(filters);
     res.status(200).send({ success: true, data: remedies });
   } catch (err) {
     logger.error("Error fetching remedies:", err);

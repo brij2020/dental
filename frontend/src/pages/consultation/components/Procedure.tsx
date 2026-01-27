@@ -1,7 +1,10 @@
 // src/features/consultation/components/Procedure.tsx
 import { useState, useEffect } from 'react';
-import { supabase } from '../../../lib/supabaseClient';
 import type { TreatmentProcedureRow } from '../types';
+import {
+  getTreatmentProceduresByConsultationId,
+  updateTreatmentProcedure,
+} from '../../../lib/apiClient';
 
 type Props = {
   onSaveAndContinue: () => void;
@@ -27,14 +30,17 @@ export default function Procedure({ onSaveAndContinue, isSaving, consultationId 
       setError(null);
 
       try {
-        const { data, error } = await supabase
-          .from('treatment_procedures')
-          .select('*')
-          .eq('consultation_id', consultationId)
-          .order('created_at', { ascending: true });
-
-        if (error) throw error;
-        setProcedures(data || []);
+        const response = await getTreatmentProceduresByConsultationId(consultationId);
+        
+        if (response.data && response.data.success) {
+          const proceduresData = response.data.data || [];
+          // Map MongoDB _id to id for compatibility
+          const mappedProcedures = proceduresData.map((proc: any) => ({
+            ...proc,
+            id: proc.id || proc._id,
+          }));
+          setProcedures(mappedProcedures as TreatmentProcedureRow[]);
+        }
       } catch (e: any) {
         console.error('Failed to fetch procedures:', e);
         setError('Could not load procedures.');
@@ -80,21 +86,16 @@ export default function Procedure({ onSaveAndContinue, isSaving, consultationId 
       setSavingId(id);
       setSaveError(null);
 
-      const { error } = await supabase
-        .from('treatment_procedures')
-        .update({ cost: newCost })
-        .eq('id', id)
-        .select('id, cost')
-        .single();
-
-      if (error) throw error;
-
-      // Update local state so UI is instant
-      setProcedures(prev => prev.map(p => (p.id === id ? { ...p, cost: newCost ?? 0 } : p)));
-      cancelEdit(id);
+      const response = await updateTreatmentProcedure(id, { cost: newCost ?? 0 });
+      
+      if (response.data && response.data.success) {
+        // Update local state so UI is instant
+        setProcedures(prev => prev.map(p => (p.id === id ? { ...p, cost: newCost ?? 0 } : p)));
+        cancelEdit(id);
+      }
     } catch (e: any) {
       console.error('Failed to save cost:', e);
-      setSaveError(e?.message ?? 'Failed to save.');
+      setSaveError(e?.response?.data?.message || e?.message || 'Failed to save.');
     } finally {
       setSavingId(null);
     }

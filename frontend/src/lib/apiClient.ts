@@ -549,6 +549,126 @@ export const deleteProcedure = async (id: string): Promise<AxiosResponse<any>> =
 };
 
 /**
+ * ==================== TREATMENT PROCEDURES ====================
+ */
+
+/**
+ * Create a new treatment procedure
+ */
+export const createTreatmentProcedure = async (procedureData: any): Promise<AxiosResponse<any>> => {
+  return post('/api/treatment-procedures', procedureData);
+};
+
+/**
+ * Create multiple treatment procedures
+ */
+export const createMultipleTreatmentProcedures = async (procedures: any[]): Promise<AxiosResponse<any>> => {
+  return post('/api/treatment-procedures/bulk', { procedures });
+};
+
+/**
+ * Get treatment procedure by ID
+ */
+export const getTreatmentProcedureById = async (id: string): Promise<AxiosResponse<any>> => {
+  return get(`/api/treatment-procedures/${id}`);
+};
+
+/**
+ * Get all treatment procedures by consultation ID
+ */
+export const getTreatmentProceduresByConsultationId = async (consultationId: string): Promise<AxiosResponse<any>> => {
+  return get(`/api/treatment-procedures/consultation/${consultationId}`);
+};
+
+/**
+ * Get all treatment procedures by clinic ID
+ */
+export const getTreatmentProceduresByClinicId = async (clinicId: string, filters?: any): Promise<AxiosResponse<any>> => {
+  return get(`/api/treatment-procedures/clinic/${clinicId}`, { params: filters });
+};
+
+/**
+ * Update treatment procedure
+ */
+export const updateTreatmentProcedure = async (id: string, procedureData: any): Promise<AxiosResponse<any>> => {
+  return put(`/api/treatment-procedures/${id}`, procedureData);
+};
+
+/**
+ * Delete treatment procedure
+ */
+export const deleteTreatmentProcedure = async (id: string): Promise<AxiosResponse<any>> => {
+  return del(`/api/treatment-procedures/${id}`);
+};
+
+/**
+ * Delete all treatment procedures by consultation ID
+ */
+export const deleteTreatmentProceduresByConsultationId = async (consultationId: string): Promise<AxiosResponse<any>> => {
+  return del(`/api/treatment-procedures/consultation/${consultationId}`);
+};
+
+/**
+ * ==================== CONSULTATIONS ====================
+ */
+
+/**
+ * Create a new consultation
+ */
+export const createConsultation = async (consultationData: any): Promise<AxiosResponse<any>> => {
+  return post('/api/consultations', consultationData);
+};
+
+/**
+ * Get consultation by ID
+ */
+export const getConsultationById = async (id: string): Promise<AxiosResponse<any>> => {
+  return get(`/api/consultations/${id}`);
+};
+
+/**
+ * Get consultation by appointment ID
+ */
+export const getConsultationByAppointmentId = async (appointmentId: string): Promise<AxiosResponse<any>> => {
+  return get(`/api/consultations/appointment/${appointmentId}`);
+};
+
+/**
+ * Get or create consultation by appointment ID
+ */
+export const getOrCreateConsultation = async (appointmentId: string, consultationData: any): Promise<AxiosResponse<any>> => {
+  return post(`/api/consultations/appointment/${appointmentId}/get-or-create`, consultationData);
+};
+
+/**
+ * Update consultation
+ */
+export const updateConsultation = async (id: string, consultationData: any): Promise<AxiosResponse<any>> => {
+  return put(`/api/consultations/${id}`, consultationData);
+};
+
+/**
+ * Get consultations by clinic ID
+ */
+export const getConsultationsByClinicId = async (clinicId: string, filters?: any): Promise<AxiosResponse<any>> => {
+  return get(`/api/consultations/clinic/${clinicId}`, { params: filters });
+};
+
+/**
+ * Get consultations by patient ID
+ */
+export const getConsultationsByPatientId = async (patientId: string, filters?: any): Promise<AxiosResponse<any>> => {
+  return get(`/api/consultations/patient/${patientId}`, { params: filters });
+};
+
+/**
+ * Delete consultation
+ */
+export const deleteConsultation = async (id: string): Promise<AxiosResponse<any>> => {
+  return del(`/api/consultations/${id}`);
+};
+
+/**
  * ==================== PROBLEMS ====================
  */
 

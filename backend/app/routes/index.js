@@ -7,6 +7,7 @@ module.exports = app => {
   require("./patient.routes")(app);
   require("./fee.routes")(app);
   require("./remedy.routes")(app);
+  require("./prescription.routes")(app);
   
   // Medical Condition Routes
   app.use("/api/medical-condition", require("./medicalCondition.routes"));
@@ -19,6 +20,12 @@ module.exports = app => {
   
   // Problem Routes
   app.use("/api/problems", require("./problem.routes"));
+  
+  // Consultation Routes
+  require("./consultation.routes")(app);
+  
+  // Treatment Procedure Routes
+  require("./treatmentProcedure.routes")(app);
 };
 
 

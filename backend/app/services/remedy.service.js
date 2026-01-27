@@ -12,13 +12,28 @@ exports.create = async (remedyData) => {
   }
 };
 
-// Get all remedies (optionally filtered by clinic_id)
-exports.findAll = async (clinic_id = null) => {
+
+// Get all remedies with optional filters: clinic_id, name (partial, case-insensitive), limit
+exports.findAllWithFilters = async (filters = {}) => {
   try {
-    const filter = clinic_id ? { clinic_id } : {};
-    return await Remedy.find(filter).sort({ name: 1 });
+    const query = {};
+    if (filters.clinic_id) {
+      query.clinic_id = filters.clinic_id;
+    }
+    if (filters.name) {
+      // Case-insensitive partial match using regex
+      query.name = { $regex: filters.name, $options: 'i' };
+    }
+    let remedyQuery = Remedy.find(query).sort({ name: 1 });
+    if (filters.limit) {
+      const limitNum = parseInt(filters.limit, 10);
+      if (!isNaN(limitNum) && limitNum > 0) {
+        remedyQuery = remedyQuery.limit(limitNum);
+      }
+    }
+    return await remedyQuery;
   } catch (error) {
-    logger.error("Error fetching remedies:", error);
+    logger.error("Error fetching remedies with filters:", error);
     throw error;
   }
 };

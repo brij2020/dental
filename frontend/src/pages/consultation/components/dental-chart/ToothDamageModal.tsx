@@ -1,5 +1,9 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { supabase } from "../../../../lib/supabaseClient"; // backend
+import { supabase } from "../../../../lib/supabaseClient"; // backend (for procedure_problems)
+import {
+  createTreatmentProcedure,
+  createMultipleTreatmentProcedures,
+} from "../../../../lib/apiClient";
 import {
   IconX,
   IconDeviceFloppy,
@@ -379,7 +383,7 @@ const ToothDamageModal: React.FC<Props> = ({
     [selectedTeeth]
   );
 
-  // --- SAVE TO SUPABASE ---
+  // --- SAVE TO MONGODB ---
   const handleSave = async () => {
     if (isSaving) return;
     setIsSaving(true);
@@ -390,33 +394,40 @@ const ToothDamageModal: React.FC<Props> = ({
         cost.trim() === "" ? null : Number(cost);
 
       if (activeTab === "one") {
-        const { error } = await supabase.from("treatment_procedures").insert({
+        // Single tooth procedure
+        const response = await createTreatmentProcedure({
           consultation_id: consultationId,
           clinic_id: clinicId,
-          tooth_number: toothNumber,
-          problems: filteredProblems.length > 0 ? filteredProblems : null,
-          solutions: filteredSolutions.length > 0 ? filteredSolutions : null,
-          cost: numericCost,
+          tooth_number: toothNumber!,
+          problems: filteredProblems.length > 0 ? filteredProblems : [],
+          solutions: filteredSolutions.length > 0 ? filteredSolutions : [],
+          cost: numericCost ?? 0,
         });
-        if (error) throw error;
+        
+        if (!response.data || !response.data.success) {
+          throw new Error('Failed to create treatment procedure');
+        }
       } else {
+        // Multiple teeth procedure
         const perToothCost: number | null =
           numericCost != null && selectedTeethList.length > 0
             ? Number((numericCost / selectedTeethList.length).toFixed(2))
             : null;
 
-        const rows = selectedTeethList.map((tooth) => ({
+        const procedures = selectedTeethList.map((tooth) => ({
           consultation_id: consultationId,
           clinic_id: clinicId,
           tooth_number: tooth,
-          problems: filteredProblems.length > 0 ? filteredProblems : null,
-          solutions: filteredSolutions.length > 0 ? filteredSolutions : null,
-          cost: perToothCost,
+          problems: filteredProblems.length > 0 ? filteredProblems : [],
+          solutions: filteredSolutions.length > 0 ? filteredSolutions : [],
+          cost: perToothCost ?? 0,
         }));
 
-        if (rows.length > 0) {
-          const { error } = await supabase.from("treatment_procedures").insert(rows);
-          if (error) throw error;
+        if (procedures.length > 0) {
+          const response = await createMultipleTreatmentProcedures(procedures);
+          if (!response.data || !response.data.success) {
+            throw new Error('Failed to create treatment procedures');
+          }
         }
       }
 

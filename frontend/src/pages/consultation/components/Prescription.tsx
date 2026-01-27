@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { IconPlus, IconTrash } from "@tabler/icons-react";
 import { supabase } from "../../../lib/supabaseClient";
+import { remedyAPI } from "../../../lib/remedyAPI";
 import type { PrescriptionRowDb, RemedyRow } from "../types";
 
 // --- TYPES ---
@@ -63,26 +64,15 @@ function MedicineAutocomplete({ value, onChange, onSelect, clinicId }: AutoCompl
         setSuggestions([]);
         return;
       }
-
-      // Only search if the dropdown is actually desired (optional logic, 
-      // but prevents searching when user is just reading)
       if (!showSuggestions) return;
-
       try {
-        const { data, error } = await supabase
-          .from("remedies")
-          .select("*")
-          .eq("clinic_id", clinicId)
-          .ilike("name", `%${value}%`)
-          .limit(10);
-
-        if (error) throw error;
+        // Use new MongoDB backend API for remedies search
+        const data = await remedyAPI.search(clinicId, value, 10);
         setSuggestions(data || []);
       } catch (err) {
         console.error("Error fetching remedies:", err);
       }
     }, 300); // 300ms delay
-
     return () => clearTimeout(delayDebounceFn);
   }, [value, clinicId, showSuggestions]);
 

@@ -83,4 +83,16 @@ export const remedyAPI = {
     );
     return response.data;
   },
+
+  // Get remedies with search and limit (for migration from Supabase REST)
+  search: async (clinicId: string, name: string, limit: number = 10) => {
+    const response = await apiClient.get(REMEDIES_ENDPOINT, {
+      params: {
+        clinic_id: clinicId,
+        name,
+        limit,
+      },
+    });
+    return response.data.data;
+  },
 };

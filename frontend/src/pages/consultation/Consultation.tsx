@@ -2,6 +2,14 @@
 import React, { useEffect, useState} from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabaseClient.ts';
+import {
+  getOrCreateConsultation,
+  updateConsultation,
+  getConsultationById,
+  getAppointmentById,
+  get,
+} from '../../lib/apiClient';
+import { prescriptionAPI } from '../../lib/prescriptionAPI';
 import type { AppointmentDetails } from '../appointments/types';
 import ProgressBar from './components/ProgressBar';
 import ClinicalExamination from './components/ClinicalExamination';
@@ -111,16 +119,18 @@ const loadPreviousConsultation = async () => {
 
   setLoadingPrev(true);
   try {
-    const { data, error } = await supabase
-      .from("consultations")
-      .select("chief_complaints, on_examination, advice, notes")
-      .eq("id", appointment.follow_up_for_consultation_id)
-      .single();
-
-    if (error) throw error;
-
-    setPrevConsultation(data);
-    setIsPrevSessionModalOpen(true);
+    const response = await getConsultationById(appointment.follow_up_for_consultation_id);
+    
+    if (response.data && response.data.success && response.data.data) {
+      const consultation = response.data.data;
+      setPrevConsultation({
+        chief_complaints: consultation.chief_complaints,
+        on_examination: consultation.on_examination,
+        advice: consultation.advice,
+        notes: consultation.notes,
+      });
+      setIsPrevSessionModalOpen(true);
+    }
   } catch (e: any) {
     console.error("Failed to load previous consultation:", e.message);
   } finally {
@@ -146,24 +156,21 @@ const handleSaveMedicalHistory = async () => {
   setIsSavingHistory(true);
 
   try {
-    const { error } = await supabase
-      .from('consultations')
-      .update({
-        medical_history: selectedMedicalHistory
-      })
-      .eq('id', consultationId);
-
-    if (error) throw error;
-
-    // Update local state to reflect the change
-    setConsultationData(prev => 
-      prev ? { ...prev, medical_history: selectedMedicalHistory } : prev
-    );
+    const response = await updateConsultation(consultationId, {
+      medical_history: selectedMedicalHistory
+    });
     
-    // Optional: Close modal on success
-    // setIsMedicalModalOpen(false); 
-    
-    // Or show a success toast (omitted for brevity)
+    if (response.data && response.data.success) {
+      // Update local state to reflect the change
+      setConsultationData(prev => 
+        prev ? { ...prev, medical_history: selectedMedicalHistory } : prev
+      );
+      
+      // Optional: Close modal on success
+      // setIsMedicalModalOpen(false); 
+      
+      // Or show a success toast (omitted for brevity)
+    }
   } catch (e: any) {
     console.error('Failed to save medical history:', e.message);
   } finally {
@@ -190,19 +197,13 @@ const toggleMedicalCondition = (condition: string) => {
       setLoading(true);
       try {
         // 1. Fetch the Appointment from MongoDB via API
-        const appointmentResponse = await fetch(`/api/appointments/${appointmentId}`, {
-          method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token') || ''}`,
-            'Content-Type': 'application/json',
-          },
-        });
+        const appointmentResponse = await getAppointmentById(appointmentId);
 
-        if (!appointmentResponse.ok) {
+        if (!appointmentResponse.data || !appointmentResponse.data.success) {
           throw new Error('Failed to fetch appointment');
         }
 
-        const apptData = (await appointmentResponse.json()).data;
+        const apptData = appointmentResponse.data.data;
         if (!apptData) {
           setError('Appointment not found.');
           setLoading(false);
@@ -219,16 +220,10 @@ const toggleMedicalCondition = (condition: string) => {
         setPatientLoading(true);
 
         try {
-          const patientResponse = await fetch(`/api/patients/${apptData.patient_id}`, {
-            method: 'GET',
-            headers: {
-              'Authorization': `Bearer ${localStorage.getItem('token') || ''}`,
-              'Content-Type': 'application/json',
-            },
-          });
-
-          if (patientResponse.ok) {
-            const patientData = (await patientResponse.json()).data;
+          const patientResponse = await get(`/api/patients/${apptData.patient_id}`);
+          
+          if (patientResponse.data && patientResponse.data.success) {
+            const patientData = patientResponse.data.data;
             if (patientData) {
               const flatPatient = {
                 id: patientData._id || patientData.id,
@@ -257,63 +252,29 @@ const toggleMedicalCondition = (condition: string) => {
         setPatientLoading(false);
 
         // ---------------------------------------------------------
-        // 2. GET or CREATE the consultation (Robust Handling)
+        // 2. GET or CREATE the consultation (Using MongoDB API)
         // ---------------------------------------------------------
         
-        // Step A: Try to find existing one
-        const { data: existingData, error: fetchError } = await supabase
-          .from('consultations')
-          .select('*')
-          .eq('appointment_id', apptData.id)
-          .maybeSingle();
+        try {
+          const response = await getOrCreateConsultation(apptData.id, {
+            clinic_id: apptData.clinic_id,
+            patient_id: apptData.patient_id,
+            doctor_id: apptData.doctor_id,
+          });
 
-        if (fetchError) throw fetchError;
-
-        // Initialize our mutable variable with the data found (or null)
-        let activeConsultation = existingData;
-        
-        if (fetchError) throw fetchError;
-
-        // Step B: If not found, try to create
-        if (!activeConsultation) {
-          const { data: newConsultation, error: insertError } = await supabase
-            .from('consultations')
-            .insert({
-              appointment_id: apptData.id,
-              patient_id: apptData.patient_id,
-              clinic_id: apptData.clinic_id,
-              doctor_id: apptData.doctor_id,
-              status: 'Draft',
-            })
-            .select()
-            .single();
-
-          if (insertError) {
-            // Step C: Handle Race Condition (Duplicate Key 23505)
-            // If two requests happened at once, the second one fails here.
-            // We simply fetch the one the first request created.
-            if (insertError.code === '23505') {
-               const { data: retryData, error: retryError } = await supabase
-                .from('consultations')
-                .select('*')
-                .eq('appointment_id', apptData.id)
-                .single();
-               
-               if (retryError) throw retryError;
-               activeConsultation = retryData;
-            } else {
-               // Real error
-               throw insertError;
-            }
-          } else {
-            activeConsultation = newConsultation;
+          if (response.data && response.data.success && response.data.data) {
+            const activeConsultation = response.data.data;
+            // Map MongoDB _id to id for compatibility
+            const mappedConsultation = {
+              ...activeConsultation,
+              id: activeConsultation.id || activeConsultation._id,
+            };
+            setConsultationData(mappedConsultation as ConsultationRow);
+            setConsultationId(mappedConsultation.id);
           }
-        }
-
-        // Final Step: Set State
-        if (activeConsultation) {
-            setConsultationData(activeConsultation);
-            setConsultationId(activeConsultation.id);
+        } catch (consultationError: any) {
+          console.error('Failed to get or create consultation:', consultationError);
+          // Don't throw - allow page to load even if consultation creation fails
         }
 
       } catch (e: any) {
@@ -369,23 +330,23 @@ const toggleMedicalCondition = (condition: string) => {
     if (!consultationId) return;
     setIsSaving(true);
     const updates = {
-      chief_complaints: data.chiefComplaints,
-      on_examination: data.onExamination,
-      advice: data.advice,
-      notes: data.notes,
-    } as Partial<ConsultationRow>;
+      chief_complaints: data.chiefComplaints || null,
+      on_examination: data.onExamination || null,
+      advice: data.advice || null,
+      notes: data.notes || null,
+    };
 
     try {
-      const { error } = await supabase
-        .from('consultations')
-        .update(updates)
-        .eq('id', consultationId);
-      if (error) throw error;
-      setConsultationData(
-        (prev) =>
-          prev ? ({ ...prev, ...updates } as ConsultationRow) : null,
-      );
-      setCurrentStep(2);
+      const response = await updateConsultation(consultationId, updates);
+      if (response.data && response.data.success && response.data.data) {
+        const updatedConsultation = response.data.data;
+        const mappedConsultation = {
+          ...updatedConsultation,
+          id: updatedConsultation.id || updatedConsultation._id,
+        };
+        setConsultationData(mappedConsultation as ConsultationRow);
+        setCurrentStep(2);
+      }
     } catch (e: any) {
       console.error('Failed to save clinical examination:', e.message);
     } finally {
@@ -397,21 +358,17 @@ const toggleMedicalCondition = (condition: string) => {
     if (!consultationId) return;
     setIsSaving(true);
     try {
-      const { error: bumpError } = await supabase
-        .from('consultations')
-        .update({ updated_at: new Date().toISOString() })
-        .eq('id', consultationId);
-      if (bumpError)
-        console.warn('Bump failed (ok if not needed):', bumpError.message);
-
-      const { data: fresh, error } = await supabase
-        .from('consultations')
-        .select('*')
-        .eq('id', consultationId)
-        .single();
-
-      if (!error && fresh) setConsultationData(fresh as ConsultationRow);
-      setCurrentStep(3);
+      // Refresh consultation data from MongoDB
+      const response = await getConsultationById(consultationId);
+      if (response.data && response.data.success && response.data.data) {
+        const fresh = response.data.data;
+        const mappedConsultation = {
+          ...fresh,
+          id: fresh.id || fresh._id,
+        };
+        setConsultationData(mappedConsultation as ConsultationRow);
+        setCurrentStep(3);
+      }
     } finally {
       setIsSaving(false);
     }
@@ -421,33 +378,27 @@ const toggleMedicalCondition = (condition: string) => {
     if (!consultationId || !consultationData?.clinic_id) return;
     setIsSaving(true);
     try {
-      const { error: deleteError } = await supabase
-        .from('prescriptions')
-        .delete()
-        .eq('consultation_id', consultationId);
-      if (deleteError) throw deleteError;
-
+      // 1. Delete all existing prescriptions for this consultation
+      await prescriptionAPI.deleteByConsultation(consultationId);
+      // 2. Prepare valid rows for saving
       const validRows = data
         .filter((row) => row.medicineName && row.medicineName.trim() !== '')
         .map((row) => ({
           consultation_id: consultationId,
           clinic_id: consultationData.clinic_id,
           medicine_name: row.medicineName.trim(),
-          times: row.times || null,
-          quantity: row.quantity || null,
-          days: row.days || null,
-          note: row.note || null,
+          times: row.times,
+          quantity: row.quantity,
+          days: row.days,
+          note: row.note,
         }));
-
       if (validRows.length > 0) {
-        const { error: insertError } = await supabase
-          .from('prescriptions')
-          .insert(validRows);
-        if (insertError) throw insertError;
+        await prescriptionAPI.saveForConsultation(consultationId, validRows);
       }
-      setCurrentStep(4);
+      // Optionally: show success message or update state
     } catch (e: any) {
       console.error('Failed to save prescription:', e.message);
+      // Optionally: show error message
     } finally {
       setIsSaving(false);
     }
@@ -464,37 +415,40 @@ const toggleMedicalCondition = (condition: string) => {
     }
     setIsSaving(true);
     try {
-      const { error: consultationError } = await supabase
-        .from('consultations')
-        .update({
-          consultation_fee: data.consultationFee ?? 0,
-          other_amount: data.otherAmount ?? 0,
-          discount: data.discount ?? 0,
-          previous_outstanding_balance: data.previousOutstandingBalance ?? 0,
-        })
-        .eq('id', consultationId);
-      if (consultationError) throw consultationError;
+      // Update consultation billing data via MongoDB API
+      const updateResponse = await updateConsultation(consultationId, {
+        consultation_fee: data.consultationFee ?? 0,
+        other_amount: data.otherAmount ?? 0,
+        discount: data.discount ?? 0,
+        previous_outstanding_balance: data.previousOutstandingBalance ?? 0,
+      });
+      
+      if (updateResponse.data && updateResponse.data.success) {
+        // Payments still handled via Supabase (separate table)
+        if ((data.paid ?? 0) > 0) {
+          const { error: paymentError } = await supabase.from('payments').insert({
+            consultation_id: consultationId,
+            clinic_id: consultationData.clinic_id,
+            patient_id: consultationData.patient_id,
+            amount: data.paid,
+            payment_mode: data.modeOfPayment,
+            reference: data.paymentReference || null,
+          });
+          if (paymentError) throw paymentError;
+        }
 
-      if ((data.paid ?? 0) > 0) {
-        const { error: paymentError } = await supabase.from('payments').insert({
-          consultation_id: consultationId,
-          clinic_id: consultationData.clinic_id,
-          patient_id: consultationData.patient_id,
-          amount: data.paid,
-          payment_mode: data.modeOfPayment,
-          reference: data.paymentReference || null,
-        });
-        if (paymentError) throw paymentError;
+        // Refresh consultation data
+        const freshResponse = await getConsultationById(consultationId);
+        if (freshResponse.data && freshResponse.data.success && freshResponse.data.data) {
+          const fresh = freshResponse.data.data;
+          const mappedConsultation = {
+            ...fresh,
+            id: fresh.id || fresh._id,
+          };
+          setConsultationData(mappedConsultation as ConsultationRow);
+        }
+        setCurrentStep(5);
       }
-
-      const { data: fresh, error: refetchError } = await supabase
-        .from('consultations')
-        .select('*')
-        .eq('id', consultationId)
-        .single();
-      if (!refetchError && fresh)
-        setConsultationData(fresh as ConsultationRow);
-      setCurrentStep(5);
     } catch (e: any) {
       console.error('Failed to save billing:', e.message);
     } finally {
@@ -511,13 +465,14 @@ const toggleMedicalCondition = (condition: string) => {
   setIsSaving(true);
 
   try {
-    // 1️⃣ Mark the consultation itself as completed
-    const { error: statusError } = await supabase
-      .from('consultations')
-      .update({ status: 'Completed' }) // keeping your existing capitalization here
-      .eq('id', consultationId);
-
-    if (statusError) throw statusError;
+    // 1️⃣ Mark the consultation itself as completed via MongoDB API
+    const statusResponse = await updateConsultation(consultationId, { 
+      status: 'Completed' 
+    });
+    
+    if (!statusResponse.data || !statusResponse.data.success) {
+      throw new Error('Failed to update consultation status');
+    }
 
     // 2️⃣ Mark the *appointment* as completed
     const { error: appointmentStatusError } = await supabase
