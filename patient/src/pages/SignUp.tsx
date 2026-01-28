@@ -9,7 +9,7 @@ type SignUpFormInputs = {
   full_name: string;
   gender: string;
   contact_number: string;
-  // age: number;
+  age: number;
   date_of_birth: string;
   address: string;
   state: string;
@@ -41,6 +41,13 @@ const SignUp: React.FC = () => {
         password: data.password,
         full_name: data.full_name,
         contact_number: data.contact_number,
+        gender: data.gender,
+        date_of_birth: data.date_of_birth,
+        address: data.address,
+        state: data.state,
+        city: data.city,
+        pincode: data.pincode,
+
       });
 
       console.log("📋 API Response:", response);
