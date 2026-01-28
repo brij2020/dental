@@ -6,7 +6,7 @@ const jwt = require("jsonwebtoken");
 const crypto = require("crypto")
 const JWT_SECRET = process.env.JWT_SECRET || "secret123";
 const { logger } = require("../config/logger");
-
+const emailService = require('../services/email.service');
 /**
  * Register (Doctor / Admin)
  */
@@ -166,7 +166,15 @@ exports.patientLogin = async (req, res) => {
  */
 exports.patientRegister = async (req, res) => {
     try {
-        const { email, password, full_name, contact_number } = req.body;
+        const { email, password, full_name, contact_number , 
+            registration_type = "clinic",
+            address,
+            state,
+            pincode,
+            city,
+            date_of_birth,
+            gender,
+        } = req.body;
 
         if (!email || !password || !full_name) {
             return res.status(400).json({
@@ -187,15 +195,22 @@ exports.patientRegister = async (req, res) => {
             });
         }
 
-        const patient = new Patient({
-            email: email.toLowerCase().trim(),
+        const patient = new Patient( {
+            email:  email.toLowerCase().trim(),
             password,
-            full_name: full_name.trim(),
-            contact_number: contact_number || null
+            full_name,
+            contact_number,
+            registration_type,
+            address,
+            state,
+            pincode,
+            city,
+            date_of_birth,
+            gender,
         });
 
         await patient.save();
-
+        emailService.sendClinicCredentials(email, full_name, email, password);
         const token = jwt.sign(
             { id: patient._id, patient_id: patient._id, email: patient.email, full_name: patient.full_name, role: "patient" },
             JWT_SECRET,
@@ -210,7 +225,13 @@ exports.patientRegister = async (req, res) => {
                 patient_id: patient._id,
                 email: patient.email,
                 full_name: patient.full_name,
-                uhid: patient.uhid
+                uhid: patient.uhid,
+                address,
+                state,
+                pincode,
+                city,
+                date_of_birth,
+                gender
             },
             message: "Registration successful"
         });

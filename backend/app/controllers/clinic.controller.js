@@ -1,6 +1,6 @@
 const { logger } = require("../config/logger");
 const clinicService = require("../services/clinic.service");
-
+const emailService = require('../services/email.service');
 /**
  * Create Clinic
  */
@@ -8,7 +8,7 @@ exports.create = async (req, res) => {
   try {
     const result = await clinicService.createClinic(req.body);
     // Send provisional login credentials email
-    const emailService = require('../services/email.service');
+    
     const clinicEmail = req.body?.adminProfile?.email;
     const clinicName = req.body?.name;
     const username = req.body?.adminProfile?.username || clinicEmail;

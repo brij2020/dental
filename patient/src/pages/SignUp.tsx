@@ -34,8 +34,7 @@ const SignUp: React.FC = () => {
     if(isSubmitting) return;
     
     try {
-      console.log("🚀 Creating patient account:", data.email);
-      
+     
       const response: any = await api.post("/api/auth/patient-register", {
         email: data.email,
         password: data.password,
@@ -47,6 +46,7 @@ const SignUp: React.FC = () => {
         state: data.state,
         city: data.city,
         pincode: data.pincode,
+        registration_type:'global'
 
       });
 
