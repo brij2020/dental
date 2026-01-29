@@ -184,10 +184,12 @@ exports.patientRegister = async (req, res) => {
             });
         }
 
+        const normalizedEmail = email.toLowerCase().trim();
         
         // Check if patient already exists
-        const existingPatient = await Patient.findOne({ email: email.toLowerCase().trim() });
+        const existingPatient = await Patient.findOne({ email: normalizedEmail });
         if (existingPatient) {
+            logger.warn({ email: normalizedEmail }, 'Patient registration failed: email already exists');
             return res.status(409).json({
                 success: false,
                 message: "Email already registered",
@@ -195,8 +197,8 @@ exports.patientRegister = async (req, res) => {
             });
         }
 
-        const patient = new Patient( {
-            email:  email.toLowerCase().trim(),
+        const patient = new Patient({
+            email: normalizedEmail,
             password,
             full_name,
             contact_number,
@@ -210,44 +212,54 @@ exports.patientRegister = async (req, res) => {
         });
 
         await patient.save();
-        emailService.sendClinicCredentials(email, full_name, email, password);
+        emailService.sendClinicCredentials(email, full_name, normalizedEmail, password);
         const token = jwt.sign(
             { id: patient._id, patient_id: patient._id, email: patient.email, full_name: patient.full_name, role: "patient" },
             JWT_SECRET,
             { expiresIn: "7d" }
         );
 
-        logger.info({ patientId: patient._id, email }, 'Patient registered successfully');
+        logger.info({ patientId: patient._id, email: normalizedEmail }, 'Patient registered successfully');
         res.status(201).json({
             success: true,
-            data: {
-                token,
-                patient_id: patient._id,
+            message: "Patient registered successfully",
+            token,
+            patient: {
+                id: patient._id,
                 email: patient.email,
-                full_name: patient.full_name,
-                uhid: patient.uhid,
-                address,
-                state,
-                pincode,
-                city,
-                date_of_birth,
-                gender
-            },
-            message: "Registration successful"
+                full_name: patient.full_name
+            }
         });
     } catch (err) {
+        logger.error({ err }, 'Patient registration error');
+        
+        // Handle duplicate key error
         if (err.code === 11000) {
+            const key = err.keyValue ? Object.keys(err.keyValue)[0] : 'email';
+            const message = key === 'email' ? 'Email already registered' : `${key} already exists`;
             return res.status(409).json({
                 success: false,
-                message: "Email already registered",
-                code: "DUPLICATE_EMAIL"
+                message,
+                code: "DUPLICATE_KEY",
+                field: key
             });
         }
-        logger.error({ err }, 'Patient registration error');
+
+        // Handle validation errors
+        if (err.name === 'ValidationError') {
+            const errors = Object.values(err.errors).map(e => e.message);
+            return res.status(400).json({
+                success: false,
+                message: "Validation error",
+                errors,
+                code: "VALIDATION_ERROR"
+            });
+        }
+
         res.status(500).json({
             success: false,
-            message: "Registration failed. Please try again.",
-            code: "INTERNAL_SERVER_ERROR"
+            message: err.message || "Error registering patient",
+            code: "REGISTRATION_ERROR"
         });
     }
 };
