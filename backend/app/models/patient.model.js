@@ -114,18 +114,35 @@ patientSchema.methods.comparePassword = async function (password) {
 
 /**
  * Pre-save hook to auto-generate UHID if not provided
- * Format: <YY><8-digit sequence> (e.g., 2600000001 for first patient in 2026)
+ * Format: <YY><timestamp-based-unique-id> (e.g., 26-1704067200000-abc123)
+ * This ensures uniqueness even with concurrent requests
  */
 patientSchema.pre("save", async function (next) {
   if (!this.uhid) {
     try {
       const currentYear = new Date().getFullYear().toString().slice(-2);
-      // Count all patients for this year (global sequence)
-      const yearStart = new Date(new Date().getFullYear(), 0, 1);
-      const count = await mongoose.model("Patient").countDocuments({ createdAt: { $gte: yearStart } });
-      // 8-digit sequence, incremented
-      const sequence = String(count + 1).padStart(8, "0");
-      this.uhid = `${currentYear}${sequence}`;
+      const timestamp = Date.now();
+      // Generate a short random string for additional uniqueness
+      const randomPart = Math.random().toString(36).substring(2, 8).toUpperCase();
+      
+      // Keep generating UHID until we find a unique one
+      let uhid = `${currentYear}${timestamp}${randomPart}`;
+      let attempts = 0;
+      const maxAttempts = 5;
+      
+      while (attempts < maxAttempts) {
+        const existing = await mongoose.model("Patient").findOne({ uhid });
+        if (!existing) {
+          this.uhid = uhid;
+          return next();
+        }
+        // If collision, regenerate
+        attempts++;
+        const newRandomPart = Math.random().toString(36).substring(2, 8).toUpperCase();
+        uhid = `${currentYear}${timestamp}${newRandomPart}`;
+      }
+      
+      throw new Error("Failed to generate unique UHID after maximum attempts");
     } catch (error) {
       console.error("Error generating UHID:", error);
       return next(error);

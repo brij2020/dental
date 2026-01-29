@@ -236,7 +236,7 @@ exports.patientRegister = async (req, res) => {
         // Handle duplicate key error
         if (err.code === 11000) {
             const key = err.keyValue ? Object.keys(err.keyValue)[0] : 'email';
-            const message = key === 'email' ? 'Email already registered' : `${key} already exists`;
+            const message = key === 'email' ? 'Email already registered' : key === 'uhid' ? 'UHID generation failed, please try again' : `${key} already exists`;
             return res.status(409).json({
                 success: false,
                 message,
