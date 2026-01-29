@@ -13,9 +13,12 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
   const { user, loading } = useProfile();
 
   useEffect(() => {
+    // Only redirect if loading is complete AND there's no user
+    // This ensures we wait for UserContext to initialize from localStorage
     if (!loading && !user) {
-      navigate("/login");
+      navigate("/login", { replace: true });
     }
+    
   }, [user, loading, navigate]);
 
   if (loading) {
@@ -24,11 +27,17 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
     );
   }
 
-  return (
-    <>
-      {children}
-    </>
-  );
+  // If not loading and user exists, render children
+  if (user) {
+    return (
+      <>
+        {children}
+      </>
+    );
+  }
+
+  // This should not happen due to the useEffect redirect, but as a fallback
+  return null;
 }
 
 

@@ -53,7 +53,7 @@ const SignUp: React.FC = () => {
       console.log("📋 API Response:", response);
 
       if (!response.success) {
-        console.error("❌ Registration failed:", response.error);
+        console.error("Registration failed:", response.error);
         toast.error(response.error || "Registration failed");
         return;
       }
@@ -73,10 +73,10 @@ const SignUp: React.FC = () => {
         
         toast.success("Account created successfully!");
         reset();
-        navigate("/");
+        window.location.replace("/");
       }
     } catch (error: unknown) {
-      console.error("❌ Unexpected error:", error);
+      console.error("Unexpected error:", error);
       if (error instanceof Error) {
         console.error("Error message:", error.message);
       }
