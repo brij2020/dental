@@ -11,11 +11,12 @@ type AppointmentCardProps = {
     appointment: Appointment
     appointmentType: string
     className?: string
+    onRefetch?: () => void
 }
 
 
 
-const AppointmentCard: React.FC<AppointmentCardProps> = ({ appointment, appointmentType, className }) => {
+const AppointmentCard: React.FC<AppointmentCardProps> = ({ appointment, appointmentType, className, onRefetch }) => {
     const [openModal, setOpenModal] = useState(false)
     const [currentModal, setCurrentModal] = useState<"reschedule" | "cancel" | null>(null)
 
@@ -86,6 +87,12 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({ appointment, appointm
                             </div>
                         </div>
                     </div>
+                    {appointmentType === "upcoming" && (
+                        <div className="hidden md:flex items-center ml-3">
+                            <button onClick={() => { setCurrentModal("cancel"); setOpenModal(true) }} className="text-sm text-red-600 hover:text-red-800 px-3 py-1 border border-red-100 rounded-md">Cancel</button>
+                        </div>
+                    )}
+
                     <Popover>
 
                         <PopoverTrigger className={`absolute right-4 md:relative md:right-0  hover:bg-zinc-600/10 cursor-pointer flex items-center justify-center h-12 w-10 rounded-sm`}>
@@ -128,9 +135,9 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({ appointment, appointm
 
             </div>
 
-            <CustomModal openModal={openModal} setOpenModal={setOpenModal}>
-                {currentModal === "reschedule" && <RescheduleModal setOpenModal={setOpenModal} />}
-                {currentModal === "cancel" && <CancelModal setOpenModal={setOpenModal} />}
+                <CustomModal openModal={openModal} setOpenModal={setOpenModal}>
+                {currentModal === "reschedule" && <RescheduleModal setOpenModal={setOpenModal} appointment={appointment} onSuccess={onRefetch} />}
+                {currentModal === "cancel" && <CancelModal setOpenModal={setOpenModal} appointment={appointment} onSuccess={onRefetch} />}
             </CustomModal>
         </div>
     )

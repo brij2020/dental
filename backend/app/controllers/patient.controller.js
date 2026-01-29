@@ -1,5 +1,6 @@
 const { logger } = require("../config/logger");
 const patientService = require("../services/patient.service");
+const { formatPatientResponse } = require("../util/patientResponseFormatter");
 
 /**
  * Create a new patient (Clinic or Global)
@@ -99,7 +100,7 @@ exports.findOne = async (req, res) => {
     const patient = await patientService.getPatientById(patientId);
 
     res.send({
-      data: patient
+      data: formatPatientResponse(patient)
     });
   } catch (err) {
     logger.error(`Error retrieving patient: ${err.message}`);
@@ -118,7 +119,7 @@ exports.findByUhid = async (req, res) => {
 
     const patient = await patientService.getPatientByUhid(uhid);
     res.send({
-      data: patient
+      data: formatPatientResponse(patient)
     });
   } catch (err) {
     logger.error(`Error retrieving patient by UHID: ${err.message}`);
@@ -144,7 +145,7 @@ exports.findByEmail = async (req, res) => {
     }
 
     res.send({
-      data: patient
+      data: formatPatientResponse(patient)
     });
   } catch (err) {
     logger.error(`Error retrieving patient by email: ${err.message}`);
@@ -196,7 +197,7 @@ exports.update = async (req, res) => {
 
     res.send({
       message: "Patient updated successfully",
-      data: patient
+      data: formatPatientResponse(patient)
     });
   } catch (err) {
     logger.error(`Error updating patient: ${err.message}`);
@@ -248,6 +249,57 @@ exports.bulkDelete = async (req, res) => {
     logger.error(`Error bulk deleting patients: ${err.message}`);
     res.status(500).send({
       message: err.message || "Error deleting patients"
+    });
+  }
+};
+
+/**
+ * Upload patient avatar
+ */
+exports.uploadAvatar = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).send({
+        success: false,
+        message: "No file uploaded"
+      });
+    }
+
+    const patientId = req.params.id;
+    const filename = req.file.filename;
+    const avatarUrl = `/uploads/avatars/${filename}`;
+
+    logger.info(`Avatar upload for patient ${patientId}: ${filename}`);
+
+    // Update patient with avatar URL
+    const patient = await patientService.updatePatient(patientId, { 
+      avatar: avatarUrl 
+    });
+
+    logger.info(`Avatar updated for patient ${patientId}: ${avatarUrl}`);
+
+    // Return full patient object with success flag to match expected response format
+    res.send({
+      success: true,
+      message: "Avatar uploaded successfully",
+      data: {
+        patient: formatPatientResponse(patient),
+        avatar: avatarUrl,
+        filename: filename
+      }
+    });
+  } catch (err) {
+    logger.error(`Error uploading avatar: ${err.message}`);
+    // Clean up uploaded file on error
+    if (req.file) {
+      const fs = require('fs');
+      fs.unlink(req.file.path, (unlinkErr) => {
+        if (unlinkErr) logger.error(`Error deleting file: ${unlinkErr.message}`);
+      });
+    }
+    res.status(500).send({
+      success: false,
+      message: err.message || "Error uploading avatar"
     });
   }
 };

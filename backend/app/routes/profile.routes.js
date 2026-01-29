@@ -7,17 +7,14 @@ module.exports = app => {
   // Create doctor profile
   router.post("/", profile.create);
 
-  // Retrieve all profile
-  router.get("/", verifyToken, profile.findAll);
-
-  // Retrieve all active profile
+  // Retrieve all active profile (public)
   router.get("/active", profile.findAllActive);
+
+  // Retrieve all profile (clinic-filtered, requires auth)
+  router.get("/", verifyToken, profile.findAll);
 
   // Get profiles by clinic_id (public - no auth required)
   router.get("/clinic/:clinicId", profile.findByClinic);
-
-  // Get profiles by clinic_id (legacy route - no auth required)
-  //router.get("/:clinicId", profile.findByClinic);
 
   // Get doctor slots (availability and slot duration)
   router.get("/:id/slots", profile.getSlots);
@@ -27,6 +24,9 @@ module.exports = app => {
 
   // Update doctor profile by id
   router.put("/:id", verifyToken, profile.update);
+  
+  // Admin reset password for a profile
+  router.put("/:id/reset-password", verifyToken, profile.adminResetPassword);
 
   // Delete doctor profile by id
   router.delete("/:id", profile.delete);

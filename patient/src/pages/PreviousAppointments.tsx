@@ -3,7 +3,7 @@ import Loading from "@/Components/Loading";
 import useGetAppointments from "@/hooks/useGetAppointments";
 
 export default function PreviousAppointments() {
-  const { appointments: { previous }, loading, error } = useGetAppointments();
+  const { appointments: { previous }, loading, error, refetch } = useGetAppointments();
 
   return (
     <div className='flex flex-col gap-5 p-0 md:p-4'>
@@ -28,7 +28,7 @@ export default function PreviousAppointments() {
               </div>
             ) : (
               previous.map((appointment) => (
-                <AppointmentCard key={appointment?.id} appointment={appointment} appointmentType="previous" />
+                <AppointmentCard key={appointment?.id} appointment={appointment} appointmentType="previous" onRefetch={refetch} />
               ))
             )
           )

@@ -1,23 +1,15 @@
-import { useState, useRef } from "react";
-import { supabase } from "@/lib/supabaseClient";
+import { useState, useRef, useCallback } from "react";
 import { toast } from "react-toastify";
 import { useProfile } from "./useProfile";
 import useUpdateProfile from "./useUpdateProfile";
+import { api } from "@/lib/apiClient";
 
 export default function useAvatarUpload() {
-    const { profile } = useProfile();
+    const { profile, setProfile } = useProfile();
     const { updateProfile } = useUpdateProfile();
     const [uploading, setUploading] = useState(false);
     const [localPreview, setLocalPreview] = useState<string | null>(null);
     const fileInputRef = useRef<HTMLInputElement | null>(null);
-
-    // ---------- Helpers ----------
-    // const sanitizeForPath = useCallback((s: string | null) => {
-    //     if (!s) return "unknown";
-    //     return s.trim().toLowerCase()
-    //         .replace(/\s+/g, "_")
-    //         .replace(/[^a-z0-9_-]/g, "");
-    // }, []);
 
     const validateFile = (file: File): string | null => {
         if (!file) return "Please select a file.";
@@ -26,40 +18,16 @@ export default function useAvatarUpload() {
         return null;
     };
 
-    const buildPath = (file: File) => {
-        // const sanitizedName = sanitizeForPath(profile.full_name);
-        if (!profile?.id) {
-            throw new Error("Profile ID is required for avatar upload");
-        }
-        const timestamp = Date.now();
-        const safeName = `${timestamp}-${file.name.replace(/\s+/g, "_")}`;
-        console.log(safeName);
-        return `${profile.id}/profile-pic-${timestamp}`;
-    };
-
-    const getPublicOrSignedUrl = async (filePath: string) => {
-        const { data: publicData } = supabase.storage.from("avatars").getPublicUrl(filePath);
-
-        if (publicData?.publicUrl) return publicData.publicUrl;
-
-        const signedRes = await supabase.storage
-            .from("avatars")
-            .createSignedUrl(filePath, 300);
-
-        if (signedRes.error || !signedRes.data?.signedUrl) {
-            throw new Error("Uploaded but failed to generate public/signed URL.");
-        }
-
-        return signedRes.data.signedUrl;
-    };
-
     // ---------- Main Upload Handler ----------
-    const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleFileChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         const error = file ? validateFile(file) : "Please select a file.";
-        if (error) return toast.error(error);
+        if (error) {
+            toast.error(error);
+            return;
+        }
 
-        if (!profile?.id) {
+        if (!profile?.patient_id) {
             toast.error("Profile information is missing. Please refresh the page.");
             return;
         }
@@ -69,6 +37,7 @@ export default function useAvatarUpload() {
         try {
             objectUrl = URL.createObjectURL(file);
             setLocalPreview(objectUrl);
+            console.log("📷 Image preview set:", objectUrl);
         } catch (err) {
             console.error("Error creating object URL:", err);
             toast.error("Failed to preview image. Please try again.");
@@ -77,43 +46,56 @@ export default function useAvatarUpload() {
         }
 
         try {
-            const filePath = buildPath(file);
+            console.log("⏳ Starting upload for patient:", profile.patient_id);
+            
+            // Create FormData for file upload
+            const formData = new FormData();
+            formData.append("avatar", file);
 
-            const { data: files } = await supabase
-                .storage
-                .from("avatars")
-                .list(profile.id);
-
-            if (files && Array.isArray(files) && files.length > 0) {
-                const paths = files.map(f => `${profile.id}/${f.name}`).filter(Boolean);
-                if (paths.length > 0) {
-                    await supabase.storage.from("avatars").remove(paths);
+            // Upload to backend
+            console.log("📤 Uploading to backend...");
+            const response: any = await api.post(
+                `/api/patients/${profile.patient_id}/upload-avatar`,
+                formData,
+                {
+                    headers: {
+                        "Content-Type": "multipart/form-data",
+                    },
                 }
+            );
+
+            console.log("Backend upload response:", response);
+
+            if (!response.success) {
+                throw new Error(response.error || "Upload failed");
             }
 
-            // Upload to Supabase
-            const uploadRes = await supabase.storage
-                .from("avatars")
-                .upload(filePath, file, {
-                    cacheControl: "3600",
-                    upsert: true,
+            // Get the avatar URL from response - API wrapper adds extra layer
+            // Backend response: { success, data: { patient, avatar, filename } }
+            // API wrapper adds: { success, data: backendResponse, status }
+            // So avatar is at response.data?.data?.avatar OR response.data?.avatar (if backend response is the data)
+            const avatarUrl = response.data?.data?.avatar || response.data?.avatar;
+            if (!avatarUrl) {
+                console.error("Response structure:", response);
+                throw new Error("No avatar URL in response");
+            }
+
+            console.log("✅ Upload successful, avatar URL:", avatarUrl);
+
+            // Update the local profile state immediately with new avatar
+            if (profile) {
+                setProfile({
+                    ...profile,
+                    avatar: avatarUrl
                 });
-
-            if (uploadRes.error) {
-                console.error(uploadRes.error);
-                toast.error(uploadRes.error.message);
-                return;
             }
 
-            const finalUrl = await getPublicOrSignedUrl(filePath);
-
-            const { error: updateErr } = await updateProfile({ avatar: finalUrl });
-            if (updateErr) throw new Error("Failed to update profile.");
-
-            toast.success("Profile photo updated.");
+            console.log("✅ Profile updated with new avatar");
+            toast.success("✓ Profile photo saved successfully!");
         } catch (err: any) {
-            console.error(err);
-            toast.error(err.message || "Unexpected upload error.");
+            console.error("Avatar upload error:", err);
+            const errorMessage = err.response?.data?.message || err.message || "Unexpected upload error.";
+            toast.error(errorMessage);
 
             // Clean up preview on error
             if (objectUrl) {
@@ -124,9 +106,11 @@ export default function useAvatarUpload() {
             setUploading(false);
             if (fileInputRef.current) fileInputRef.current.value = "";
         }
-    };
+    }, [profile, setProfile]);
 
-    const openFilePicker = () => fileInputRef.current?.click();
+    const openFilePicker = useCallback(() => {
+        fileInputRef.current?.click();
+    }, []);
 
     return { uploading, localPreview, fileInputRef, handleFileChange, openFilePicker };
 }

@@ -86,5 +86,15 @@ export function useFetchUpcomingAppointments(patientId?: string) {
         }
     }, [patientId, fetchAppointments]);
 
+    // Listen for global refetch events (e.g., after reschedule/cancel)
+    useEffect(() => {
+        const handleRefetch = () => {
+            fetchAppointments();
+        };
+
+        window.addEventListener('appointments:refetch', handleRefetch);
+        return () => window.removeEventListener('appointments:refetch', handleRefetch);
+    }, [fetchAppointments]);
+
     return { appointments, loading, error, refetch: fetchAppointments };
 }

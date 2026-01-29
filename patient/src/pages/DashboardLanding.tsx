@@ -33,9 +33,9 @@ const QuotesIcon = () => {
 }
 
 
-const DashboardLanding = () => {
-	const { loading: profileLoading, profile } = useProfile();
-	const { appointments: { upcoming, previous, missed }, loading: appointmentsLoading } = useGetAppointments();
+ const DashboardLanding = () => {
+ 	const { loading: profileLoading, profile } = useProfile();
+ 	const { appointments: { upcoming, previous, missed }, loading: appointmentsLoading, refetch } = useGetAppointments();
 	console.log(upcoming)
 
 	const countDown = getAppointmentCountdown(upcoming[0]?.appointment_date, upcoming[0]?.appointment_time);
@@ -82,7 +82,7 @@ const DashboardLanding = () => {
 					<div>
 						{
 							upcoming?.length > 0 ? (
-								<AppointmentCard appointment={upcoming[0]} appointmentType='upcoming' className='bg-zinc-100' />
+								<AppointmentCard appointment={upcoming[0]} appointmentType='upcoming' className='bg-zinc-100' onRefetch={refetch} />
 							) : (
 								<div className='flex flex-col gap-4 bg-zinc-50 rounded-md p-3 xs:p-4'>
 									<div className='flex items-center gap-1.5 text-xs text-zinc-400'>

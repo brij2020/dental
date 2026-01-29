@@ -105,6 +105,14 @@ const doctorSchema = new mongoose.Schema(
     capacity: {
       type: String,
       default: "1x"
+    },
+    resetPasswordToken: {
+      type: String,
+      select: false
+    },
+    resetPasswordExpires: {
+      type: Date,
+      select: false
     }
   },
   {

@@ -3,7 +3,7 @@ import Loading from "@/Components/Loading";
 import useGetAppointments from "@/hooks/useGetAppointments";
 
 export default function MissedAppointments() {
-  const { appointments: { missed }, loading, error } = useGetAppointments();
+  const { appointments: { missed }, loading, error, refetch } = useGetAppointments();
 
   return (
     <div className='flex flex-col gap-5 p-0 md:p-4'>
@@ -29,7 +29,7 @@ export default function MissedAppointments() {
             ) : (
 
               missed.map((appointment) => (
-                <AppointmentCard key={appointment?.id} appointment={appointment} appointmentType="missed" />
+                <AppointmentCard key={appointment?.id} appointment={appointment} appointmentType="missed" onRefetch={refetch} />
               ))
             )
           )

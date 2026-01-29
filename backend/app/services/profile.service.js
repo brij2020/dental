@@ -25,9 +25,13 @@ const createProfile = async (profileData, options = {}) => {
       profile_pic: profileData.profile_pic,
       education: profileData.education || [],
       years_of_experience: profileData.years_of_experience || 0,
-      specialization: profileData.specialization || [],
+      specialization: Array.isArray(profileData.specialization)
+        ? profileData.specialization.join(', ')
+        : (profileData.specialization || ''),
       bio: profileData.bio,
-      password: profileData.password
+      password: profileData.password,
+      // Only set capacity for doctors and admins, not for receptionist
+      capacity: (profileData.role === 'doctor' || profileData.role === 'admin') ? (profileData.capacity || "1x") : null
     });
 
     // Support transaction session
@@ -44,8 +48,8 @@ const createProfile = async (profileData, options = {}) => {
  */
 const getAllProfiles = async (filters = {}) => {
   try {
-    
-    const { full_name, clinic_id, status, role } = filters;
+    console.log('Filters applied for getAllProfiles:', filters);
+    const { full_name, clinic_id, status, role, page = '' } = filters;
     let condition = {};
 
     if (full_name) {
@@ -66,7 +70,10 @@ const getAllProfiles = async (filters = {}) => {
     } else {
       condition.role = { $in: ['doctor', 'admin'] };
     }
-
+    if(page == 'staff'){
+      delete condition.role
+    }
+  
     const doctors = await Profile.find(condition);
     return doctors;
   } catch (err) {
@@ -85,7 +92,7 @@ const getProfileById = async (id) => {
     }
 
     const doctor = await Profile.findById(id);
-    console.log('---------------Retrieved doctor profile:', doctor);
+
     if (!doctor) {
       throw new Error("Doctor not found with id " + id);
     }
@@ -103,6 +110,11 @@ const updateProfile = async (id, updateData) => {
   try {
     if (!updateData || Object.keys(updateData).length === 0) {
       throw new Error("Data to update cannot be empty");
+    }
+
+    // Ensure specialization matches schema type (string). If client sent an array, join it.
+    if (updateData.specialization && Array.isArray(updateData.specialization)) {
+      updateData.specialization = updateData.specialization.join(', ');
     }
 
     const updated = await Profile.findByIdAndUpdate(
@@ -233,3 +245,46 @@ module.exports = {
   getActiveProfiles,
   getProfileSlots
 };
+
+/**
+ * Admin reset password for another profile
+ * - verify admin's current password
+ * - set new password on target profile and save (so pre-save hook hashes it)
+ */
+const adminResetPassword = async (targetProfileId, adminId, adminCurrentPassword, newPassword) => {
+  try {
+    if (!targetProfileId || !adminId || !adminCurrentPassword || !newPassword) {
+      throw new Error('Missing required data');
+    }
+
+    // Load admin with password for verification
+    const admin = await Profile.findById(adminId).select('+password');
+    if (!admin) throw new Error('Admin profile not found');
+
+    const isMatch = await admin.comparePassword(adminCurrentPassword);
+    if (!isMatch) {
+      const err = new Error('Admin current password is incorrect');
+      err.name = 'AuthError';
+      throw err;
+    }
+
+    // Load target profile
+    const target = await Profile.findById(targetProfileId).select('+password');
+    if (!target) {
+      const err = new Error('Target profile not found');
+      err.name = 'NotFound';
+      throw err;
+    }
+
+    // Set new password and save (pre-save will hash)
+    target.password = newPassword;
+    await target.save();
+
+    return { message: 'Password updated successfully' };
+  } catch (err) {
+    logger.error({ err }, 'Error in adminResetPassword');
+    throw err;
+  }
+};
+
+module.exports.adminResetPassword = adminResetPassword;

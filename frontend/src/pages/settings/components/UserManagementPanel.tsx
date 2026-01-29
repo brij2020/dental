@@ -1,7 +1,7 @@
 import { useState, useEffect, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../../state/useAuth';
-import { createProfile, getAllProfiles, deleteProfile } from '../../../lib/apiClient';
+import { createProfile, getAllProfiles, deleteProfile, adminResetPassword } from '../../../lib/apiClient';
 import { Modal } from '../../../components/Modal';
 import {
   IconChevronLeft,
@@ -42,6 +42,12 @@ export default function UserManagementPanel() {
   const [error, setError] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedRole, setSelectedRole] = useState('doctor');
+  const [fieldErrors, setFieldErrors] = useState<{ [k: string]: string }>({});
+  // Reset-password modal state
+  const [isResetModalOpen, setIsResetModalOpen] = useState(false);
+  const [resetUserId, setResetUserId] = useState<string | null>(null);
+  const [resetLoading, setResetLoading] = useState(false);
+  const [resetMessage, setResetMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
 
   useEffect(() => {
@@ -53,8 +59,10 @@ export default function UserManagementPanel() {
     setLoading(true);
     try {
       console.log('Fetching staff for clinic:', adminUser.clinic_id);
-      const response = await getAllProfiles();
-      setStaff(response.data);
+      const response = await getAllProfiles({page: 'staff'});
+      // Filter to show only doctors and admins (exclude receptionist)
+      const filteredStaff = response.data.filter((member: any) => member);
+      setStaff(filteredStaff);
       setError(null);
     } catch (err: any) {
       console.error("Error fetching staff:", err);
@@ -87,18 +95,39 @@ export default function UserManagementPanel() {
         clinic_id: adminUser.clinic_id
       };
 
-      // Add qualification and specialization if doctor role
+      // Client-side validation
+      const errors: { [k: string]: string } = {};
+      const validateEmail = (email?: string) => !!email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+      const validateMobile = (m?: string) => !!m && /^[6-9]\d{9}$/.test(m);
+
+      if (!newUserPayload.full_name) errors.full_name = 'Full name is required.';
+      if (!newUserPayload.email || !validateEmail(newUserPayload.email)) errors.email = 'Valid email required.';
+      if (!newUserPayload.mobile_number || !validateMobile(newUserPayload.mobile_number)) errors.mobile_number = 'Valid 10-digit mobile required.';
+      if (!newUserPayload.password || String(newUserPayload.password).length < 8) errors.password = 'Password must be at least 8 characters.';
+      if (!newUserPayload.role) errors.role = 'Role is required.';
+
+      // If doctor, optionally require qualification/specialization (here we require qualification)
       const qualification = (formData.get('qualification') as string)?.trim();
       const specialization = (formData.get('specialization') as string)?.trim();
-      
-      if (newUserPayload.role === 'doctor') {
-        if (qualification) newUserPayload.qualification = qualification;
-        if (specialization) newUserPayload.specialization = specialization;
-      } else {
-        // For non-doctor roles, send empty strings to avoid array validation errors
-        newUserPayload.qualification = '';
-        newUserPayload.specialization = '';
+      if (newUserPayload.role === 'doctor' && !qualification) {
+        errors.qualification = 'Qualification is required for doctors.';
       }
+
+      if (Object.keys(errors).length > 0) {
+        setFieldErrors(errors);
+        setFormLoading(false);
+        return;
+      }
+
+      // clear errors
+      setFieldErrors({});
+
+      // Add qualification and specialization if doctor role
+      // assign qualification & specialization
+      const qualificationVal = qualification || '';
+      const specializationVal = specialization || '';
+      newUserPayload.qualification = newUserPayload.role === 'doctor' ? qualificationVal : '';
+      newUserPayload.specialization = newUserPayload.role === 'doctor' ? specializationVal : '';
 
       const newUser = async () => {
         const response = await createProfile(newUserPayload);
@@ -156,34 +185,58 @@ export default function UserManagementPanel() {
   };
 
 
-  const handleResetPassword = async (userId: string) => {
-    // const newPass = prompt('Enter a new password (min 8 chars)');
-    // if (!newPass) return;
+  const handleResetPassword = (userId: string) => {
+    setResetUserId(userId);
+    setIsResetModalOpen(true);
+  };
 
-    // const run = () =>
-    //   supabase.functions.invoke('admin-reset-password', {
-    //     body: { user_id: userId, new_password: newPass, enforceSameClinic: true },
-    //   }).then((res) => {
-    //     if (res.error) {
-    //       const msg = (res.data as any)?.error ?? res.error.message;
-    //       throw new Error(msg);
-    //     }
-    //     return res.data;
-    //   });
+  const submitResetPassword = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setResetLoading(true);
+    setResetMessage(null);
+    const fd = new FormData(e.currentTarget);
+    const adminCurrent = fd.get('admin_current_password') as string;
+    const newPassword = fd.get('new_password') as string;
+    const confirmPassword = fd.get('confirm_password') as string;
 
-    // try {
-    //   await toast.promise(run(), {
-    //     pending: 'Resetting password...',
-    //     success: 'Password reset',
-    //     error: {
-    //       render({ data }: any) {
-    //         return `Failed to reset: ${data?.message ?? 'Unknown error'}`;
-    //       },
-    //     },
-    //   });
-    // } catch (e) {
-    //   console.error(e);
-    // }
+    if (!adminCurrent || !newPassword || !confirmPassword) {
+      setResetMessage({ type: 'error', text: 'All fields are required.' });
+      setResetLoading(false);
+      return;
+    }
+    if (newPassword.length < 8) {
+      setResetMessage({ type: 'error', text: 'Password must be at least 8 characters.' });
+      setResetLoading(false);
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setResetMessage({ type: 'error', text: 'New password and confirm do not match.' });
+      setResetLoading(false);
+      return;
+    }
+
+    try {
+      if (!resetUserId) throw new Error('No user selected');
+      await toast.promise(
+        adminResetPassword(resetUserId, adminCurrent, newPassword),
+        {
+          pending: 'Updating password...',
+          success: 'Password updated successfully',
+          error: {
+            render({ data }: any) {
+              return `Failed: ${data?.message ?? 'Unknown error'}`;
+            }
+          }
+        }
+      );
+      setIsResetModalOpen(false);
+      setResetUserId(null);
+      void fetchStaff();
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setResetLoading(false);
+    }
   };
 
 
@@ -237,10 +290,25 @@ export default function UserManagementPanel() {
 
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Add New Staff Member">
         <form onSubmit={handleCreateUser} className="space-y-4">
-          <Input id="full_name" name="full_name" label="Full Name" type="text" icon={IconUser} placeholder="Dr. John Doe" required />
-          <Input id="email" name="email" label="Email" type="email" icon={IconMail} placeholder="john.doe@clinic.com" required />
-          <Input id="mobile_number" name="mobile_number" label="Mobile Number" type="tel" icon={IconUser} placeholder="9876543210" required />
-          <Input id="password" name="password" label="Password" type="password" icon={IconKey} placeholder="Minimum 8 characters" required />
+          <div>
+            <Input id="full_name" name="full_name" label="Full Name" type="text" icon={IconUser} placeholder="Dr. John Doe" required />
+            {fieldErrors.full_name && <p className="text-xs text-rose-500 mt-1">{fieldErrors.full_name}</p>}
+          </div>
+
+          <div>
+            <Input id="email" name="email" label="Email" type="email" icon={IconMail} placeholder="john.doe@clinic.com" required />
+            {fieldErrors.email && <p className="text-xs text-rose-500 mt-1">{fieldErrors.email}</p>}
+          </div>
+
+          <div>
+            <Input id="mobile_number" name="mobile_number" label="Mobile Number" type="tel" icon={IconUser} placeholder="9876543210" required />
+            {fieldErrors.mobile_number && <p className="text-xs text-rose-500 mt-1">{fieldErrors.mobile_number}</p>}
+          </div>
+
+          <div>
+            <Input id="password" name="password" label="Password" type="password" icon={IconKey} placeholder="Minimum 8 characters" required />
+            {fieldErrors.password && <p className="text-xs text-rose-500 mt-1">{fieldErrors.password}</p>}
+          </div>
           <div>
             <label htmlFor="role" className="block text-sm font-medium text-slate-700 mb-1">Role</label>
             <select 
@@ -248,49 +316,53 @@ export default function UserManagementPanel() {
               name="role" 
               required 
               value={selectedRole}
-              onChange={(e) => {
-                setSelectedRole(e.target.value);
-                const doctorFields = document.getElementById('doctorFields');
-                if (e.target.value === 'doctor') {
-                  doctorFields?.classList.remove('hidden');
-                } else {
-                  doctorFields?.classList.add('hidden');
-                }
-              }}
+              onChange={(e) => setSelectedRole(e.target.value)}
               className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-slate-900 outline-none focus:ring-4 focus:ring-sky-300/40 focus:border-sky-400 transition">
               <option value="doctor">Doctor</option>
               <option value="receptionist">Receptionist</option>
             </select>
+            {fieldErrors.role && <p className="text-xs text-rose-500 mt-1">{fieldErrors.role}</p>}
           </div>
 
-          <div id="doctorFields" className="space-y-4">
-            <div>
-              <label htmlFor="qualification" className="block text-sm font-medium text-slate-700 mb-1">Qualification</label>
-              <select id="qualification" name="qualification" className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-slate-900 outline-none focus:ring-4 focus:ring-sky-300/40 focus:border-sky-400 transition">
-                <option value="">Select Qualification</option>
-                <option value="BDS">BDS (Bachelor of Dental Surgery)</option>
-                <option value="MDS">MDS (Master of Dental Surgery)</option>
-                <option value="PhD">PhD in Dentistry</option>
-                <option value="PGDIP">PGDIP (Post Graduate Diploma)</option>
-              </select>
-            </div>
+          {selectedRole === 'doctor' && (
+            <div className="space-y-4 border-t pt-4">
+              <p className="text-sm font-medium text-slate-700">Doctor Qualifications</p>
+              <div>
+                <label htmlFor="qualification" className="block text-sm font-medium text-slate-700 mb-1">Qualification</label>
+                <select id="qualification" name="qualification" className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-slate-900 outline-none focus:ring-4 focus:ring-sky-300/40 focus:border-sky-400 transition">
+                  <option value="">Select Qualification</option>
+                  <option value="BDS">BDS (Bachelor of Dental Surgery)</option>
+                  <option value="MDS">MDS (Master of Dental Surgery)</option>
+                  <option value="PhD">PhD in Dentistry</option>
+                  <option value="PGDIP">PGDIP (Post Graduate Diploma)</option>
+                </select>
+                {fieldErrors.qualification && <p className="text-xs text-rose-500 mt-1">{fieldErrors.qualification}</p>}
+              </div>
 
-            <div>
-              <label htmlFor="specialization" className="block text-sm font-medium text-slate-700 mb-1">Specialization</label>
-              <select id="specialization" name="specialization" className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-slate-900 outline-none focus:ring-4 focus:ring-sky-300/40 focus:border-sky-400 transition">
-                <option value="">Select Specialization</option>
-                <option value="General Dentistry">General Dentistry</option>
-                <option value="Orthodontics">Orthodontics</option>
-                <option value="Periodontics">Periodontics</option>
-                <option value="Endodontics">Endodontics</option>
-                <option value="Prosthodontics">Prosthodontics</option>
-                <option value="Oral Surgery">Oral Surgery</option>
-                <option value="Pediatric Dentistry">Pediatric Dentistry</option>
-                <option value="Cosmetic Dentistry">Cosmetic Dentistry</option>
-                <option value="Implantology">Implantology</option>
-              </select>
+              <div>
+                <label htmlFor="specialization" className="block text-sm font-medium text-slate-700 mb-1">Specialization</label>
+                <select id="specialization" name="specialization" className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-slate-900 outline-none focus:ring-4 focus:ring-sky-300/40 focus:border-sky-400 transition">
+                  <option value="">Select Specialization</option>
+                  <option value="General Dentistry">General Dentistry</option>
+                  <option value="Orthodontics">Orthodontics</option>
+                  <option value="Periodontics">Periodontics</option>
+                  <option value="Endodontics">Endodontics</option>
+                  <option value="Prosthodontics">Prosthodontics</option>
+                  <option value="Oral Surgery">Oral Surgery</option>
+                  <option value="Pediatric Dentistry">Pediatric Dentistry</option>
+                  <option value="Cosmetic Dentistry">Cosmetic Dentistry</option>
+                  <option value="Implantology">Implantology</option>
+                </select>
+                {fieldErrors.specialization && <p className="text-xs text-rose-500 mt-1">{fieldErrors.specialization}</p>}
+              </div>
             </div>
-          </div>
+          )}
+
+          {selectedRole === 'receptionist' && (
+            <div className="p-4 rounded-lg bg-blue-50 border border-blue-200">
+              <p className="text-sm text-blue-700">Receptionist role selected. Doctor-specific fields are not required.</p>
+            </div>
+          )}
 
           <div className="flex justify-end gap-3 pt-4">
             <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 text-sm font-medium text-slate-700 bg-slate-100 rounded-xl hover:bg-slate-200">Cancel</button>
@@ -298,6 +370,36 @@ export default function UserManagementPanel() {
           </div>
         </form>
       </Modal>
+
+        <Modal isOpen={isResetModalOpen} onClose={() => setIsResetModalOpen(false)} title="Reset User Password">
+          <form onSubmit={submitResetPassword} className="space-y-4">
+            <div>
+            <label htmlFor="admin_current_password" className="block text-sm font-medium text-slate-700 mb-1">Your Admin Password (to verify)</label>
+              <input id="admin_current_password" name="admin_current_password" type="password" className="w-full rounded-xl border border-slate-300 px-3 py-2.5" required />
+            </div>
+
+            <div>
+              <label htmlFor="new_password" className="block text-sm font-medium text-slate-700 mb-1">New Password</label>
+              <input id="new_password" name="new_password" type="password" className="w-full rounded-xl border border-slate-300 px-3 py-2.5" required />
+            </div>
+
+            <div>
+              <label htmlFor="confirm_password" className="block text-sm font-medium text-slate-700 mb-1">Confirm New Password</label>
+              <input id="confirm_password" name="confirm_password" type="password" className="w-full rounded-xl border border-slate-300 px-3 py-2.5" required />
+            </div>
+
+            {resetMessage && (
+              <div className={`p-3 rounded text-sm ${resetMessage.type === 'success' ? 'bg-emerald-50 text-emerald-800' : 'bg-rose-50 text-rose-800'}`}>
+                {resetMessage.text}
+              </div>
+            )}
+
+            <div className="flex justify-end gap-3 pt-4">
+              <button type="button" onClick={() => setIsResetModalOpen(false)} className="px-4 py-2 text-sm font-medium text-slate-700 bg-slate-100 rounded-xl hover:bg-slate-200">Cancel</button>
+              <Button loading={resetLoading} type="submit">Update Password</Button>
+            </div>
+          </form>
+        </Modal>
     </>
   );
 }

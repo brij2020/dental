@@ -6,9 +6,10 @@ import {
   IconTrash,
   IconEdit,
   IconDownload,
-
   IconChevronLeft,
   IconChevronRight,
+  IconArrowUp,
+  IconArrowDown,
 } from '@tabler/icons-react';
 import {
   getAllPatients,
@@ -40,6 +41,8 @@ export default function PatientPanel() {
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedPatients, setSelectedPatients] = useState<Set<string>>(new Set());
+  const [sortColumn, setSortColumn] = useState<'age' | 'name' | null>(null);
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
@@ -78,9 +81,22 @@ export default function PatientPanel() {
     fetchPatients();
   }, [clinicId]);
 
-  // Filter patients by search term
+  // Calculate age from DOB
+  const calculateAge = (dob?: string): number | null => {
+    if (!dob) return null;
+    const birthDate = new Date(dob);
+    const today = new Date();
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const monthDiff = today.getMonth() - birthDate.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+      age--;
+    }
+    return age >= 0 ? age : null;
+  };
+
+  // Filter and sort patients
   useEffect(() => {
-    const filtered = patients.filter((patient) => {
+    let filtered = patients.filter((patient) => {
       const searchLower = searchTerm.toLowerCase();
       return (
         patient.full_name?.toLowerCase().includes(searchLower) ||
@@ -89,9 +105,35 @@ export default function PatientPanel() {
         patient.uhid?.toLowerCase().includes(searchLower)
       );
     });
+
+    // Apply sorting
+    if (sortColumn === 'age') {
+      filtered.sort((a, b) => {
+        const ageA = calculateAge(a.dob) ?? -1;
+        const ageB = calculateAge(b.dob) ?? -1;
+        return sortDirection === 'asc' ? ageA - ageB : ageB - ageA;
+      });
+    } else if (sortColumn === 'name') {
+      filtered.sort((a, b) => {
+        const nameA = a.full_name?.toLowerCase() ?? '';
+        const nameB = b.full_name?.toLowerCase() ?? '';
+        return sortDirection === 'asc' ? nameA.localeCompare(nameB) : nameB.localeCompare(nameA);
+      });
+    }
+
     setFilteredPatients(filtered);
     setCurrentPage(1);
-  }, [searchTerm, patients]);
+  }, [searchTerm, patients, sortColumn, sortDirection]);
+
+  // Handle sort click
+  const handleSort = (column: 'age' | 'name') => {
+    if (sortColumn === column) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortColumn(column);
+      setSortDirection('asc');
+    }
+  };
 
   // Handle edit patient
   const handleEdit = (patient: Patient) => {
@@ -279,11 +321,32 @@ export default function PatientPanel() {
                       className="w-4 h-4 rounded border-gray-300 cursor-pointer"
                     />
                   </th>
-                  <th className="px-6 py-3 font-semibold text-gray-900">Name</th>
+                  <th 
+                    className="px-6 py-3 font-semibold text-gray-900 cursor-pointer hover:bg-gray-100 select-none"
+                    onClick={() => handleSort('name')}
+                  >
+                    <div className="flex items-center gap-2">
+                      Name
+                      {sortColumn === 'name' && (
+                        sortDirection === 'asc' ? <IconArrowUp size={16} /> : <IconArrowDown size={16} />
+                      )}
+                    </div>
+                  </th>
                   <th className="px-6 py-3 font-semibold text-gray-900">Email</th>
                   <th className="px-6 py-3 font-semibold text-gray-900">Phone</th>
                   <th className="px-6 py-3 font-semibold text-gray-900">UHID</th>
                   <th className="px-6 py-3 font-semibold text-gray-900">Gender</th>
+                  <th 
+                    className="px-6 py-3 font-semibold text-gray-900 cursor-pointer hover:bg-gray-100 select-none"
+                    onClick={() => handleSort('age')}
+                  >
+                    <div className="flex items-center gap-2">
+                      Age
+                      {sortColumn === 'age' && (
+                        sortDirection === 'asc' ? <IconArrowUp size={16} /> : <IconArrowDown size={16} />
+                      )}
+                    </div>
+                  </th>
                   <th className="px-6 py-3 font-semibold text-gray-900">Actions</th>
                 </tr>
               </thead>
@@ -308,6 +371,7 @@ export default function PatientPanel() {
                     <td className="px-6 py-4 text-gray-600">{patient.phone}</td>
                     <td className="px-6 py-4 text-gray-600">{patient.uhid || '-'}</td>
                     <td className="px-6 py-4 text-gray-600">{patient.gender || '-'}</td>
+                    <td className="px-6 py-4 text-gray-600">{calculateAge(patient.dob) !== null ? `${calculateAge(patient.dob)} years` : '-'}</td>
                     <td className="px-6 py-4">
                       <div className="flex gap-2">
                         <button

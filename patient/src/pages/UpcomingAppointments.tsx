@@ -5,7 +5,7 @@ import useGetAppointments from '@/hooks/useGetAppointments';
 
 export default function UpcomingAppointments() {
 
-  const { appointments: { upcoming }, loading, error } = useGetAppointments();
+  const { appointments: { upcoming }, loading, error, refetch } = useGetAppointments();
   console.log(upcoming);
   
   
@@ -31,8 +31,8 @@ export default function UpcomingAppointments() {
                 <p>No upcoming appointments scheduled!</p>
               </div>
             ) : (
-              upcoming.map((appointment) => (
-                <AppointmentCard key={appointment?.id} appointment={appointment} appointmentType="upcoming" />
+                upcoming.map((appointment) => (
+                <AppointmentCard key={appointment?.id} appointment={appointment} appointmentType="upcoming" onRefetch={refetch} />
               ))
             )
           )

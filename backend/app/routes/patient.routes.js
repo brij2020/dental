@@ -1,4 +1,5 @@
 const { verifyToken, allowRoles } = require("../middleware/auth.middleware");
+const { upload, handleUploadError } = require("../middleware/upload.middleware");
 
 module.exports = app => {
   const patient = require("../controllers/patient.controller");
@@ -27,6 +28,14 @@ module.exports = app => {
 
   // Update patient by ID
   router.put("/:id", verifyToken, patient.update);
+
+  // Upload patient avatar
+  router.post("/:id/upload-avatar", 
+    verifyToken, 
+    upload.single("avatar"),
+    handleUploadError,
+    patient.uploadAvatar
+  );
 
   // Delete patient by ID
   router.delete("/:id", verifyToken, patient.delete);

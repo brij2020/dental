@@ -92,6 +92,59 @@ class AppointmentService {
     return appointment;
   }
 
+  // Reschedule an appointment with slot capacity checks
+  static async rescheduleAppointment(appointmentId, updateData) {
+    // Find existing appointment by uid or _id
+    let appointment = await Appointment.findOne({ appointment_uid: appointmentId });
+    if (!appointment) {
+      if (appointmentId.length === 24 && /^[0-9a-fA-F]{24}$/.test(appointmentId)) {
+        appointment = await Appointment.findById(appointmentId);
+      }
+    }
+
+    if (!appointment) {
+      return null;
+    }
+
+    const newDate = updateData.appointment_date || appointment.appointment_date;
+    const newTime = updateData.appointment_time || appointment.appointment_time;
+    const doctorId = appointment.doctor_id;
+
+    // Determine slot capacity from doctor profile
+    const dbModels = require('../models');
+    const Profile = dbModels.profiles;
+    let slotCapacity = 1;
+    try {
+      const doctorProfile = await Profile.findById(doctorId);
+      if (doctorProfile && doctorProfile.role === 'admin') {
+        const capStr = doctorProfile.capacity || '1x';
+        const match = capStr.match(/(\d+)x/);
+        slotCapacity = match ? parseInt(match[1], 10) : 1;
+      }
+    } catch (err) {
+      // ignore and use default capacity
+    }
+
+    // Count existing bookings for the slot excluding this appointment
+    const bookedCount = await Appointment.countDocuments({
+      doctor_id: doctorId,
+      appointment_date: newDate,
+      appointment_time: newTime,
+      status: { $in: ['scheduled', 'confirmed'] },
+      _id: { $ne: appointment._id }
+    });
+
+    if (bookedCount >= slotCapacity) {
+      const err = new Error('Selected slot is fully booked');
+      err.code = 'SLOT_FULL';
+      throw err;
+    }
+
+    // Safe to update
+    const updated = await Appointment.findByIdAndUpdate(appointment._id, updateData, { new: true });
+    return updated;
+  }
+
   // Delete an appointment
   static async deleteAppointment(appointmentId) {
     // First, try to find and delete by appointment_uid

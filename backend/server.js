@@ -4,6 +4,7 @@ const config = require('./app/config/environment');
 
 const express = require("express");
 const cors = require("cors");
+const path = require("path");
 const swaggerSetup = require("./swagger");
 const { logger, httpLogger } = require('./app/config/logger');
 const app = express();
@@ -24,6 +25,9 @@ app.use(express.json());
 
 // parse requests of content-type - application/x-www-form-urlencoded
 app.use(express.urlencoded({ extended: true }));
+
+// Serve uploaded files as static assets
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 const db = require("./app/models");
 db.mongoose

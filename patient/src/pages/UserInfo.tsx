@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { UserProfileCard, UserProfileField } from "@/Components/UserInfoCard";
 import { cn } from "@/lib/utils";
+import { getImageUrl } from "@/lib/imageUrlHelper";
 import EditProfileModal from "@/Components/EditProfileModal";
 import { toast } from "react-toastify";
 import { useProfile } from "@/hooks/useProfile";
@@ -46,6 +47,18 @@ export default function UserInfo() {
 
   const displayedAvatar = profile?.avatar?.trim() ? profile?.avatar : localPreview;
 
+  // Debug: Log the avatar URL being used
+  useEffect(() => {
+    if (displayedAvatar) {
+      const fullUrl = getImageUrl(displayedAvatar);
+      console.log("Avatar URL Debug:", {
+        original: displayedAvatar,
+        fullUrl: fullUrl,
+        isLocalPreview: displayedAvatar === localPreview
+      });
+    }
+  }, [displayedAvatar, localPreview]);
+
   const formatDate = (dateString: string | null | undefined): string => {
     if (!dateString) return "N/A";
     try {
@@ -73,28 +86,50 @@ export default function UserInfo() {
               <div className={cn("relative w-24 h-24 rounded-full overflow-hidden", "border-[5px] border-white")}>
                 {
                 displayedAvatar ? (
-                  <img src={displayedAvatar} alt={profile?.full_name || "avatar"} className="w-full h-full object-cover"/>
+                  <img 
+                    src={getImageUrl(displayedAvatar)} 
+                    alt={profile?.full_name || "avatar"} 
+                    className="w-full h-full object-cover"
+                    crossOrigin="anonymous"
+                    onLoad={() => console.log("✅ Image loaded successfully")}
+                    onError={(e) => {
+                      console.error("❌ Image failed to load:", {
+                        src: (e.currentTarget as HTMLImageElement).src,
+                        original: displayedAvatar,
+                        error: e.type
+                      });
+                    }}
+                  />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center bg-gray-100">
                     <span className="text-3xl font-bold text-gray-600 group-hover:text-blue-800 transition-colors">{profile?.full_name?.charAt(0) || "U"}</span>
                   </div>
                 )}
 
-                {/* optional uploading overlay */}
+                {/* Uploading overlay */}
                 {uploading && (
-                  <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
-                    <span className="text-white text-sm">Uploading...</span>
+                  <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center gap-2">
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    <span className="text-white text-xs">Saving...</span>
                   </div>
                 )}
               </div>
             </div>
 
-            <div className={cn("absolute bottom-1 right-1 cursor-pointer", "bg-blue-600 rounded-full w-8 h-8 shadow-md", "transition-all duration-300", "group-hover:bg-blue-700 group-hover:scale-110", "flex items-center justify-center")} onClick={openFilePicker} title="Change photo">
+            {/* Camera icon picker button */}
+            <div className={cn("absolute bottom-1 right-1 cursor-pointer", "bg-blue-600 rounded-full w-8 h-8 shadow-md", "transition-all duration-300", "group-hover:bg-blue-700 group-hover:scale-110", "flex items-center justify-center", uploading && "opacity-50 pointer-events-none")} onClick={openFilePicker} title="Click to pick image and save">
               <span className="material-symbols-sharp text-white text-base">photo_camera</span>
             </div>
 
             {/* hidden file input */}
             <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileChange}/>
+            
+            {/* Status indicator */}
+            {localPreview && !uploading && (
+              <div className="absolute -bottom-6 left-0 right-0 text-center">
+                <span className="text-xs text-green-600 font-medium">✓ Image saved</span>
+              </div>
+            )}
           </div>
         </div>
 

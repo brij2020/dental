@@ -1,15 +1,28 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import { NavLink } from "react-router-dom";
 import { useTheme } from "@/hooks/useTheme";
 import LogoutModal from "./LogoutModal";
 import CustomModal from "./CustomModal";
 import { useProfile } from "@/hooks/useProfile";
+import { getImageUrl } from "@/lib/imageUrlHelper";
 
 const AppHeader = () => {
     const [openLogoutModal, setOpenLogoutModal] = useState(false);
     const { theme, toggleTheme } = useTheme();
     const { profile } = useProfile();
+  const displayedAvatar = profile?.avatar?.trim() ? profile?.avatar : 'localPreview';
+
+     useEffect(() => {
+        if (displayedAvatar) {
+          const fullUrl = getImageUrl(displayedAvatar);
+          console.log("Avatar URL Debug:", {
+            original: displayedAvatar,
+            fullUrl: fullUrl
+          });
+        }
+      }, [displayedAvatar]);
+
 
     return (
         <div className={`relative flex items-center justify-between pr-2 md:pr-6 py-2 sm:py-1.5 border-b border-gray-300 bg-white dark:border-zinc-700 dark:bg-zinc-900`}>
@@ -60,7 +73,7 @@ const AppHeader = () => {
                         {
                             profile?.avatar ? (
                                 <div className='p-1 rounded-full hover:bg-gray-200 dark:hover:bg-zinc-700 grid place-items-center cursor-pointer'>
-                                    <img src={profile?.avatar} alt="" className='rounded-full border border-gray-200 w-8 h-8 object-contain' />
+                                    <img src={getImageUrl(profile.avatar)} alt="" className='rounded-full border border-gray-200 w-8 h-8 object-contain' />
                                 </div>
                             ) : (
                                 <div className='p-1 rounded-full grid hover:bg-gray-200 dark:hover:bg-zinc-700 place-items-center cursor-pointer'>

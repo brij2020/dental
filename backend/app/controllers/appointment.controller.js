@@ -397,7 +397,24 @@ exports.update = async (req, res) => {
       });
     }
 
-    const appointment = await AppointmentService.updateAppointment(id, updateData);
+    let appointment;
+    // If date/time is being changed, use reschedule flow to enforce slot capacity checks
+    if (updateData.appointment_date || updateData.appointment_time) {
+      try {
+        appointment = await AppointmentService.rescheduleAppointment(id, updateData);
+      } catch (err) {
+        if (err && err.code === 'SLOT_FULL') {
+          return res.status(409).json({
+            success: false,
+            message: err.message || 'Selected slot is fully booked',
+            code: 'SLOT_FULL',
+          });
+        }
+        throw err;
+      }
+    } else {
+      appointment = await AppointmentService.updateAppointment(id, updateData);
+    }
     if (!appointment) {
       return res.status(404).json({
         success: false,

@@ -47,7 +47,17 @@ export default function ResetPassword() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50">
       <div className="w-full max-w-md p-8 bg-white rounded-2xl shadow">
-        <h2 className="text-2xl font-bold mb-6 text-slate-800">Reset Password</h2>
+        <h2 className="text-2xl font-bold mb-2 text-slate-800">Reset Password</h2>
+        <p className="text-sm text-slate-600 mb-6">Enter your reset token and new password to regain access to your account.</p>
+        
+        {!token && (
+          <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <p className="text-sm text-blue-800">
+              Don't have a reset token? <Link to="/forgot-password" className="font-medium text-blue-600 hover:underline">Request one here</Link>
+            </p>
+          </div>
+        )}
+        
         <form onSubmit={handleSubmit} className="space-y-5">
           <div>
             <label htmlFor="token" className="block mb-1 text-sm font-medium text-slate-700">Reset Token</label>
@@ -58,7 +68,7 @@ export default function ResetPassword() {
               value={token}
               onChange={e => setToken(e.target.value)}
               required
-              className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-slate-900 outline-none focus:ring-4 focus:ring-sky-300/40 focus:border-sky-400 transition"
+              className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-slate-900 outline-none focus:ring-4 focus:ring-sky-300/40 focus:border-sky-400 transition font-mono text-sm"
               placeholder="Paste your reset token here"
             />
           </div>
@@ -72,7 +82,7 @@ export default function ResetPassword() {
               onChange={e => setNewPassword(e.target.value)}
               required
               className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-slate-900 outline-none focus:ring-4 focus:ring-sky-300/40 focus:border-sky-400 transition"
-              placeholder="Enter new password"
+              placeholder="Enter new password (min 8 characters)"
             />
           </div>
           <div>
@@ -96,8 +106,13 @@ export default function ResetPassword() {
             {loading ? 'Resetting...' : 'Reset Password'}
           </button>
         </form>
-        <div className="mt-6 text-center">
-          <Link to="/login" className="text-sky-600 hover:underline">Back to Login</Link>
+        <div className="mt-6 space-y-3 text-center text-sm">
+          <p className="text-slate-600">
+            Remember your password? <Link to="/login" className="text-sky-600 font-medium hover:underline">Back to Login</Link>
+          </p>
+          <p className="text-slate-600">
+            <Link to="/forgot-password" className="text-sky-600 font-medium hover:underline">Request a new reset token</Link>
+          </p>
         </div>
       </div>
     </div>

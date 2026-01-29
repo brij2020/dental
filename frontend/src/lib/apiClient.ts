@@ -123,8 +123,8 @@ export const createProfile = async (profileData: any): Promise<AxiosResponse<any
 /**
  * Get all profiles
  */
-export const getAllProfiles = async (): Promise<AxiosResponse<any>> => {
-  return get('/api/profile');
+export const getAllProfiles = async (pagefrom?: any): Promise<AxiosResponse<any>> => {
+  return get('/api/profile', { params: pagefrom });
 };
 
 /**
@@ -147,6 +147,13 @@ export const updateProfile = async (id: string, data: any): Promise<AxiosRespons
  */
 export const deleteProfile = async (id: string): Promise<AxiosResponse<any>> => {
   return del(`/api/profile/${id}`);
+};
+
+/**
+ * Admin reset another user's password
+ */
+export const adminResetPassword = async (profileId: string, adminCurrentPassword: string, newPassword: string): Promise<AxiosResponse<any>> => {
+  return put(`/api/profile/${profileId}/reset-password`, { admin_current_password: adminCurrentPassword, new_password: newPassword });
 };
 
 /**

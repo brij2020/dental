@@ -429,18 +429,33 @@ export default function FeesPanel() {
                   <div className="relative">
                     <IconNumbers className="absolute left-3 top-2.5 h-5 w-5 text-slate-400" />
                     <input
-                      type="number"
+                      type="text"
                       id="cost_fees"
-                      min="0"
-                      step="0.01"
                       value={costFees}
-                      onChange={e => setCostFees(e.target.value)}
+                      onChange={e => {
+                        const value = e.target.value;
+                        // Only allow numeric values and decimal point
+                        const sanitized = value.replace(/[^0-9.]/g, '');
+                        // Prevent multiple decimal points
+                        const finalValue = sanitized.split('.').length > 2 
+                          ? sanitized.split('.').slice(0, 2).join('.') 
+                          : sanitized;
+                        setCostFees(finalValue);
+                      }}
+                      onKeyPress={e => {
+                        // Allow only numbers and decimal point
+                        if (!/[0-9.]/.test(e.key)) {
+                          e.preventDefault();
+                        }
+                      }}
                       required
                       autoFocus
                       className="w-full pl-10 pr-3 py-2.5 rounded-xl border border-slate-300 bg-white text-slate-900 outline-none transition focus:border-sky-400 focus:ring-4 focus:ring-sky-300/40"
                       placeholder="500"
+                      inputMode="decimal"
                     />
                   </div>
+                  <p className="mt-1 text-xs text-slate-500">Only numeric values allowed (e.g., 500 or 500.50)</p>
                 </div>
 
                 <div>
