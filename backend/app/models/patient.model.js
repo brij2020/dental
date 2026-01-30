@@ -114,35 +114,33 @@ patientSchema.methods.comparePassword = async function (password) {
 
 /**
  * Pre-save hook to auto-generate UHID if not provided
- * Format: <YY><timestamp-based-unique-id> (e.g., 26-1704067200000-abc123)
- * This ensures uniqueness even with concurrent requests
+ * Format: <YY><sequence> (10 digits total, e.g., 2600000005 => year 26 + sequence 00000005)
+ * Uses an atomic counter per year stored in the `counters` collection with key `uhid_<YY>`.
  */
 patientSchema.pre("save", async function (next) {
   if (!this.uhid) {
     try {
       const currentYear = new Date().getFullYear().toString().slice(-2);
-      const timestamp = Date.now();
-      // Generate a short random string for additional uniqueness
-      const randomPart = Math.random().toString(36).substring(2, 8).toUpperCase();
-      
-      // Keep generating UHID until we find a unique one
-      let uhid = `${currentYear}${timestamp}${randomPart}`;
-      let attempts = 0;
-      const maxAttempts = 5;
-      
-      while (attempts < maxAttempts) {
-        const existing = await mongoose.model("Patient").findOne({ uhid });
-        if (!existing) {
-          this.uhid = uhid;
-          return next();
-        }
-        // If collision, regenerate
-        attempts++;
-        const newRandomPart = Math.random().toString(36).substring(2, 8).toUpperCase();
-        uhid = `${currentYear}${timestamp}${newRandomPart}`;
+      const counterId = `uhid_${currentYear}`;
+
+      // Atomically increment the counter for the current year
+      const countersColl = mongoose.connection.collection('counters');
+      const result = await countersColl.findOneAndUpdate(
+        { _id: counterId },
+        { $inc: { seq: 1 } },
+        { upsert: true, returnDocument: 'after' }
+      );
+
+      if (!result || !result.value || typeof result.value.seq !== 'number') {
+        throw new Error('Failed to obtain UHID sequence');
       }
-      
-      throw new Error("Failed to generate unique UHID after maximum attempts");
+
+      const seq = result.value.seq;
+      // Pad sequence to 8 digits to produce 10-digit UHID (2-digit year + 8-digit sequence)
+      const seqPad = String(seq).padStart(8, '0');
+      this.uhid = `${currentYear}${seqPad}`;
+
+      return next();
     } catch (error) {
       console.error("Error generating UHID:", error);
       return next(error);

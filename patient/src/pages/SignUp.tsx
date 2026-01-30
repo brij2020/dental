@@ -58,23 +58,34 @@ const SignUp: React.FC = () => {
         return;
       }
 
-      // response.data contains the backend response with patient data
+      // response.data contains the backend response (standardized by api client)
       const backendData = response.data;
-      
-      if(backendData?.success && backendData?.data) {
-        console.log("✅ Registration successful:", backendData.data);
-        
-        // Store token and patient info
-        localStorage.setItem("authToken", backendData.data.token);
-        localStorage.setItem("patient_id", backendData.data.patient_id);
-        localStorage.setItem("patient_email", backendData.data.email);
-        localStorage.setItem("patient_name", backendData.data.full_name);
-        localStorage.setItem("patient_uhid", backendData.data.uhid);
-        
-        toast.success("Account created successfully!");
-        reset();
-        window.location.replace("/");
+
+      if (!backendData?.success) {
+        toast.error(backendData?.message || response.error || "Registration failed");
+        return;
       }
+
+      // Support both shapes: { success: true, data: {...} } and legacy { success: true, token: ..., patient: {...} }
+      const payload = backendData.data || {
+        token: backendData.token,
+        patient_id: backendData.patient?.id || backendData.patient?._id,
+        email: backendData.patient?.email,
+        full_name: backendData.patient?.full_name,
+        uhid: backendData.patient?.uhid
+      };
+
+      console.log("✅ Registration successful:", payload);
+
+      if (payload?.token) localStorage.setItem("authToken", payload.token);
+      if (payload?.patient_id) localStorage.setItem("patient_id", payload.patient_id);
+      if (payload?.email) localStorage.setItem("patient_email", payload.email);
+      if (payload?.full_name) localStorage.setItem("patient_name", payload.full_name);
+      if (payload?.uhid) localStorage.setItem("patient_uhid", payload.uhid);
+
+      toast.success("Account created successfully!");
+      reset();
+      navigate("/");
     } catch (error: unknown) {
       console.error("Unexpected error:", error);
       if (error instanceof Error) {

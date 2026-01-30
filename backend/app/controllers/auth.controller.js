@@ -220,15 +220,17 @@ exports.patientRegister = async (req, res) => {
         );
 
         logger.info({ patientId: patient._id, email: normalizedEmail }, 'Patient registered successfully');
+        // Return payload in the same shape as patientLogin (nest under `data`) for consistency
         res.status(201).json({
             success: true,
-            message: "Patient registered successfully",
-            token,
-            patient: {
-                id: patient._id,
+            data: {
+                token,
+                patient_id: patient._id,
                 email: patient.email,
-                full_name: patient.full_name
-            }
+                full_name: patient.full_name,
+                uhid: patient.uhid
+            },
+            message: "Patient registered successfully"
         });
     } catch (err) {
         logger.error({ err }, 'Patient registration error');
