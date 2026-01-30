@@ -85,7 +85,7 @@ const SignUp: React.FC = () => {
 
       toast.success("Account created successfully!");
       reset();
-      navigate("/");
+      window.location.href = "/";
     } catch (error: unknown) {
       console.error("Unexpected error:", error);
       if (error instanceof Error) {
