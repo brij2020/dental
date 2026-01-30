@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from "react";
 import { getDoctorProfile } from "@/lib/apiClient";
-import { checkDoctorLeaveStatus } from "@/pages/patients/api";
 import type { Clinic, Slots } from "@/Components/bookAppointments/types";
 import DateSelector from "../DateSelector";
 import CustomModal from "../CustomModal";
@@ -36,6 +35,32 @@ interface DoctorProfile {
     slot_duration_minutes?: number;
     profile_pic?: string;
     [key: string]: any;
+}
+
+// Local helper to check doctor's leave status for a date (YYYY-MM-DD)
+function checkDoctorLeaveStatusLocal(doctor: DoctorProfile | null, dateStr: string): { isOnLeave: boolean; leaveReason?: string } {
+    if (!doctor) return { isOnLeave: false };
+    const leaveArr = (doctor as any).leave;
+    if (!leaveArr || !Array.isArray(leaveArr)) return { isOnLeave: false };
+
+    for (let i = 0; i < leaveArr.length; i++) {
+        const leaveRecord = leaveArr[i];
+        if (leaveRecord.is_active === false) continue;
+
+        // Single day leave
+        if (leaveRecord.date && leaveRecord.date === dateStr) {
+            return { isOnLeave: true, leaveReason: leaveRecord.reason || `On leave on ${leaveRecord.day || dateStr}` };
+        }
+
+        // Range leave
+        if (leaveRecord.leave_start_date && leaveRecord.leave_end_date) {
+            if (dateStr >= leaveRecord.leave_start_date && dateStr <= leaveRecord.leave_end_date) {
+                return { isOnLeave: true, leaveReason: leaveRecord.reason || `On leave from ${leaveRecord.leave_start_date} to ${leaveRecord.leave_end_date}` };
+            }
+        }
+    }
+
+    return { isOnLeave: false };
 }
 
 const SlotGrid: React.FC<SlotGridProps> = ({ selectedTime, setSelectedTime, slots, label, icon, errorMessage, isDisabled, leaveReason }) => {
@@ -131,6 +156,8 @@ const AppointmentDateTime: React.FC<ConfirmAppointmentProps> = ({ clinic, setOpe
             if (!doctor?.availability || !selectedDate) {
                 if (isMounted) setAvailableSlots(null);
                 setSelectedTime(null);
+                setIsDoctorOnLeave(false);
+                setLeaveReason(undefined);
                 return;
             }
 
@@ -145,11 +172,13 @@ const AppointmentDateTime: React.FC<ConfirmAppointmentProps> = ({ clinic, setOpe
                 if (isMounted) {
                     setAvailableSlots(slots);
                     setSelectedTime(null);
+                    setIsDoctorOnLeave(false);
+                    setLeaveReason(undefined);
                 }
                 return;
             }
 
-            const step = doctor?.slot_duration_minutes || 30;
+            const step = doctor.slot_duration_minutes || 30;
 
             const timeToMinutes = (time: string) => {
                 const [h, m] = time.split(":").map(Number);
@@ -176,19 +205,23 @@ const AppointmentDateTime: React.FC<ConfirmAppointmentProps> = ({ clinic, setOpe
             };
 
             if (!daySchedule.morning?.is_off && daySchedule.morning?.start && daySchedule.morning?.end) {
-                slots.morning.push(...generateSlotsFromRange(
-                    daySchedule.morning.start,
-                    daySchedule.morning.end,
-                    step
-                ));
+                slots.morning.push(
+                    ...generateSlotsFromRange(
+                        daySchedule.morning.start,
+                        daySchedule.morning.end,
+                        step
+                    )
+                );
             }
 
             if (!daySchedule.evening?.is_off && daySchedule.evening?.start && daySchedule.evening?.end) {
-                slots.evening.push(...generateSlotsFromRange(
-                    daySchedule.evening.start,
-                    daySchedule.evening.end,
-                    step
-                ));
+                slots.evening.push(
+                    ...generateSlotsFromRange(
+                        daySchedule.evening.start,
+                        daySchedule.evening.end,
+                        step
+                    )
+                );
             }
 
             // Filter out past slots for today
@@ -197,24 +230,20 @@ const AppointmentDateTime: React.FC<ConfirmAppointmentProps> = ({ clinic, setOpe
             const currentMinutes = today.getHours() * 60 + today.getMinutes();
 
             if (isToday) {
-                slots.morning = slots.morning.filter((slot) => {
-                    const mins = timeToMinutes(slot);
-                    return mins > currentMinutes;
-                });
-
-                slots.evening = slots.evening.filter((slot) => {
-                    const mins = timeToMinutes(slot);
-                    return mins > currentMinutes;
-                });
+                slots.morning = slots.morning.filter(slot => timeToMinutes(slot) > currentMinutes);
+                slots.evening = slots.evening.filter(slot => timeToMinutes(slot) > currentMinutes);
             }
 
-            // Check doctor's leave status for the selected date
-            let leaveResult = { isOnLeave: false, leaveReason: undefined };
+            // ---- FIXED LEAVE STATUS HANDLING ----
+            type LeaveStatus = { isOnLeave: boolean; leaveReason?: string };
+
+            let leaveResult: LeaveStatus = { isOnLeave: false };
+
             try {
                 const dateStr = selectedDate.toISOString().slice(0, 10); // YYYY-MM-DD
-                leaveResult = await checkDoctorLeaveStatus(doctor._id || doctor.id, dateStr, [doctor]);
+                leaveResult = checkDoctorLeaveStatusLocal(doctor, dateStr);
             } catch (err) {
-                console.error('Error checking doctor leave status:', err);
+                console.error("Error checking doctor leave status:", err);
             }
 
             if (isMounted) {
@@ -226,15 +255,18 @@ const AppointmentDateTime: React.FC<ConfirmAppointmentProps> = ({ clinic, setOpe
         }
 
         buildSlots();
-        return () => { isMounted = false };
+        return () => {
+            isMounted = false;
+        };
     }, [selectedDate, doctor]);
+
 
     return (
         <div className="p-3 pb-5 flex flex-col gap-4 w-[800px] max-w-full">
 
             {/* Loading State */}
             {loading && <Loading size={"200px"} />}
-            
+
             {/* Error State */}
             {error && (
                 <div className="p-3 bg-red-50 border border-red-200 rounded-sm text-red-700 text-sm">
