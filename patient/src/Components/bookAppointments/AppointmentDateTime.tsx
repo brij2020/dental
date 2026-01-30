@@ -69,16 +69,10 @@ const SlotGrid: React.FC<SlotGridProps> = ({ selectedTime, setSelectedTime, slot
             <h4 className="text-sm text-zinc-500">{label}:</h4>
             {
                 isDisabled ? (
-                    <div>
-                        <p className="flex items-center text-[12px] bg-red-50 rounded-sm py-2 text-red-600 gap-2 justify-center border border-red-100"><span className="material-symbols-sharp">cancel</span>Doctor is on leave {leaveReason ? `- ${leaveReason}` : ''}</p>
-                        <div className="grid grid-cols-4 gap-2 mt-2">
-                            {slots?.map((slot) => (
-                                <div key={slot} className="border rounded-sm py-1.5 text-xs text-red-600 flex items-center justify-center opacity-80">
-                                    <span className="material-symbols-sharp text-lg">cancel</span>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
+                    <p className="flex items-center gap-1.5 text-[12px] bg-red-50 border border-red-100 rounded-sm py-3 text-red-600 justify-center">
+                        <span className="material-symbols-sharp text-base">{icon}</span>
+                        Doctor is on leave{leaveReason ? ` – ${leaveReason}` : ""}
+                    </p>
                 ) : (
                     slots?.length === 0 ? (
                         <p className="flex items-center text-[11px] bg-zinc-50 rounded-sm py-4 text-zinc-400 gap-1 justify-center"><span className="material-symbols-sharp text-base">{icon}</span>{errorMessage}</p>
