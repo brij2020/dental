@@ -87,11 +87,11 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({ appointment, appointm
                             </div>
                         </div>
                     </div>
-                    {appointmentType === "upcoming" && (
+                    {/* {appointmentType === "upcoming" && (
                         <div className="hidden md:flex items-center ml-3">
                             <button onClick={() => { setCurrentModal("cancel"); setOpenModal(true) }} className="text-sm text-red-600 hover:text-red-800 px-3 py-1 border border-red-100 rounded-md">Cancel</button>
                         </div>
-                    )}
+                    )} */}
 
                     <Popover>
 
