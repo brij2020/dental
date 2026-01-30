@@ -5,15 +5,19 @@ import { dateAPI } from "@/services/fakeApis";
 type calenderContextProps = {
   dentistId: string;
   clinicId?: string;
+  initialDate?: string | Date | null;
   children: ReactNode;
 };
 //based on dentist ID and (optional clinic ID) we will fetch the unavailable dates and these
 export default function CalenderProvider({
   dentistId,
   clinicId,
+  initialDate,
   children,
 }: calenderContextProps) {
-  const [pickedDate, setDate] = useState<Date | null>(null);
+  const [pickedDate, setDate] = useState<Date | null>(
+    initialDate ? (initialDate instanceof Date ? initialDate : new Date(initialDate)) : null
+  );
   const [unavailableDates, setDates] = useState<Date[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const pickedDateSetter = useCallback((date: Date) => {

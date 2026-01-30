@@ -1,5 +1,6 @@
 const { logger } = require("../config/logger");
 const clinicService = require("../services/clinic.service");
+const profileService = require("../services/profile.service");
 const emailService = require('../services/email.service');
 /**
  * Create Clinic
@@ -107,6 +108,27 @@ exports.findById = async (req, res) => {
     });
   }
 }   
+
+/**
+ * Public clinic lookup by either Mongo _id or clinic_id
+ */
+exports.findPublicById = async (req, res) => {
+  const id = req.params.id;
+  try {
+    // try by ObjectId-style id first
+    try {
+      const clinic = await clinicService.getClinicSelfId(id);
+      return res.status(200).send(clinic);
+    } catch (e) {
+      // fallback to clinic_id lookup
+    }
+
+    const clinicByClinicId = await clinicService.getClinicById(id);
+    return res.status(200).send(clinicByClinicId);
+  } catch (err) {
+    res.status(404).send({ message: err.message || 'Clinic not found' });
+  }
+}
 
 /**
  * Get a single clinic by id
@@ -220,3 +242,40 @@ exports.getDoctorScheduleById = async (req, res) => {
     });
   }
 };
+
+/**
+ * Clinic information endpoint by clinic_id
+ * Returns clinic, admin_staff profile (if available) and list of doctors/admins
+ */
+exports.clinicInformation = async (req, res) => {
+  try {
+    const clinic_id = req.params.clinic_id || req.query.clinic_id;
+    if (!clinic_id) {
+      return res.status(400).send({ message: 'clinic_id is required' });
+    }
+
+    // Fetch clinic by clinic_id
+    const clinic = await clinicService.getClinicById(clinic_id);
+
+    // Fetch admin profile if admin_staff populated
+    let adminProfile = null;
+    try {
+      if (clinic.admin_staff) {
+        adminProfile = await profileService.getProfileById(clinic.admin_staff.toString());
+      }
+    } catch (err) {
+      // ignore admin lookup errors
+      logger.error({ err }, 'Failed to load admin profile for clinic-information');
+    }
+
+    // Fetch all profiles (doctors + admins) for this clinic
+    let doctors = await profileService.getAllProfiles({ clinic_id });
+    if(!doctors || doctors.length === 0){
+      doctors = doctors.filter(profile =>  profile.role === 'admin'); 
+    }
+    console.log(doctors);
+    return res.status(200).send({ clinic, admin: adminProfile, doctors });
+  } catch (err) {
+    res.status(500).send({ message: err.message || 'Error retrieving clinic information' });
+  }
+}

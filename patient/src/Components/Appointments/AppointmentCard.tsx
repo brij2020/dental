@@ -113,7 +113,7 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({ appointment, appointm
                                             onClick={() => {
                                                 const appt: any = appointment as any
                                                 const clinicId = appt?.clinic_id || appt?.clinics?.clinic_id || appt?.clinics?._id || appt?.clinics?.id || ''
-                                                if (clinicId) navigate(`/book-appointment/${clinicId}`)
+                                                if (clinicId) navigate(`/book-appointment/${clinicId}`, { state: { fromAppointment: appt } })
                                             }}
                                             className='flex items-center gap-3 rounded-sm p-1.5 cursor-pointer text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900'
                                         >

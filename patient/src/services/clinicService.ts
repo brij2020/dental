@@ -22,10 +22,14 @@ export interface ClinicLocation {
 export interface Clinic {
   id?: string;
   _id?: string;
+  clinic_id?: string;
   name: string;
   phone: string;
+  contact_number?: string;
   address?: ClinicAddress;
-  clinic_id?: string;
+  admin_staff?: string;
+  admin_staff_name?: string;
+
   status?: 'Active' | 'Inactive' | 'Pending';
   logo?: string;
   branding_moto?: string;
@@ -52,6 +56,7 @@ export interface DoctorSchedule {
   specialization?: string;
   qualification?: string;
   experience?: number;
+  years_of_experience?: number;
   availability?: string;
   slot_duration_minutes?: number;
   working_days?: string[];

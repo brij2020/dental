@@ -223,10 +223,21 @@ const getClinicById = async (id) => {
  */
 const getClinicSelfId = async (id) => {
   try {
-    const clinic = await Clinic.findById(id);
+    let clinic = null;
+    // Only call findById if id looks like a Mongo ObjectId
+    if (typeof id === 'string' && id.match(/^[0-9a-fA-F]{24}$/)) {
+      clinic = await Clinic.findById(id);
+    }
+
+    // If not found by ObjectId, try clinic_id
+    if (!clinic) {
+      clinic = await Clinic.findOne({ clinic_id: id });
+    }
+
     if (!clinic) {
       throw new Error("Clinic not found");
     }
+
     // Transform _id to id for API response
     return {
       id: clinic._id.toString(),
@@ -373,7 +384,28 @@ const getDoctorSchedules = async (clinicId) => {
 
     // Return populated doctors with schedule details
     if (!clinic.doctors || clinic.doctors.length === 0) {
-      return [];
+      // Fallback: if clinic document doesn't reference doctors, query profiles collection
+      try {
+        const profiles = await profileService.getAllProfiles({ clinic_id: clinicId });
+        if (!profiles || profiles.length === 0) return [];
+
+        return profiles.map(doctor => ({
+          id: doctor._id.toString(),
+          _id: doctor._id.toString(),
+          name: doctor.full_name,
+          full_name: doctor.full_name,
+          email: doctor.email,
+          role: doctor.role,
+          clinic_id: doctor.clinic_id,
+          availability: doctor.availability,
+          slot_duration_minutes: doctor.slot_duration_minutes,
+          status: doctor.status,
+          ...doctor.toObject()
+        }));
+      } catch (err) {
+        logger.error({ err }, 'Error fetching doctors from profiles fallback');
+        return [];
+      }
     }
 
     return clinic.doctors.map(doctor => ({

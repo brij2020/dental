@@ -1,8 +1,11 @@
 import { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useLocation } from 'react-router-dom';
+import { useProfile } from '@/hooks/useProfile';
 import Datepicker from "@/Components/DatePicker";
 import SlotList from "@/Components/SlotList";
 import CalenderProvider from "@/contexts/Calender";
+import CustomModal from '@/Components/CustomModal';
+import AppointmentDateTime from '@/Components/bookAppointments/AppointmentDateTime';
 import { useClinicData } from '@/services/bookAppointmentApi';
 import { ClinicHeader } from '@/Components/bookAppointments/ClinicHeader';
 import { DentistSelector } from '@/Components/bookAppointments/DentistSelector';
@@ -40,7 +43,11 @@ const ErrorState = ({ error, onRetry }: { error: string; onRetry: () => void }) 
 
 export default function BookAppointments() {
   const { clinicId } = useParams();
+  const location = useLocation();
+  const fromAppointment = (location.state as any)?.fromAppointment || null;
+  const { profile, setProfile } = useProfile();
   const [selectedDentist, setSelectedDentist] = useState<Dentist | null>(null);
+  const [openBookModal, setOpenBookModal] = useState<boolean>(false);
 
   const { clinic, loading, error, refetch } = useClinicData(clinicId || null);
 
@@ -55,7 +62,40 @@ export default function BookAppointments() {
 
   // Auto-select default dentist when clinic data loads
   useEffect(() => {
+    // If navigated from an appointment with patient info, prefill user profile for booking
+    if (fromAppointment && fromAppointment.full_name) {
+      try {
+        const apptPatient = fromAppointment;
+        const mapped = {
+          id: apptPatient.id || apptPatient._id || apptPatient.patient_id || apptPatient.patient_id || '',
+          patient_id: apptPatient.patient_id || apptPatient.id || apptPatient._id || '',
+          full_name: apptPatient.full_name || apptPatient.name || '',
+          contact_number: apptPatient.contact_number || apptPatient.mobile_number || '',
+          email: apptPatient.email || '',
+          uhid: apptPatient.uhid || null,
+          date_of_birth: apptPatient.date_of_birth || apptPatient.dob || null,
+          clinic_id: apptPatient.clinic_id || clinicId || null,
+        } as any;
+
+        // Only overwrite if there's no profile or the appointment has more specific data
+        if (!profile || !profile.full_name) {
+          setProfile(mapped);
+        }
+      } catch (err) {
+        console.error('Error mapping appointment patient to profile:', err);
+      }
+    }
+
     if (clinic && !selectedDentist) {
+      // If navigated from an appointment, try to select that doctor first
+      if (fromAppointment?.doctor_id) {
+        const matched = clinic.dentists.find(d => d.id === String(fromAppointment.doctor_id) || d.id === (fromAppointment.doctor_id as any)?._id || (d.id === (fromAppointment.doctor_id as any)?.id));
+        if (matched) {
+          setSelectedDentist(matched);
+          return;
+        }
+      }
+
       const defaultDentist = clinic.dentists.find(d => d.isDefault && d.isAvailable);
       if (defaultDentist) {
         setSelectedDentist(defaultDentist);
@@ -71,6 +111,7 @@ export default function BookAppointments() {
 
   const handleDentistSelect = (dentist: Dentist) => {
     setSelectedDentist(dentist);
+    setOpenBookModal(true);
   };
 
   // Show loading state
@@ -131,7 +172,7 @@ export default function BookAppointments() {
               </div>
             </div>
 
-            <CalenderProvider clinicId={clinic.id} dentistId={selectedDentist.id}>
+            <CalenderProvider clinicId={clinic.id} dentistId={selectedDentist.id} initialDate={fromAppointment?.appointment_date || null}>
               <div className="grid lg:grid-cols-2 gap-6">
                 <div className='text-sm'>
                   <h3 className="font-semibold text-sm text-gray-900 mb-2">Select Date</h3>
@@ -172,6 +213,12 @@ export default function BookAppointments() {
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8 text-center">
             <p className="text-gray-600">No clinic data available. Please check the URL parameters.</p>
           </div>
+        )}
+        {/* Booking Modal opened when a dentist is selected via "Book Now" */}
+        {clinic && selectedDentist && (
+          <CustomModal openModal={openBookModal} setOpenModal={setOpenBookModal}>
+            <AppointmentDateTime clinic={clinic as any} setOpenAppointmentDateTime={setOpenBookModal} doctorId={selectedDentist.id} />
+          </CustomModal>
         )}
       </div>
     </div>

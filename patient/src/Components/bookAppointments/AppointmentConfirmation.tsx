@@ -65,9 +65,11 @@ const AppointmentConfirmation: React.FC<AppointmentSummaryProps> = ({ selectedCl
         }
 
         // Validate clinic and doctor data
-        if (!selectedClinic?.id) {
+        // Ensure we have a clinic identifier (accept clinic_id, id or _id)
+        const clinicIdentifier = selectedClinic?.clinic_id || selectedClinic?.id || selectedClinic?._id;
+        if (!clinicIdentifier) {
             toast.error("Clinic ID is missing. Please select a clinic again.");
-            console.error('Missing clinic_id in selectedClinic:', selectedClinic);
+            console.error('Missing clinic identifier in selectedClinic:', selectedClinic);
             return;
         }
 
@@ -91,13 +93,13 @@ const AppointmentConfirmation: React.FC<AppointmentSummaryProps> = ({ selectedCl
             full_name: profile?.full_name,
             uhid: profile?.uhid || null,
             contact_number: profile?.contact_number || null,
-            clinic_id: selectedClinic.clinic_id,
+            clinic_id: selectedClinic.clinic_id || selectedClinic.id || selectedClinic._id || clinicIdentifier,
             doctor_id: doctorId,
             appointment_date: appointmentDateForAPI,
             appointment_time: selectedTime,
             patient_note: patientNote?.trim().length > 0 ? patientNote?.trim() : null,
             clinics: {
-                id: selectedClinic._id || selectedClinic.id,
+                id: selectedClinic._id || selectedClinic.id || clinicIdentifier,
                 name: selectedClinic.name,
                 contact_number: selectedClinic.phone,
                 address: selectedClinic.address,

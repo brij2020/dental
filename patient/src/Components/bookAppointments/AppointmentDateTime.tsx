@@ -9,6 +9,7 @@ import Loading from "../Loading";
 interface ConfirmAppointmentProps {
     clinic: Clinic;
     setOpenAppointmentDateTime: React.Dispatch<React.SetStateAction<boolean>>;
+    doctorId?: string;
 }
 
 interface SlotGridProps {
@@ -95,7 +96,7 @@ const SlotGrid: React.FC<SlotGridProps> = ({ selectedTime, setSelectedTime, slot
     );
 }
 
-const AppointmentDateTime: React.FC<ConfirmAppointmentProps> = ({ clinic, setOpenAppointmentDateTime }) => {
+const AppointmentDateTime: React.FC<ConfirmAppointmentProps> = ({ clinic, setOpenAppointmentDateTime, doctorId }) => {
     const [selectedDate, setSelectedDate] = useState<Date | null>(new Date());
     const [availableSlots, setAvailableSlots] = useState<Slots | null>(null);
     const [selectedTime, setSelectedTime] = useState<string | null>(null);
@@ -107,10 +108,11 @@ const AppointmentDateTime: React.FC<ConfirmAppointmentProps> = ({ clinic, setOpe
     const [isDoctorOnLeave, setIsDoctorOnLeave] = useState<boolean>(false);
     const [leaveReason, setLeaveReason] = useState<string | undefined>(undefined);
 
-    // Fetch doctor profile using admin_staff ID from clinic
+    // Fetch doctor profile using provided doctorId or admin_staff ID from clinic
     useEffect(() => {
         const fetchDoctorProfile = async () => {
-            if (!clinic?.admin_staff) {
+            const profileKey = doctorId || clinic?.admin_staff;
+            if (!profileKey) {
                 setError("No doctor available for this clinic");
                 return;
             }
@@ -120,7 +122,7 @@ const AppointmentDateTime: React.FC<ConfirmAppointmentProps> = ({ clinic, setOpe
                 setError(null);
 
                 // Fetch doctor profile using centralized API function
-                const response = await getDoctorProfile(clinic.admin_staff);
+                const response = await getDoctorProfile(profileKey);
 
                 if (response.success && 'data' in response) {
                     setDoctor(response.data as DoctorProfile);
@@ -141,7 +143,7 @@ const AppointmentDateTime: React.FC<ConfirmAppointmentProps> = ({ clinic, setOpe
         if (clinic) {
             fetchDoctorProfile();
         }
-    }, [clinic]);
+    }, [clinic, doctorId]);
 
     // Generate slots from doctor availability
     useEffect(() => {
@@ -350,7 +352,21 @@ const AppointmentDateTime: React.FC<ConfirmAppointmentProps> = ({ clinic, setOpe
             {
                 openAppointmentConfirmation && (
                     <CustomModal openModal={openAppointmentConfirmation} setOpenModal={setOpenAppointmentConfirmation}>
-                        <AppointmentConfirmation selectedClinic={clinic} selectedDate={selectedDate} selectedTime={selectedTime} patientNote={patientNote} setOpenAppointmentDateTime={setOpenAppointmentDateTime} setOpenAppointmentConfirmation={setOpenAppointmentConfirmation} />
+                        <AppointmentConfirmation
+                            selectedClinic={{
+                                ...clinic,
+                                // ensure confirmation has a doctor/staff id and display name
+                                doctor_id: doctor?._id || doctor?.id || (clinic as any).doctor_id,
+                                contact_name: doctor?.full_name || (clinic as any).admin_staff_name || (clinic as any).contact_name,
+                                admin_staff: (clinic as any).admin_staff,
+                                admin_staff_name: (clinic as any).admin_staff_name
+                            } as any}
+                            selectedDate={selectedDate}
+                            selectedTime={selectedTime}
+                            patientNote={patientNote}
+                            setOpenAppointmentDateTime={setOpenAppointmentDateTime}
+                            setOpenAppointmentConfirmation={setOpenAppointmentConfirmation}
+                        />
                     </CustomModal>
                 )
             }

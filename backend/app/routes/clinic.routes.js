@@ -21,7 +21,12 @@ module.exports = app => {
 
   // Retrieve a single clinic by id
   router.get("/information", verifyToken, clinic.findOne);
+  // Public lookup (accepts ObjectId or clinic_id)
+  router.get("/:id/public", clinic.findPublicById);
   router.get("/:id", verifyToken, clinic.findById);
+
+  // Clinic information by clinic_id (public) - returns clinic + admin + doctors
+  router.get("/clinic-information/:clinic_id", clinic.clinicInformation);
 
   // Get admin/staff schedules for a clinic (public)
   router.get("/:id/admin", clinic.getAdminSchedules);

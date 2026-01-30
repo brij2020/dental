@@ -26,9 +26,13 @@ export interface Review {
  */
 export interface Clinic {
   id: string;                 // Unique identifier for the clinic
+  _id?: string;               // Optional MongoDB _id
+  clinic_id?: string;         // Optional external clinic identifier
   name: string;               // Name of the dental clinic
-  address: string;            // Physical address of the clinic
+  address: string | any;      // Physical address of the clinic (string or structured object)
   phone: string;              // Contact phone number
+  contact_name?: string;      // Display name for contact/doctor
+  contact_number?: string;    // alternative phone field used in some APIs
   email?: string;             // Optional contact email address
   rating: number;             // Clinic rating (likely out of 5)
   dentists: Dentist[];        // Array of dentists working at this clinic
@@ -38,6 +42,10 @@ export interface Clinic {
     days: string[];           // Days of the week the clinic operates
   };
   reviews: Review[];
+  admin_staff?: string;       // optional staff/profile id
+  admin_staff_name?: string;  // optional staff display name
+  location?: any;             // optional structured location
+  description?: string;
 }
 
 /**
