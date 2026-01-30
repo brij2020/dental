@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover'
 import CustomModal from '../CustomModal'
 import RescheduleModal from './RescheduleModal'
@@ -19,6 +20,7 @@ type AppointmentCardProps = {
 const AppointmentCard: React.FC<AppointmentCardProps> = ({ appointment, appointmentType, className, onRefetch }) => {
     const [openModal, setOpenModal] = useState(false)
     const [currentModal, setCurrentModal] = useState<"reschedule" | "cancel" | null>(null)
+    const navigate = useNavigate()
 
     const formattedDate = useMemo(() => {
         if (!appointment?.appointment_date) return { day: "", month: "", year: "" }
@@ -107,7 +109,14 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({ appointment, appointm
                                 </div>
                                 {
                                     appointmentType === "missed" && (
-                                        <div className='flex items-center gap-3 rounded-sm p-1.5 cursor-pointer text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900'>
+                                        <div
+                                            onClick={() => {
+                                                const appt: any = appointment as any
+                                                const clinicId = appt?.clinic_id || appt?.clinics?.clinic_id || appt?.clinics?._id || appt?.clinics?.id || ''
+                                                if (clinicId) navigate(`/book-appointment/${clinicId}`)
+                                            }}
+                                            className='flex items-center gap-3 rounded-sm p-1.5 cursor-pointer text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900'
+                                        >
                                             <span className="material-symbols-sharp text-[16px]">calendar_add_on</span>
                                             <p className='text-[13px]'>Book Again</p>
                                         </div>
