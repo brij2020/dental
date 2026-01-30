@@ -14,13 +14,14 @@ interface RescheduleModalProps {
 }
 
 interface SlotGridProps {
-  selectedTime: string;
-  setSelectedTime: React.Dispatch<React.SetStateAction<string>>;
+  selectedTime: string | null;
+  setSelectedTime: React.Dispatch<React.SetStateAction<string | null>>;
   slots: string[];
   label: string;
   icon: string;
   errorMessage: string;
 }
+
 
 interface DoctorProfile {
   _id?: string;
@@ -65,9 +66,9 @@ const SlotGrid: React.FC<SlotGridProps> = ({ selectedTime, setSelectedTime, slot
   );
 };
 
-const RescheduleModal: React.FC<RescheduleModalProps> = ({ setOpenModal, appointment }) => {
+const RescheduleModal: React.FC<RescheduleModalProps> = ({ setOpenModal, appointment, onSuccess }) => {
   const { reschedule, loading } = useRescheduleAppointment();
-  
+
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
   const [availableSlots, setAvailableSlots] = useState<Slots | null>(null);
@@ -218,13 +219,14 @@ const RescheduleModal: React.FC<RescheduleModalProps> = ({ setOpenModal, appoint
 
     if (result.success) {
       setOpenModal(false);
-      // Prefer callback-based refetch when provided (React-friendly)
+
       if (typeof onSuccess === 'function') {
         onSuccess();
       } else {
         window.dispatchEvent(new Event('appointments:refetch'));
       }
     }
+
   };
 
   return (

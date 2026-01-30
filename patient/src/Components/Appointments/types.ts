@@ -1,4 +1,5 @@
 export interface Appointment {
+    _id?: string;
     id: string;
     status: string;
     appointment_uid: string;
