@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { getDoctorProfile } from "@/lib/apiClient";
+import { checkDoctorLeaveStatus } from "@/pages/patients/api";
 import type { Clinic, Slots } from "@/Components/bookAppointments/types";
 import DateSelector from "../DateSelector";
 import CustomModal from "../CustomModal";
@@ -18,6 +19,8 @@ interface SlotGridProps {
     label: string;
     icon: string;
     errorMessage: string;
+    isDisabled?: boolean;
+    leaveReason?: string;
 }
 
 interface DoctorProfile {
@@ -35,25 +38,38 @@ interface DoctorProfile {
     [key: string]: any;
 }
 
-const SlotGrid: React.FC<SlotGridProps> = ({ selectedTime, setSelectedTime, slots, label, icon, errorMessage }) => {
+const SlotGrid: React.FC<SlotGridProps> = ({ selectedTime, setSelectedTime, slots, label, icon, errorMessage, isDisabled, leaveReason }) => {
     return (
         <div className="flex flex-col gap-1.5">
             <h4 className="text-sm text-zinc-500">{label}:</h4>
             {
-                slots?.length === 0 ? (
-                    <p className="flex items-center text-[11px] bg-zinc-50 rounded-sm py-4 text-zinc-400 gap-1 justify-center"><span className="material-symbols-sharp text-base">{icon}</span>{errorMessage}</p>
-                ) : (
-                    <div className="grid grid-cols-4 gap-2">
-                        {slots?.map((slot) => (
-                            <button
-                                key={slot}
-                                onClick={() => setSelectedTime(slot)}
-                                className={`border rounded-sm py-1.5 text-xs ${selectedTime === slot ? "bg-sky-600 border-sky-600 text-white" : "border-zinc-200 hover:bg-[#c8ebf74c] hover:border-sky-700"}`}
-                            >
-                                {slot}
-                            </button>
-                        ))}
+                isDisabled ? (
+                    <div>
+                        <p className="flex items-center text-[12px] bg-red-50 rounded-sm py-2 text-red-600 gap-2 justify-center border border-red-100"><span className="material-symbols-sharp">cancel</span>Doctor is on leave {leaveReason ? `- ${leaveReason}` : ''}</p>
+                        <div className="grid grid-cols-4 gap-2 mt-2">
+                            {slots?.map((slot) => (
+                                <div key={slot} className="border rounded-sm py-1.5 text-xs text-red-600 flex items-center justify-center opacity-80">
+                                    <span className="material-symbols-sharp text-lg">cancel</span>
+                                </div>
+                            ))}
+                        </div>
                     </div>
+                ) : (
+                    slots?.length === 0 ? (
+                        <p className="flex items-center text-[11px] bg-zinc-50 rounded-sm py-4 text-zinc-400 gap-1 justify-center"><span className="material-symbols-sharp text-base">{icon}</span>{errorMessage}</p>
+                    ) : (
+                        <div className="grid grid-cols-4 gap-2">
+                            {slots?.map((slot) => (
+                                <button
+                                    key={slot}
+                                    onClick={() => setSelectedTime(slot)}
+                                    className={`border rounded-sm py-1.5 text-xs ${selectedTime === slot ? "bg-sky-600 border-sky-600 text-white" : "border-zinc-200 hover:bg-[#c8ebf74c] hover:border-sky-700"}`}
+                                >
+                                    {slot}
+                                </button>
+                            ))}
+                        </div>
+                    )
                 )
             }
         </div>
@@ -69,6 +85,8 @@ const AppointmentDateTime: React.FC<ConfirmAppointmentProps> = ({ clinic, setOpe
     const [doctor, setDoctor] = useState<DoctorProfile | null>(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [isDoctorOnLeave, setIsDoctorOnLeave] = useState<boolean>(false);
+    const [leaveReason, setLeaveReason] = useState<string | undefined>(undefined);
 
     // Fetch doctor profile using admin_staff ID from clinic
     useEffect(() => {
@@ -108,24 +126,31 @@ const AppointmentDateTime: React.FC<ConfirmAppointmentProps> = ({ clinic, setOpe
 
     // Generate slots from doctor availability
     useEffect(() => {
-        if (doctor?.availability && selectedDate) {
+        let isMounted = true;
+        async function buildSlots() {
+            if (!doctor?.availability || !selectedDate) {
+                if (isMounted) setAvailableSlots(null);
+                setSelectedTime(null);
+                return;
+            }
+
             const dayName = selectedDate.toLocaleDateString("en-US", { weekday: "long" });
-            
-            const daySchedule = Array.isArray(doctor.availability) 
+            const daySchedule = Array.isArray(doctor.availability)
                 ? doctor.availability.find((a: any) => a.day === dayName)
                 : doctor.availability[dayName];
 
             const slots: Slots = { morning: [], evening: [] };
 
             if (!daySchedule) {
-                setAvailableSlots(slots);
-                setSelectedTime(null);
+                if (isMounted) {
+                    setAvailableSlots(slots);
+                    setSelectedTime(null);
+                }
                 return;
             }
 
             const step = doctor?.slot_duration_minutes || 30;
 
-            // Helper functions for time conversion
             const timeToMinutes = (time: string) => {
                 const [h, m] = time.split(":").map(Number);
                 return h * 60 + m;
@@ -150,7 +175,6 @@ const AppointmentDateTime: React.FC<ConfirmAppointmentProps> = ({ clinic, setOpe
                 return slotsArr;
             };
 
-            // Generate morning slots
             if (!daySchedule.morning?.is_off && daySchedule.morning?.start && daySchedule.morning?.end) {
                 slots.morning.push(...generateSlotsFromRange(
                     daySchedule.morning.start,
@@ -159,7 +183,6 @@ const AppointmentDateTime: React.FC<ConfirmAppointmentProps> = ({ clinic, setOpe
                 ));
             }
 
-            // Generate evening slots
             if (!daySchedule.evening?.is_off && daySchedule.evening?.start && daySchedule.evening?.end) {
                 slots.evening.push(...generateSlotsFromRange(
                     daySchedule.evening.start,
@@ -185,11 +208,25 @@ const AppointmentDateTime: React.FC<ConfirmAppointmentProps> = ({ clinic, setOpe
                 });
             }
 
-            setAvailableSlots(slots);
-        } else {
-            setAvailableSlots(null);
+            // Check doctor's leave status for the selected date
+            let leaveResult = { isOnLeave: false, leaveReason: undefined };
+            try {
+                const dateStr = selectedDate.toISOString().slice(0, 10); // YYYY-MM-DD
+                leaveResult = await checkDoctorLeaveStatus(doctor._id || doctor.id, dateStr, [doctor]);
+            } catch (err) {
+                console.error('Error checking doctor leave status:', err);
+            }
+
+            if (isMounted) {
+                setAvailableSlots(slots);
+                setIsDoctorOnLeave(leaveResult.isOnLeave);
+                setLeaveReason(leaveResult.leaveReason);
+                setSelectedTime(null);
+            }
         }
-        setSelectedTime(null);
+
+        buildSlots();
+        return () => { isMounted = false };
     }, [selectedDate, doctor]);
 
     return (
@@ -237,8 +274,8 @@ const AppointmentDateTime: React.FC<ConfirmAppointmentProps> = ({ clinic, setOpe
                         </div>
                     ) : (
                         <>
-                            <SlotGrid selectedTime={selectedTime} setSelectedTime={setSelectedTime} slots={availableSlots?.morning} label="Morning" icon="light_mode" errorMessage="No morning slots available." />
-                            <SlotGrid selectedTime={selectedTime} setSelectedTime={setSelectedTime} slots={availableSlots?.evening} label="Evening" icon="dark_mode" errorMessage="No evening slots available." />
+                            <SlotGrid selectedTime={selectedTime} setSelectedTime={setSelectedTime} slots={availableSlots?.morning} label="Morning" icon="light_mode" errorMessage="No morning slots available." isDisabled={isDoctorOnLeave} leaveReason={leaveReason} />
+                            <SlotGrid selectedTime={selectedTime} setSelectedTime={setSelectedTime} slots={availableSlots?.evening} label="Evening" icon="dark_mode" errorMessage="No evening slots available." isDisabled={isDoctorOnLeave} leaveReason={leaveReason} />
                         </>
                     )
                 }
@@ -270,8 +307,10 @@ const AppointmentDateTime: React.FC<ConfirmAppointmentProps> = ({ clinic, setOpe
 
             {/* Continue button */}
             <div className="flex flex-col items-center mt-1  pt-5 border-t border-zinc-200">
-                <button onClick={() => setOpenAppointmentConfirmation(true)} className={`w-[200px] py-2 rounded-sm text-sm ${selectedDate && selectedTime ? "bg-black text-white cursor-pointer hover:bg-zinc-700 " : "bg-zinc-200 text-zinc-400 cursor-not-allowed"}`} disabled={!selectedDate || !selectedTime}>Continue</button>
-                {(!selectedDate || !selectedTime) && (
+                <button onClick={() => setOpenAppointmentConfirmation(true)} className={`w-[200px] py-2 rounded-sm text-sm ${selectedDate && selectedTime && !isDoctorOnLeave ? "bg-black text-white cursor-pointer hover:bg-zinc-700 " : "bg-zinc-200 text-zinc-400 cursor-not-allowed"}`} disabled={!selectedDate || !selectedTime || isDoctorOnLeave}>Continue</button>
+                {isDoctorOnLeave ? (
+                    <p className="text-[11px] text-red-600 mt-1">Doctor is on leave{leaveReason ? `: ${leaveReason}` : ''}. Please choose another date or doctor.</p>
+                ) : (!selectedDate || !selectedTime) && (
                     <p className="text-[11px] text-zinc-400 mt-1">
                         {!selectedDate ? 'Select a date' :
                             !selectedTime ? 'Select a time-slot' :
