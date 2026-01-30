@@ -121,7 +121,7 @@ patientSchema.pre("save", async function (next) {
   if (!this.uhid) {
     try {
       const currentYear = new Date().getFullYear().toString().slice(-2);
-      const counterId = `uhid_${currentYear}`;
+      const counterId = `${currentYear}`;
 
       // Atomically increment the counter for the current year
       const countersColl = mongoose.connection.collection('counters');
