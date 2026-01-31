@@ -20,6 +20,11 @@ const treatmentProcedureSchema = new mongoose.Schema(
       min: 1,
       max: 52
     },
+    tooth_damage: {
+      type: String,
+      default: "",
+      trim: true
+    },
     problems: {
       type: [String],
       default: []

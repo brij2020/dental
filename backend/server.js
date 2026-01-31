@@ -30,18 +30,23 @@ app.use(express.urlencoded({ extended: true }));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 const db = require("./app/models");
-db.mongoose
-  .connect(db.url, {
-    useNewUrlParser: true,
-    useUnifiedTopology: true
-  })
-  .then(() => {
-    logger.info('Connected to the database!');
-  })
-  .catch(err => {
-    logger.error({ err }, 'Cannot connect to the database!');
-    process.exit();
-  });
+// Connect mongoose unless running tests (tests control connection)
+if (process.env.NODE_ENV !== 'test') {
+  db.mongoose
+    .connect(db.url, {
+      useNewUrlParser: true,
+      useUnifiedTopology: true
+    })
+    .then(() => {
+      logger.info('Connected to the database!');
+    })
+    .catch(err => {
+      logger.error({ err }, 'Cannot connect to the database!');
+      process.exit();
+    });
+} else {
+  logger.info('Skipping DB connect in test environment');
+}
 
 // simple route
 app.get("/", (req, res) => {
@@ -58,9 +63,15 @@ require("./app/routes")(app);
 swaggerSetup(app);
 
 const PORT = config.port;
-app.listen(PORT, () => {
-  logger.info(`🚀 Server started successfully on port ${PORT} in ${config.name} mode`);
-  logger.info(`📊 Environment: ${config.name.toUpperCase()}`);
-  logger.info(`🔗 API URL: ${config.api_url}`);
-  logger.info(`📱 Frontend URL: ${config.frontend_url}`);
-});
+
+// Export app for testing. Start server only when running directly.
+if (require.main === module) {
+  app.listen(PORT, () => {
+    logger.info(`🚀 Server started successfully on port ${PORT} in ${config.name} mode`);
+    logger.info(`📊 Environment: ${config.name.toUpperCase()}`);
+    logger.info(`🔗 API URL: ${config.api_url}`);
+    logger.info(`📱 Frontend URL: ${config.frontend_url}`);
+  });
+}
+
+module.exports = app;

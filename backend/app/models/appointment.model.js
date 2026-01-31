@@ -1,11 +1,11 @@
 const mongoose = require('mongoose');
-const { v4: uuidv4 } = require('uuid');
+const crypto = require('crypto');
 
 const appointmentSchema = new mongoose.Schema(
   {
     appointment_uid: {
       type: String,
-      default: () => uuidv4(),
+      default: () => (crypto.randomUUID ? crypto.randomUUID() : require('uuid').v4()),
       unique: true,
       index: true,
     },

@@ -12,6 +12,7 @@ const envMap = {
   'development': 'dev',
   'dev': 'dev',
   'local': 'dev',
+  'test': 'dev',
   'staging': 'staging',
   'stg': 'staging',
   'stage': 'staging',
@@ -82,6 +83,11 @@ const getConfig = () => {
   const config = environments[NODE_ENV];
   
   if (!config) {
+    // During tests we prefer to fallback to dev rather than exiting the process
+    if (NODE_ENV === 'test') {
+      console.warn(`Unknown environment: ${NODE_ENV}. Falling back to 'dev' configuration for tests.`);
+      return environments.dev;
+    }
     console.error(`Unknown environment: ${NODE_ENV}`);
     process.exit(1);
   }

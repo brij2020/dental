@@ -43,6 +43,7 @@ const ToothDamageModal: React.FC<Props> = ({
   const [problems, setProblems] = useState<string[]>([""]);
   const [solutions, setSolutions] = useState<string[]>([""]);
   const [cost, setCost] = useState<string>("");
+  const [toothDamage, setToothDamage] = useState<string>("");
 
   const [procedureOptions, setProcedureOptions] = useState<ProcedureOption[]>([]);
   const [isLoadingProcedures, setIsLoadingProcedures] = useState(false);
@@ -192,6 +193,7 @@ const ToothDamageModal: React.FC<Props> = ({
       setSelectedTeeth(new Set());
       setLoadProceduresError(null);
       setLoadProblemsError(null);
+      setToothDamage("");
     }
   }, [isOpen]);
 
@@ -402,6 +404,7 @@ const ToothDamageModal: React.FC<Props> = ({
           problems: filteredProblems.length > 0 ? filteredProblems : [],
           solutions: filteredSolutions.length > 0 ? filteredSolutions : [],
           cost: numericCost ?? 0,
+          tooth_damage: toothDamage?.trim() || "",
         });
         
         if (!response.data || !response.data.success) {
@@ -421,6 +424,7 @@ const ToothDamageModal: React.FC<Props> = ({
           problems: filteredProblems.length > 0 ? filteredProblems : [],
           solutions: filteredSolutions.length > 0 ? filteredSolutions : [],
           cost: perToothCost ?? 0,
+          tooth_damage: toothDamage?.trim() || "",
         }));
 
         if (procedures.length > 0) {
@@ -617,6 +621,20 @@ const ToothDamageModal: React.FC<Props> = ({
 
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Damage notes (optional)
+                </label>
+                <textarea
+                  value={toothDamage}
+                  onChange={(e) => setToothDamage(e.target.value)}
+                  placeholder="e.g., Enamel fracture on buccal surface"
+                  disabled={isSaving}
+                  className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-slate-900 outline-none focus:ring-4 focus:ring-sky-300/40 focus:border-sky-400 transition"
+                  rows={2}
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
                   Treatment Cost
                 </label>
                 <div className="relative">
@@ -710,6 +728,20 @@ const ToothDamageModal: React.FC<Props> = ({
                     </p>
                   )}
                 </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Damage notes (optional)
+                </label>
+                <textarea
+                  value={toothDamage}
+                  onChange={(e) => setToothDamage(e.target.value)}
+                  placeholder="e.g., Enamel fracture on buccal surface"
+                  disabled={isSaving}
+                  className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-slate-900 outline-none focus:ring-4 focus:ring-sky-300/40 focus:border-sky-400 transition"
+                  rows={2}
+                />
               </div>
 
               <div>
