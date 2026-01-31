@@ -81,8 +81,8 @@ export default function DashboardRevenue({ clinicId }: Props) {
   })();
 
   return (
-    <div className="rounded-2xl border bg-white p-4 sm:p-6">
-      <div className="flex items-center justify-between">
+    <div className="rounded-2xl border bg-white p-4 sm:p-6 h-full flex flex-col">
+      <div className="flex items-start justify-between gap-4">
         <div>
           <p className="text-sm text-slate-600">Revenue</p>
           <p className="text-2xl font-semibold">{loading ? '...' : `₹${(todayRevenue ?? 0).toLocaleString()}`} <span className="text-sm text-slate-400">today</span></p>
@@ -102,6 +102,7 @@ export default function DashboardRevenue({ clinicId }: Props) {
           </div>
         </div>
       </div>
+      <div className="flex-1" />
     </div>
   );
 }

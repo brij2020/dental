@@ -44,7 +44,41 @@ class DoctorLeaveService {
 
   // Get all active leaves for a clinic
   static async getLeavesByClinic(clinicId) {
-    return await DoctorLeave.find({ clinic_id: clinicId, is_active: true }).sort({ leave_start_date: 1 });
+    // Fetch explicit leave records stored in DoctorLeave collection
+    const explicitLeaves = await DoctorLeave.find({ clinic_id: clinicId, is_active: true }).sort({ leave_start_date: 1 }).lean();
+
+    // Also include per-profile `leave` entries stored on Profile documents (some installs store single-day leaves there)
+    try {
+      const Profile = require('../models/profile.model');
+      const profiles = await Profile.find({ clinic_id: clinicId, leave: { $exists: true, $ne: [] } }).select('leave _id full_name').lean();
+      const profileLeaves = [];
+      profiles.forEach(p => {
+        if (Array.isArray(p.leave)) {
+          p.leave.forEach(l => {
+            // normalize shape to match DoctorLeave
+            const date = l.date || l.leave_start_date;
+            if (!date) return;
+            profileLeaves.push({
+              doctor_id: String(p._id),
+              doctor_name: p.full_name,
+              clinic_id: clinicId,
+              leave_start_date: date,
+              leave_end_date: date,
+              reason: l.reason || null,
+              _source: 'profile'
+            });
+          });
+        }
+      });
+
+      // Merge and sort by start date
+      const merged = explicitLeaves.concat(profileLeaves);
+      merged.sort((a, b) => (a.leave_start_date || '').localeCompare(b.leave_start_date || ''));
+      return merged;
+    } catch (err) {
+      // If profile lookup fails, return explicit leaves only
+      return explicitLeaves;
+    }
   }
 
   // Deactivate a leave record (soft delete)

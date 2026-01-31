@@ -10,6 +10,7 @@ module.exports = app => {
   require("./prescription.routes")(app);
   require("./medicalCondition.routes")(app);
   require("./appointment.routes")(app);
+  require("./doctor-leave.routes")(app);
   require("./procedure.routes")(app);
   require("./problem.routes")(app);
   require("./consultation.routes")(app);

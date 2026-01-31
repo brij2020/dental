@@ -7,13 +7,14 @@ import {
   IconDeviceFloppy,
 } from '@tabler/icons-react';
 import dayjs, { type Dayjs } from "dayjs";
-import {getAllProfiles, updateProfile} from '../../../lib/apiClient';
+import {getAllProfiles, updateProfile, getDoctorLeavesByClinic} from '../../../lib/apiClient';
 import { useAuth } from '../../../state/useAuth';
 import { DatePicker, Space } from 'antd';
 // --- Types ---
 type DoctorProfile = {
   _id: string;
   full_name: string;
+  role?: string;
 };
 
 
@@ -39,6 +40,7 @@ export default function AppointmentTimingsPanel() {
   const { user } = useAuth();
   const [doctors, setDoctors] = useState<DoctorProfile[]>([]);
   const [selectedDoctorId, setSelectedDoctorId] = useState('');
+  const [clinicLeaves, setClinicLeaves] = useState<any[]>([]);
 
   
   const { RangePicker } = DatePicker;
@@ -55,18 +57,19 @@ export default function AppointmentTimingsPanel() {
       if (!user?.clinic_id) return;
       setIsListLoading(true);
       try {
-        const response = await getAllProfiles();
-        
+        const response = await getAllProfiles({ clinic_id: user.clinic_id, page: 'staff' });
+
         if (response.status === 200 && response.data) {
           const profileData = response.data.data || response.data;
-          const doctors = Array.isArray(profileData) ? profileData : [profileData];
-          
-          const mappedDoctors = doctors
+          const doctorsArr = Array.isArray(profileData) ? profileData : [profileData];
+
+          const mappedDoctors = doctorsArr
             .map((doc: any) => ({
               _id: doc._id || doc.id,
               full_name: doc.full_name,
+              role: doc.role,
             }));
-          
+
           setDoctors(mappedDoctors);
           if (mappedDoctors.length > 0) setSelectedDoctorId(mappedDoctors[0]._id);
         }
@@ -78,7 +81,19 @@ export default function AppointmentTimingsPanel() {
       }
     };
 
+    const fetchClinicLeaves = async () => {
+      if (!user?.clinic_id) return;
+      try {
+        const resp = await getDoctorLeavesByClinic(user.clinic_id);
+        const leaves = resp?.data?.data || resp?.data || [];
+        setClinicLeaves(Array.isArray(leaves) ? leaves : []);
+      } catch (err) {
+        console.error('Failed to fetch clinic leaves', err);
+      }
+    };
+
     fetchDoctors();
+    fetchClinicLeaves();
   }, [user]);
 
 
@@ -96,24 +111,33 @@ export default function AppointmentTimingsPanel() {
   const handleSubmit = async (e: FormEvent) => {
     try {
       e.preventDefault();
-    if (!selectedDoctorId) return;
-    setSaving(true);
+      if (!selectedDoctorId) return;
+      setSaving(true);
 
-    console.log('Payload to save:', payload,selectedDoctorId);
+      console.log('Payload to save:', payload, selectedDoctorId);
 
-    const response = await updateProfile(selectedDoctorId,
-      payload,
-    );
+      const response = await updateProfile(selectedDoctorId, payload);
 
-    if (response.status === 200) {
-      toast.success('Leave has been updated!');
-    }
-    setSaving(false);
+      if (response.status === 200) {
+        toast.success('Leave has been updated!');
+      }
     } catch (error: any) {
       toast.error('Failed to save leave. Please try again.');
       console.error('Error in handleSubmit:', error?.response?.data || error.message);
+    } finally {
+      setSaving(false);
     }
-    
+  };
+
+  const refreshLeaves = async () => {
+    if (!user?.clinic_id) return;
+    try {
+      const resp = await getDoctorLeavesByClinic(user.clinic_id);
+      const leaves = resp?.data?.data || resp?.data || [];
+      setClinicLeaves(Array.isArray(leaves) ? leaves : []);
+    } catch (err) {
+      console.error('Failed to refresh leaves', err);
+    }
   };
 
   const isLoading = isListLoading;
@@ -190,7 +214,7 @@ export default function AppointmentTimingsPanel() {
                 htmlFor="doctor-select"
                 className="block text-sm font-medium text-slate-700 mb-1"
               >
-                Select Doctor
+                Select Staff Member
               </label>
               <div className="relative">
                 <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
@@ -206,15 +230,15 @@ export default function AppointmentTimingsPanel() {
                              focus:ring-4 focus:ring-sky-300/40 focus:border-sky-400 transition"
                 >
                   {isListLoading ? (
-                    <option>Loading doctors...</option>
+                    <option>Loading staff...</option>
                   ) : doctors.length > 0 ? (
                     doctors.map((doc) => (
                       <option key={doc._id} value={doc._id}>
-                        {doc.full_name}
+                        {doc.full_name} {doc?.role ? `(${doc.role})` : ''}
                       </option>
                     ))
                   ) : (
-                    <option>No doctors found</option>
+                    <option>No staff found</option>
                   )}
                 </select>
               </div>
@@ -235,6 +259,61 @@ export default function AppointmentTimingsPanel() {
                 value={dateRange}
               />
             </Space>
+          </div>
+
+          {/* Clinic leave list */}
+          <div className="mt-6">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-medium text-slate-700">Clinic Leaves</h3>
+              <button
+                type="button"
+                onClick={refreshLeaves}
+                className="inline-flex items-center gap-2 text-xs text-sky-600 hover:text-sky-700"
+              >
+                Refresh
+              </button>
+            </div>
+
+            <div className="mt-3">
+              {clinicLeaves.length === 0 ? (
+                <div className="py-6 text-center">
+                  <div className="text-sm text-slate-500">No clinic leaves found.</div>
+                  <div className="mt-2 text-xs text-slate-400">Click refresh after adding leaves.</div>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 max-h-72 overflow-y-auto pr-2">
+                  {clinicLeaves.map((l: any) => {
+                    const staff = doctors.find(d => d._id === (l.doctor_id || l.doctorId));
+                    const name = staff?.full_name || l.doctor_name || l.doctor_id || 'Staff';
+                    const role = staff?.role;
+                    return (
+                      <div key={l._id || l.id} className="flex gap-3 p-3 border rounded-lg bg-white shadow-sm items-start">
+                        <div className="flex-none">
+                          <img
+                            src={ (l.doctor_pic) ? l.doctor_pic : undefined }
+                            onError={(e) => { (e.target as HTMLImageElement).src = '/assets/spai.jpeg'; }}
+                            alt={name}
+                            className="w-12 h-12 rounded-full object-cover bg-slate-100"
+                          />
+                        </div>
+                        <div className="flex-1">
+                          <div className="flex items-start justify-between gap-2">
+                            <div>
+                              <div className="text-sm font-semibold text-slate-800">{name}</div>
+                              {role && <div className="text-xs text-slate-500">{role}</div>}
+                            </div>
+                            <div className="text-xs text-slate-500 text-right">
+                              <div className="inline-block px-2 py-1 rounded bg-slate-100 text-slate-700">{l.leave_start_date}{l.leave_end_date && l.leave_end_date !== l.leave_start_date ? ` → ${l.leave_end_date}` : ''}</div>
+                            </div>
+                          </div>
+                          {l.reason ? <div className="mt-2 text-xs text-slate-500 line-clamp-2">{l.reason}</div> : <div className="mt-2 text-xs text-slate-400">No reason provided</div>}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Save Button */}

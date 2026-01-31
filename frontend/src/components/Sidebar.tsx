@@ -3,7 +3,7 @@ import { NAV_ITEMS } from "../config/navigation";
 import { IconHelpCircle } from "@tabler/icons-react";
 import { useAuth } from "../state/useAuth"; 
 import { useEffect, useMemo, useState } from "react";
-import { supabase } from "../lib/supabaseClient";
+import { getClinicById } from "../lib/apiClient";
 import fallbackLogo from "../assets/spai.jpeg";
 
 type Props = { onNavigate?: () => void };
@@ -33,24 +33,16 @@ export default function Sidebar({ onNavigate }: Props) {
 
       if (!user?.clinic_id) return;
 
-      const { data: clinic, error } = await supabase
-        .from("clinics")
-        .select("name, clinic_logo_path")
-        .eq("id", user.clinic_id)
-        .single();
-
-      if (!alive || error || !clinic) return;
-
-      setClinicName(clinic.name ?? "Clinic");
-
-      if (clinic.clinic_logo_path) {
-        const { data: signed, error: signErr } = await supabase
-          .storage
-          .from("clinic-logos")
-          .createSignedUrl(clinic.clinic_logo_path, 60 * 60);
-
-        if (!alive || signErr) return;
-        setClinicLogoUrl(signed?.signedUrl ?? null);
+      try {
+        const resp = await getClinicById();
+        const data = resp?.data?.data || resp?.data;
+        if (!alive || !data) return;
+        setClinicName(data.name ?? "Clinic");
+        // prefer explicit full URL fields if present
+        const logoUrl = data.clinic_logo_url || data.clinic_logo_path || data.profile_pic || null;
+        setClinicLogoUrl(logoUrl);
+      } catch (e) {
+        // keep nulls on error
       }
     })();
 

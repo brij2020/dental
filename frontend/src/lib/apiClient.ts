@@ -678,6 +678,13 @@ export const getAnalyticsTrends = async (clinicId: string, metric: string, start
 };
 
 /**
+ * Get doctor leaves for a clinic
+ */
+export const getDoctorLeavesByClinic = async (clinicId: string): Promise<AxiosResponse<any>> => {
+  return get(`/api/doctor-leave/clinic/${clinicId}`);
+};
+
+/**
  * Get consultations by patient ID
  */
 export const getConsultationsByPatientId = async (patientId: string, filters?: any): Promise<AxiosResponse<any>> => {

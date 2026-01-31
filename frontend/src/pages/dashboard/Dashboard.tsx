@@ -5,6 +5,7 @@ import { AppointmentCalendar } from './AppointmentCalendar';
 import { getTodaysAppointmentCount, getMonthlyAppointmentCount, getConsultationsByClinicId, getAnalyticsOverview } from '../../lib/apiClient';
 import DashboardTrends from './DashboardTrends';
 import DashboardRevenue from './DashboardRevenue';
+import NoticeBoard from './NoticeBoard';
 import { useAuth } from '../../state/useAuth';
 
 type Stats = {
@@ -183,7 +184,8 @@ export default function Dashboard() {
         consultationsTrend={consultationsTrend}
       />
 
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-4 md:grid-cols-3">
+        <NoticeBoard clinicId={user?.clinic_id ?? ''} />
         <DashboardRevenue clinicId={user?.clinic_id ?? ''} />
         <DashboardTrends clinicId={user?.clinic_id ?? ''} />
       </div>

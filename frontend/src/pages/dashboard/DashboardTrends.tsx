@@ -64,14 +64,14 @@ export default function DashboardTrends({ clinicId }: { clinicId: string }) {
   const combined = appointments.map((p, i) => ({ date: p.x, appointments: p.y, consultations: consultations[i]?.y ?? 0 }));
 
   return (
-    <div className="mt-6 grid grid-cols-1 gap-4">
-      <div className="rounded-2xl border bg-white p-4">
+    <div className="h-full">
+      <div className="rounded-2xl border bg-white p-4 h-full flex flex-col">
         <h3 className="text-sm font-semibold mb-2">30-day Trends</h3>
         {loading ? (
           <div className="text-sm text-slate-500">Loading trends...</div>
         ) : (
-          <div style={{ width: '100%', height: 240 }}>
-            <ResponsiveContainer>
+          <div className="flex-1 min-h-[240px]">
+            <ResponsiveContainer width="100%" height="100%">
               <LineChart data={combined} margin={{ top: 8, right: 20, left: 0, bottom: 8 }}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="date" tick={{ fontSize: 11 }} />
