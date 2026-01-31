@@ -209,7 +209,12 @@ const toggleMedicalCondition = (condition: string) => {
           setLoading(false);
           return;
         }
-        setAppointment(apptData);
+        // Normalize appointment object to always include `id` (uses `_id` from MongoDB when needed)
+        const normalizedAppt = {
+          ...apptData,
+          id: apptData.id || apptData._id || apptData.appointment_uid,
+        };
+        setAppointment(normalizedAppt as unknown as AppointmentDetails);
         setAppointmentNotes(apptData.notes ?? '');
         setAppointmentNotesSaved(false);
         setAppointmentNotesError(null);
@@ -256,10 +261,10 @@ const toggleMedicalCondition = (condition: string) => {
         // ---------------------------------------------------------
         
         try {
-          const response = await getOrCreateConsultation(apptData.id, {
-            clinic_id: apptData.clinic_id,
-            patient_id: apptData.patient_id,
-            doctor_id: apptData.doctor_id,
+          const response = await getOrCreateConsultation(normalizedAppt.id, {
+            clinic_id: normalizedAppt.clinic_id,
+            patient_id: normalizedAppt.patient_id,
+            doctor_id: normalizedAppt.doctor_id,
           });
 
           if (response.data && response.data.success && response.data.data) {
@@ -395,7 +400,8 @@ const toggleMedicalCondition = (condition: string) => {
       if (validRows.length > 0) {
         await prescriptionAPI.saveForConsultation(consultationId, validRows);
       }
-      // Optionally: show success message or update state
+      // Move to next step (Billing)
+      setCurrentStep(4);
     } catch (e: any) {
       console.error('Failed to save prescription:', e.message);
       // Optionally: show error message

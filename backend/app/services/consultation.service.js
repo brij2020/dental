@@ -142,6 +142,8 @@ const getOrCreateConsultation = async (appointmentId, consultationData) => {
 /**
  * Update consultation
  */
+const Appointment = require('../models/appointment.model');
+
 const updateConsultation = async (id, updateData) => {
   try {
     const consultation = await Consultation.findByIdAndUpdate(
@@ -161,6 +163,23 @@ const updateConsultation = async (id, updateData) => {
     }
 
     logger.info({ consultationId: id }, 'Consultation updated successfully');
+    // If consultation status was changed to Completed, cascade update to appointment
+    try {
+      const newStatus = updateData.status;
+      if (newStatus && String(newStatus).toLowerCase() === 'completed') {
+        const appointmentIdentifier = consultation.appointment_id;
+        if (appointmentIdentifier) {
+          await Appointment.findOneAndUpdate(
+            { $or: [ { _id: appointmentIdentifier }, { appointment_uid: appointmentIdentifier } ] },
+            { status: 'completed' }
+          );
+          logger.info({ appointmentIdentifier }, 'Appointment status set to completed due to consultation completion');
+        }
+      }
+    } catch (apptErr) {
+      logger.warn({ err: apptErr, consultationId: id }, 'Failed to cascade appointment status update');
+    }
+
     return {
       id: consultation._id.toString(),
       ...consultation.toObject()

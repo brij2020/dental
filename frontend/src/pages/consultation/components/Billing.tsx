@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import type { ConsultationRow, PaymentModeEnum } from '../types'; // <-- Import types
-import { supabase } from '../../../lib/supabaseClient';
+import { getAllFeesByClinicId } from '../../../lib/apiClient';
 
 // --- Reusable Row Component ---
 type BillingRowProps = {
@@ -147,21 +147,21 @@ const [, setDefaultConsultationFee] = useState<number>(0);
 useEffect(() => {
   const fetchConsultationFee = async () => {
     if (!consultationData?.clinic_id) return;
-
-    const { data, error } = await supabase
-      .from('fees')
-      .select('cost_fees')
-      .eq('clinic_id', consultationData.clinic_id)
-      .single();
-
-    if (!error && data) {
-      setDefaultConsultationFee(Number(data.cost_fees));
-
-      // Pre-fill into billing state only if it's currently 0
-      setBilling(prev => ({
-        ...prev,
-        consultationFee: prev.consultationFee || Number(data.cost_fees),
-      }));
+    try {
+      const resp = await getAllFeesByClinicId(consultationData.clinic_id);
+      const fees = resp.data?.data || [];
+      if (fees.length > 0) {
+        // Prefer clinic-wide fee (doctor_id == null), otherwise take first
+        const clinicFee = fees.find((f: any) => !f.doctor_id) || fees[0];
+        const cost = Number(clinicFee.cost_fees ?? clinicFee.cost ?? 0);
+        setDefaultConsultationFee(cost);
+        setBilling(prev => ({
+          ...prev,
+          consultationFee: prev.consultationFee || cost,
+        }));
+      }
+    } catch (err) {
+      console.warn('Failed to load consultation fee from API:', err);
     }
   };
 

@@ -41,7 +41,13 @@ exports.findById = async (req, res) => {
  */
 exports.findByAppointmentId = async (req, res) => {
   try {
-    const consultation = await consultationService.getConsultationByAppointmentId(req.params.appointmentId);
+    const { appointmentId } = req.params;
+    if (!appointmentId || String(appointmentId).trim() === '' || ['undefined', 'null'].includes(String(appointmentId))) {
+      logger.warn({ appointmentId, ip: req.ip }, 'Invalid appointmentId provided to findByAppointmentId');
+      return res.status(400).send({ success: false, message: 'Invalid appointmentId' });
+    }
+
+    const consultation = await consultationService.getConsultationByAppointmentId(appointmentId);
     if (!consultation) {
       return res.status(404).send({ message: "Consultation not found for this appointment" });
     }
@@ -58,6 +64,11 @@ exports.findByAppointmentId = async (req, res) => {
 exports.getOrCreate = async (req, res) => {
   try {
     const { appointmentId } = req.params;
+    if (!appointmentId || String(appointmentId).trim() === '' || ['undefined', 'null'].includes(String(appointmentId))) {
+      logger.warn({ appointmentId, ip: req.ip }, 'Invalid appointmentId provided to getOrCreate');
+      return res.status(400).send({ success: false, message: 'Invalid appointmentId' });
+    }
+
     const consultation = await consultationService.getOrCreateConsultation(appointmentId, req.body);
     res.status(200).send({ success: true, data: consultation });
   } catch (err) {

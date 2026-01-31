@@ -8,23 +8,11 @@ module.exports = app => {
   require("./fee.routes")(app);
   require("./remedy.routes")(app);
   require("./prescription.routes")(app);
-  
-  // Medical Condition Routes
-  app.use("/api/medical-condition", require("./medicalCondition.routes"));
-  
-  // Appointment Routes
-  app.use("/api/appointments", require("./appointment.routes"));
-  
-  // Procedure Routes
-  app.use("/api/procedures", require("./procedure.routes"));
-  
-  // Problem Routes
-  app.use("/api/problems", require("./problem.routes"));
-  
-  // Consultation Routes
+  require("./medicalCondition.routes")(app);
+  require("./appointment.routes")(app);
+  require("./procedure.routes")(app);
+  require("./problem.routes")(app);
   require("./consultation.routes")(app);
-  
-  // Treatment Procedure Routes
   require("./treatmentProcedure.routes")(app);
 };
 

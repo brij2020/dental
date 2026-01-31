@@ -1,8 +1,10 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { supabase } from "../../../../lib/supabaseClient"; // backend (for procedure_problems)
+import { getProblems } from "../../../../lib/apiClient";
 import {
   createTreatmentProcedure,
   createMultipleTreatmentProcedures,
+  getProcedures,
 } from "../../../../lib/apiClient";
 import {
   IconX,
@@ -86,68 +88,39 @@ const ToothDamageModal: React.FC<Props> = ({
 
         console.log("Patient Panel detected:", patientPanel);
 
-        // 2. Prepare the Procedure Query
-        let procedureQuery = supabase
-          .from("clinic_procedures")
-          .select(`
-            procedure_id,
-            amount,
-            panel,
-            procedures (
-              id,
-              name
-            )
-          `)
-          .eq("clinic_id", clinicId)
-          .order("created_at", { ascending: false });
+        // 2. Fetch procedures from backend API for this clinic
+        try {
+          const procResp = await getProcedures(clinicId);
+          const procData = procResp.data?.data || [];
+          const options: ProcedureOption[] = procData
+            .map((p: any) => ({
+              id: p._id ?? p.id,
+              name: p.name,
+              cost: p.cost ?? p.amount ?? null,
+            }))
+            .filter((item: any) => item && item.name);
 
-        // 3. Apply Panel Filter based on your logic
-        if (patientPanel) {
-          // If patient has a panel, fetch procedures matching that panel
-          procedureQuery = procedureQuery.eq("panel", patientPanel);
-        } else {
-          // If patient has NO panel, fetch procedures where panel is NULL
-          procedureQuery = procedureQuery.is("panel", null);
+          setProcedureOptions(options as ProcedureOption[]);
+        } catch (err) {
+          console.warn('Failed to load procedures from API, falling back to Supabase', err);
+          // keep previous behavior or leave empty
+          setProcedureOptions([]);
         }
 
-        // 4. Execute Procedure Fetch
-        const { data: procData, error: procError } = await procedureQuery;
-        if (procError) throw procError;
-
-        const options: ProcedureOption[] = (procData ?? [])
-          .map((row: any) => {
-            const proc = Array.isArray(row.procedures)
-              ? row.procedures[0]
-              : row.procedures;
-
-            if (!proc || !proc.name) return null;
-
-            return {
-              id: row.procedure_id ?? proc.id,
-              name: proc.name,
-              cost: row.amount,
-            } as ProcedureOption;
-          })
-          .filter((item): item is ProcedureOption => item !== null);
-
-        setProcedureOptions(options);
-
-        // 5. Fetch Problems (These usually don't depend on the panel, but kept here for unified loading)
-        const { data: problemData, error: problemError } = await supabase
-          .from("procedure_problems")
-          .select("problem_name")
-          .eq("clinic_id", clinicId)
-          .order("problem_name", { ascending: true });
-
-        if (problemError) throw problemError;
-
-        const probOptions: string[] = problemData.map((item) => item.problem_name);
-        setProblemOptions(probOptions);
+        // 5. Fetch Problems from backend API (requires auth token)
+        try {
+          const resp = await getProblems();
+          const problemsData = resp.data?.data || [];
+          const probOptions: string[] = problemsData.map((p: any) => p.brief_description || p.clinical_findings || p._id);
+          console.log("Fetched problem options:", probOptions);
+          setProblemOptions(probOptions);
+        } catch (err) {
+          console.warn('Failed to fetch problems from API, falling back to procedure_problems if any', err);
+          setLoadProblemsError('Could not load problems.');
+        }
 
       } catch (err: any) {
         console.error("Failed to load modal data:", err?.message || err);
-        setLoadProceduresError("Could not load data.");
-        setLoadProblemsError("Could not load data.");
       } finally {
         setIsLoadingProcedures(false);
         setIsLoadingProblems(false);
@@ -156,6 +129,70 @@ const ToothDamageModal: React.FC<Props> = ({
 
     fetchClinicData();
   }, [isOpen, clinicId, consultationId]);
+
+  // Ensure problems are fetched when modal opens even if clinic/consultation info is not available
+  useEffect(() => {
+    if (!isOpen) return;
+
+    let cancelled = false;
+    const fetchProblemsDirect = async () => {
+      setIsLoadingProblems(true);
+      setLoadProblemsError(null);
+      try {
+        const resp = await getProblems();
+        if (cancelled) return;
+        const problemsData = resp.data?.data || [];
+        const probOptions: string[] = problemsData.map((p: any) =>  p.clinical_findings || p._id);
+        setProblemOptions(probOptions);
+      } catch (err) {
+        if (cancelled) return;
+        console.warn('Failed to fetch problems on open:', err);
+        setLoadProblemsError('Could not load problems.');
+      } finally {
+        if (!cancelled) setIsLoadingProblems(false);
+      }
+    };
+
+    fetchProblemsDirect();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen]);
+
+  // Ensure procedures are fetched when modal opens (independent of consultation)
+  useEffect(() => {
+    if (!isOpen || !clinicId) return;
+
+    let cancelled = false;
+    setIsLoadingProcedures(true);
+    setLoadProceduresError(null);
+
+    const fetchProceduresOnOpen = async () => {
+      try {
+        const resp = await getProcedures(clinicId);
+        if (cancelled) return;
+        const procData = resp.data?.data || [];
+        const options: ProcedureOption[] = procData
+          .map((p: any) => ({ id: p._id ?? p.id, name: p.name, cost: p.cost ?? p.amount ?? null }))
+          .filter((item: any) => item && item.name);
+
+        setProcedureOptions(options as ProcedureOption[]);
+      } catch (err) {
+        if (cancelled) return;
+        console.warn("Failed to fetch procedures on open:", err);
+        setLoadProceduresError("Could not load procedures.");
+      } finally {
+        if (!cancelled) setIsLoadingProcedures(false);
+      }
+    };
+
+    fetchProceduresOnOpen();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, clinicId]);
 
   // --- MULTI TAB STATE ---
   const ADULT_UPPER = useMemo(
@@ -461,6 +498,7 @@ const ToothDamageModal: React.FC<Props> = ({
               onChange={() => toggleToothGroup(values)}
               disabled={isSaving}
             />
+            
             <span className="text-sm font-semibold">Select All</span>
           </label>
         </div>
@@ -558,11 +596,11 @@ const ToothDamageModal: React.FC<Props> = ({
                 <label className="block text-sm font-medium text-slate-700 mb-1">
                   Tooth Number
                 </label>
-                <input
-                  value={toothNumber ?? ""}
-                  readOnly
-                  className="w-full rounded-xl border border-slate-300 bg-slate-50 pr-3 py-2.5 text-slate-900 outline-none"
-                />
+               <input
+                value={toothNumber ?? ""}
+                readOnly
+                className="w-full rounded-xl border border-slate-300 bg-slate-50 pl-[10px] pr-3 py-2.5 text-slate-900 outline-none"
+              />
               </div>
 
               {/* Problems */}

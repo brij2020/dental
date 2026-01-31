@@ -1,7 +1,6 @@
 const Problem = require("../models/problem.model");
 const logger = require("../config/logger");
 
-// --- GET ALL PROBLEMS ---
 exports.getAllProblems = async (req, res) => {
   try {
     const { clinic_id } = req.user;
