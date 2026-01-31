@@ -472,21 +472,25 @@ const toggleMedicalCondition = (condition: string) => {
 
   try {
     // 1️⃣ Mark the consultation itself as completed via MongoDB API
-    const statusResponse = await updateConsultation(consultationId, { 
-      status: 'Completed' 
-    });
-    
+    const statusResponse = await updateConsultation(consultationId, { status: 'Completed' });
     if (!statusResponse.data || !statusResponse.data.success) {
-      throw new Error('Failed to update consultation status');
+      console.error('Failed to update consultation status');
     }
 
     // 2️⃣ Mark the *appointment* as completed
-    const { error: appointmentStatusError } = await supabase
-      .from('appointments')
-      .update({ status: 'completed' }) // <- matches StatusBadge + DB enum
-      .eq('id', appointment.id);
-
-    if (appointmentStatusError) throw appointmentStatusError;
+    try {
+      const { error: appointmentStatusError } = await supabase
+        .from('appointments')
+        .update({ status: 'completed' })
+        .eq('id', appointment.id);
+      if (appointmentStatusError) {
+        console.warn('Failed to update appointment status in Supabase:', appointmentStatusError);
+      } else {
+        setAppointment((prev) => prev ? { ...prev, status: 'completed' } : prev);
+      }
+    } catch (supErr) {
+      console.warn('Supabase update error (non-fatal):', supErr);
+    }
 
     // Optional but nice: keep local state in sync so if you ever stay
     // on this page or show status, it's correct in memory too
@@ -509,7 +513,9 @@ const toggleMedicalCondition = (condition: string) => {
           follow_up_for_consultation_id: consultationId,
         });
 
-      if (followUpError) throw followUpError;
+      if (followUpError) {
+        console.warn('Failed to create follow-up appointment (non-fatal):', followUpError);
+      }
     }
 
     // 4️⃣ Done → go back to dashboard

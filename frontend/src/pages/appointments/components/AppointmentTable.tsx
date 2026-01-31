@@ -176,17 +176,17 @@ export default function AppointmentTable({
   }
 
   return (
-       <div className="mt-6">
-      <table className="min-w-full divide-y divide-slate-200">
+       <div className="mt-6 -mx-4 sm:mx-0 overflow-x-auto">
+      <table className="min-w-full divide-y divide-slate-200 table-auto">
         <thead className="bg-slate-50">
           <tr>
-            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">File Number</th>
-            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Patient / Doctor</th>
-            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Time</th>
-            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Status</th>
-            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Patient Note</th>
-            <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-slate-500 uppercase tracking-wider">Conditions</th>
-            <th scope="col" className="relative px-6 py-3">
+            <th scope="col" className="px-3 py-2 sm:px-6 sm:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">File Number</th>
+            <th scope="col" className="px-3 py-2 sm:px-6 sm:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Patient / Doctor</th>
+            <th scope="col" className="px-3 py-2 sm:px-6 sm:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Time</th>
+            <th scope="col" className="px-3 py-2 sm:px-6 sm:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Status</th>
+            <th scope="col" className="px-3 py-2 sm:px-6 sm:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Patient Note</th>
+            <th scope="col" className="px-3 py-2 sm:px-6 sm:py-3 text-center text-xs font-medium text-slate-500 uppercase tracking-wider">Conditions</th>
+            <th scope="col" className="relative px-3 py-2 sm:px-6 sm:py-3">
               <span className="sr-only">Actions</span>
             </th>
           </tr>
@@ -194,18 +194,18 @@ export default function AppointmentTable({
         <tbody className="bg-white divide-y divide-slate-200">
           {appointments.map((appt) => (
             <tr key={appt.id}>
-              <td className="px-6 py-4 whitespace-nowrap font-mono text-xs text-slate-700">{appt.file_number || '-'}</td>
-              <td className="px-6 py-4 whitespace-nowrap">
+              <td className="px-3 py-3 sm:px-6 sm:py-4 whitespace-nowrap font-mono text-xs text-slate-700">{appt.file_number || '-'}</td>
+              <td className="px-3 py-3 sm:px-6 sm:py-4 whitespace-nowrap">
                 <div className="text-sm font-medium text-slate-900">{appt.full_name}</div>
                 <div className="text-sm text-slate-500">{appt.doctor?.full_name ?? 'N/A'}</div>
               </td>
-              <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-700">{formatTime(appt.appointment_time)}</td>
-              <td className="px-6 py-4 whitespace-nowrap">
+              <td className="px-3 py-3 sm:px-6 sm:py-4 whitespace-nowrap text-sm text-slate-700">{formatTime(appt.appointment_time)}</td>
+              <td className="px-3 py-3 sm:px-6 sm:py-4 whitespace-nowrap">
                 <StatusBadge status={appt.status} />
               </td>
 
               {/* Patient Note Column */}
-              <td className="px-6 py-4 whitespace-nowrap">
+              <td className="px-3 py-3 sm:px-6 sm:py-4 whitespace-nowrap">
                 <div className="relative">
                   {appt.patient_note ? (
                     <>
@@ -221,8 +221,7 @@ export default function AppointmentTable({
 
                       {noteOpenId === appt.id && (
                         <div
-                          className="absolute top-full left-0 mt-2 w-72 bg-white border border-slate-200 shadow-xl rounded-xl z-40 p-4"
-                          style={{ minWidth: '200px' }}
+                          className="absolute top-full left-0 mt-2 w-full sm:w-72 bg-white border border-slate-200 shadow-xl rounded-xl z-40 p-4"
                         >
                           <div className="flex justify-between items-start mb-2">
                              <h5 className="text-xs font-bold text-slate-500 uppercase tracking-wide">Patient Note</h5>
@@ -245,12 +244,12 @@ export default function AppointmentTable({
                 </div>
               </td>
 
-              <td className="px-6 py-4 whitespace-nowrap">
+              <td className="px-3 py-3 sm:px-6 sm:py-4 whitespace-nowrap">
                 <div className="relative flex justify-center">
                   <button
                     type="button"
                     onClick={() => openEditor(appt)}
-                    className="inline-flex items-center gap-2 px-3 py-1.5 text-xs font-semibold bg-slate-100 text-slate-700 rounded-md hover:bg-slate-200 transition"
+                    className="inline-flex w-full sm:w-auto items-center gap-2 px-3 py-2 sm:py-1.5 text-sm sm:text-xs font-semibold bg-slate-100 text-slate-700 rounded-md hover:bg-slate-200 transition justify-center"
                   >
                     { (appt.medical_conditions?.length ?? 0) > 0
                       ? `Conditions (${appt.medical_conditions!.length})`
@@ -259,9 +258,8 @@ export default function AppointmentTable({
                     
                   {editorOpenId === appt.id && (
                     <div
-                      className="absolute top-full mt-2 w-80 bg-white border border-slate-200 shadow-lg rounded-xl z-30"
+                      className="absolute top-full mt-2 w-full sm:w-80 left-0 sm:left-1/2 sm:-translate-x-1/2 bg-white border border-slate-200 shadow-lg rounded-xl z-30"
                       role="dialog" aria-label="Edit medical conditions"
-                      style={{ left: '50%', transform: 'translateX(-50%)' }}
                     >
                       <h4 className="text-sm font-semibold text-slate-900 px-4 pt-4">
                         Edit Medical Conditions
@@ -312,18 +310,18 @@ export default function AppointmentTable({
                         )}
                       </div>
 
-                      <div className="p-4 flex items-center justify-end gap-3 border-t border-slate-100">
+                      <div className="p-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-3 border-t border-slate-100">
                         <button
                           type="button"
                           onClick={closeEditor}
-                          className="px-4 py-2 text-sm font-medium rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50 transition"
+                          className="w-full sm:w-auto px-4 py-2 text-sm font-medium rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50 transition"
                         >
                           Cancel
                         </button>
                         <button
                           type="button"
                           onClick={() => saveDraft(appt.id)}
-                          className="px-4 py-2 text-sm font-medium rounded-lg bg-sky-600 text-white hover:bg-sky-700 transition"
+                          className="w-full sm:w-auto px-4 py-2 text-sm font-medium rounded-lg bg-sky-600 text-white hover:bg-sky-700 transition"
                         >
                           Save
                         </button>
@@ -333,12 +331,12 @@ export default function AppointmentTable({
                 </div>
               </td>
 
-              <td className="px-6 py-4 whitespace-nowrap">
-                <div className="flex items-center justify-end gap-2">
+              <td className="px-3 py-3 sm:px-6 sm:py-4 whitespace-nowrap">
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-2">
                   {appt.status === 'scheduled' && (
                     <button
                       onClick={() => handleStartConsultation(appt.id)}
-                      className="inline-flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-white bg-green-600 rounded-md hover:bg-green-700 transition"
+                      className="inline-flex w-full sm:inline-flex sm:w-auto items-center gap-2 px-3 py-3 sm:py-1.5 text-sm sm:text-xs font-semibold text-white bg-green-600 rounded-md hover:bg-green-700 transition justify-center"
                     >
                       <IconPlayerPlay size={14} />
                       Start Consultation
@@ -347,7 +345,7 @@ export default function AppointmentTable({
                   {appt.status === 'in-progress' && (
                     <button
                       onClick={() => handleStartConsultation(appt.id)}
-                      className="inline-flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-white bg-indigo-600 rounded-md hover:bg-indigo-700 transition"
+                      className="inline-flex w-full sm:inline-flex sm:w-auto items-center gap-2 px-3 py-3 sm:py-1.5 text-sm sm:text-xs font-semibold text-white bg-indigo-600 rounded-md hover:bg-indigo-700 transition justify-center"
                     >
                       <IconPlayerPlay size={14} />
                       Continue Consultation
