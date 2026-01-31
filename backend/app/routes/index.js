@@ -14,6 +14,7 @@ module.exports = app => {
   require("./problem.routes")(app);
   require("./consultation.routes")(app);
   require("./treatmentProcedure.routes")(app);
+  require("./analytics.routes")(app);
 };
 
 

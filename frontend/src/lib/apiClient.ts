@@ -662,6 +662,22 @@ export const getConsultationsByClinicId = async (clinicId: string, filters?: any
 };
 
 /**
+ * Get analytics overview for a clinic (aggregated KPIs)
+ */
+export const getAnalyticsOverview = async (clinicId: string, date?: string): Promise<AxiosResponse<any>> => {
+  const params: any = { clinic_id: clinicId };
+  if (date) params.date = date;
+  return get('/api/analytics/overview', { params });
+};
+
+/**
+ * Get analytics trends
+ */
+export const getAnalyticsTrends = async (clinicId: string, metric: string, start: string, end: string, group_by = 'day'): Promise<AxiosResponse<any>> => {
+  return get('/api/analytics/trends', { params: { clinic_id: clinicId, metric, start, end, group_by } });
+};
+
+/**
  * Get consultations by patient ID
  */
 export const getConsultationsByPatientId = async (patientId: string, filters?: any): Promise<AxiosResponse<any>> => {
