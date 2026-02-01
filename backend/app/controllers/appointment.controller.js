@@ -116,6 +116,14 @@ exports.book = async (req, res) => {
       clinics: clinics || null,
     };
 
+    // Mark as provisional if explicitly set by caller or when booking as a patient (patient portal)
+    const provisionalFlag = (req.body && (req.body.provisional === true || req.body.provisional === 'true'))
+      || (req.user && req.user.role === 'patient');
+    appointmentData.provisional = !!provisionalFlag;
+
+    // Accept `doctor_name` from client (frontend) if provided; do not lookup profile on backend
+    appointmentData.doctor_name = (req.body && req.body.doctor_name) ? String(req.body.doctor_name) : null;
+
     const appointment = await AppointmentService.createAppointment(appointmentData);
 
     return res.status(201).json({
@@ -199,7 +207,7 @@ exports.getBookedSlots = async (req, res) => {
 exports.getByClinic = async (req, res) => {
   try {
     const { clinic_id } = req.params;
-    const { status, doctorId, patientId, startDate, endDate, date, search } = req.query;
+    const { status, doctorId, patientId, startDate, endDate, date, search, provisional } = req.query;
 
     if (!clinic_id) {
       return res.status(400).json({
@@ -253,6 +261,7 @@ exports.getByClinic = async (req, res) => {
       endDate: endDate || undefined,
       date: date || undefined,
       search: search || undefined,
+      provisional: provisional || undefined,
     };
 
     // Remove undefined filters
@@ -395,6 +404,11 @@ exports.update = async (req, res) => {
         message: 'Invalid appointment_time format. Expected HH:MM',
         code: 'INVALID_TIME_FORMAT',
       });
+    }
+
+    // If client provided `doctor_name` include it; do not perform server-side profile lookup
+    if (updateData.doctor_name) {
+      updateData.doctor_name = String(updateData.doctor_name);
     }
 
     let appointment;

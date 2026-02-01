@@ -50,6 +50,11 @@ const appointmentSchema = new mongoose.Schema(
       required: true,
       index: true,
     },
+    doctor_name: {
+      type: String,
+      default: null,
+      description: 'Snapshot of the doctor full_name at booking time (for quick display)'
+    },
     medical_conditions: {
       type: [String], // Array of condition names (e.g., ["Fever: 102F", "Diabetes"])
       default: [],
@@ -72,6 +77,13 @@ const appointmentSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.Mixed,
       default: null,
       description: "Embedded clinic details snapshot taken at booking time"
+    }
+    ,
+    provisional: {
+      type: Boolean,
+      default: false,
+      index: true,
+      description: 'Whether this appointment was created from patient portal and is provisional'
     }
   },
   {

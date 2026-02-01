@@ -31,7 +31,7 @@ export async function getAppointments(
       `${APPOINTMENTS_API.getByClinic(clinicId)}?${params.toString()}`
     );
     const data = response.data?.data || [];
-
+    console.log('Fetched appointments data:', data);
     return data.map((appointment: any) => mapAppointmentData(appointment)) as AppointmentDetails[];
   } catch (error) {
     console.error('Error fetching appointments:', error);
@@ -94,5 +94,6 @@ function mapAppointmentData(appointment: any): AppointmentDetails {
       : null,
     notes: appointment.notes || null,
     patient_note: appointment.patient_note || null,
+    doctor_name: appointment.doctor_name
   };
 }

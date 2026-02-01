@@ -197,7 +197,7 @@ export default function AppointmentTable({
               <td className="px-3 py-3 sm:px-6 sm:py-4 whitespace-nowrap font-mono text-xs text-slate-700">{appt.file_number || '-'}</td>
               <td className="px-3 py-3 sm:px-6 sm:py-4 whitespace-nowrap">
                 <div className="text-sm font-medium text-slate-900">{appt.full_name}</div>
-                <div className="text-sm text-slate-500">{appt.doctor?.full_name ?? 'N/A'}</div>
+                <div className="text-sm text-slate-500">({appt.doctor_name || appt.doctor?.full_name || '—'})</div>
               </td>
               <td className="px-3 py-3 sm:px-6 sm:py-4 whitespace-nowrap text-sm text-slate-700">{formatTime(appt.appointment_time)}</td>
               <td className="px-3 py-3 sm:px-6 sm:py-4 whitespace-nowrap">

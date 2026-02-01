@@ -14,6 +14,7 @@ export type AppointmentDetails = {
   notes: string | null;
   patient_note?: string | null;
   follow_up_for_consultation_id?: string | null;
+  doctor_name: string
 };
 
 // Type for updating the status

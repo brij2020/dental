@@ -1,5 +1,5 @@
 import React, { useState, useEffect, type FormEvent, type ElementType } from 'react';
-import { getClinicById as getClinicInfo } from '../../../lib/apiClient';
+import { getClinicById as getClinicInfo, updateAppointment as updateAppointmentAPI } from '../../../lib/apiClient';
 import { toast } from 'react-toastify';
 import { Modal } from '../../../components/Modal';
 import {
@@ -92,6 +92,9 @@ type Props = {
   onSuccess: () => void;
   patient: ClinicPatientRow | null;
   clinicId: string | null;
+  // Optional: when editing an existing appointment
+  appointment?: any | null;
+  isEditing?: boolean;
 };
 
 type InputProps = React.InputHTMLAttributes<HTMLInputElement> & {
@@ -117,7 +120,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(({ id, label, icon:
   </div>
 ));
 
-export default function BookAppointmentModal({ open, onClose, onSuccess, patient, clinicId }: Props) {
+export default function BookAppointmentModal({ open, onClose, onSuccess, patient, clinicId, appointment = null, isEditing = false }: Props) {
   const { user } = useAuth(); 
   const [date, setDate] = useState('');
   const [time, setTime] = useState('');
@@ -240,10 +243,19 @@ export default function BookAppointmentModal({ open, onClose, onSuccess, patient
   useEffect(() => {
     if (patient) {
       setPhone(patient?.contact_number ?? '');
-      setDate(new Date().toISOString().split('T')[0]);
-      setTime('');
-      setSelectedConditions([]);
-      setConditionValues({}); // Clear values on new patient load
+      // If editing an appointment, prefill from appointment data
+      if (isEditing && appointment) {
+        setDate(appointment.appointment_date || new Date().toISOString().split('T')[0]);
+        setTime(appointment.appointment_time || '');
+        const docId = appointment.doctor_id && typeof appointment.doctor_id === 'object' ? appointment.doctor_id.id || appointment.doctor_id._id || '' : appointment.doctor_id || '';
+        setSelectedDoctorId(docId);
+        setSelectedConditions(appointment.medical_conditions || []);
+      } else {
+        setDate(new Date().toISOString().split('T')[0]);
+        setTime('');
+        setSelectedConditions([]);
+        setConditionValues({}); // Clear values on new patient load
+      }
     }
   }, [patient]);
 
@@ -339,6 +351,9 @@ export default function BookAppointmentModal({ open, onClose, onSuccess, patient
     setSaving(true);
 
     try {
+      const selectedDoctor = doctors.find(d => d.id === selectedDoctorId);
+      const doctorName = selectedDoctor?.full_name || appointment?.doctor_name || null;
+
       const payload: any = {
         clinic_id: clinicInfo?.clinic_id,
         patient_id: patient?.id ?? (patient as any)?._id ?? 'null',
@@ -348,6 +363,7 @@ export default function BookAppointmentModal({ open, onClose, onSuccess, patient
         appointment_date: date,
         appointment_time: time,
         doctor_id: selectedDoctorId,
+        doctor_name: doctorName,
         medical_conditions: finalConditions, // Use the formatted array
         clinics: clinicInfo
           ? {
@@ -391,15 +407,28 @@ export default function BookAppointmentModal({ open, onClose, onSuccess, patient
       }
 
       
-      const confirmation = await bookAppointment(payload);
-      
-      toast.success(
-        <div>
-          <p className="font-semibold">Appointment Booked!</p>
-          <p>ID: <strong>{confirmation.appointment_uid}</strong></p>
-        </div>
-      );
-      onSuccess();
+      if (isEditing && appointment) {
+        // Update only doctor/time/date and clear provisional flag. Do not touch status.
+        const upd: any = {
+          doctor_id: selectedDoctorId,
+          doctor_name: doctorName,
+          appointment_time: time,
+          appointment_date: date,
+          provisional: false,
+        };
+        await updateAppointmentAPI(appointment._id || appointment.id, upd);
+        toast.success('Appointment updated');
+        onSuccess();
+      } else {
+        const confirmation = await bookAppointment(payload);
+        toast.success(
+          <div>
+            <p className="font-semibold">Appointment Booked!</p>
+            <p>ID: <strong>{confirmation.appointment_uid}</strong></p>
+          </div>
+        );
+        onSuccess();
+      }
     } catch (error: any) {
       console.error('Booking Error:', error);
       if (error.code === '23505' || error.message?.includes('unique_doctor_slot')) {
@@ -420,7 +449,7 @@ setBookedSlots(normalized);
   if (!patient) return null; 
 
   return (
-    <Modal isOpen={open} onClose={onClose} title="Book New Appointment">
+    <Modal isOpen={open} onClose={onClose} title={isEditing ? 'Update Appointment' : 'Book New Appointment'}>
       <form onSubmit={handleSubmit} className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Input label="Patient Name" id="name" icon={IconUser} value={patient?.full_name ?? ''} disabled />
@@ -456,6 +485,7 @@ setBookedSlots(normalized);
             type="tel"
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
+            disabled={isEditing}
             placeholder="Enter contact number"
             required
           />
@@ -467,6 +497,7 @@ setBookedSlots(normalized);
             value={date}
             min={new Date().toISOString().split('T')[0]}
             onChange={(e) => setDate(e.target.value)}
+            disabled={isEditing}
             required
           />
           <p className="text-xs text-slate-500 mt-1">Past dates are disabled. Select from today onwards.</p>
@@ -585,7 +616,7 @@ setBookedSlots(normalized);
             className="inline-flex items-center justify-center gap-2 px-5 py-2.5 font-medium text-white transition bg-gradient-to-r from-sky-600 to-cyan-500 rounded-xl shadow-sm hover:brightness-105 active:brightness-95 disabled:opacity-60 disabled:cursor-not-allowed"
             disabled={saving}
           >
-            {saving ? 'Booking...' : 'Book Appointment'}
+            {saving ? (isEditing ? 'Updating...' : 'Booking...') : (isEditing ? 'Update Appointment' : 'Book Appointment')}
           </button>
         </div>
       </form>

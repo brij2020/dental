@@ -40,6 +40,9 @@ class AppointmentService {
     // Optional filters
     if (filters.status) query.status = filters.status;
     if (filters.doctorId) query.doctor_id = filters.doctorId;
+    if (filters.provisional !== undefined) {
+      query.provisional = (filters.provisional === true || filters.provisional === 'true');
+    }
     if (filters.startDate || filters.endDate) {
       query.appointment_date = {};
       if (filters.startDate) query.appointment_date.$gte = filters.startDate;
@@ -108,7 +111,7 @@ class AppointmentService {
 
     const newDate = updateData.appointment_date || appointment.appointment_date;
     const newTime = updateData.appointment_time || appointment.appointment_time;
-    const doctorId = appointment.doctor_id;
+    const doctorId = updateData.doctor_id || appointment.doctor_id;
 
     // Determine slot capacity from doctor profile
     const dbModels = require('../models');

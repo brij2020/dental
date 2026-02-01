@@ -12,8 +12,10 @@ export default function useBookAppointment() {
             // Log the appointment data being sent
             console.log('📋 Booking appointment with data:', appointment);
 
+            // Ensure bookings from patient portal are marked provisional
+            const payload = Object.assign({}, appointment, { provisional: true });
             // Call backend API through centralized axios client
-            const response: any = await api.post('/api/appointments', appointment);
+            const response: any = await api.post('/api/appointments', payload);
 
             console.log('✅ Appointment booking response:', response);
 
