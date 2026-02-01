@@ -85,7 +85,7 @@ const [clinicConditions, setClinicConditions] = useState<MedicalCondition[]>([])
     setLoading(true);
     try {
       const today = getTodayISTString();
-      console.log("Fetching appointments for", clinicId, today, searchTerm);
+      
       const data = await getAppointments(clinicId, today, searchTerm);
       setAppointments(data);
     } catch (error) {

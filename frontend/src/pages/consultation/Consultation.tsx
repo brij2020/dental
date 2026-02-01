@@ -1,5 +1,5 @@
 // src/features/consultation/Consultation.tsx
-import React, { useEffect, useState} from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabaseClient.ts';
 import {
@@ -8,6 +8,7 @@ import {
   getConsultationById,
   getAppointmentById,
   get,
+  getProfileById,
 } from '../../lib/apiClient';
 import { prescriptionAPI } from '../../lib/prescriptionAPI';
 import type { AppointmentDetails } from '../appointments/types';
@@ -23,19 +24,9 @@ import type { FollowUpData } from './components/FollowUp';
 import FollowUp from './components/FollowUp';
 import type { ConsultationRow } from './types';
 import { Modal } from '../../components/Modal';
+import PatientDetailModal from './PatientDetailModal';
 // --- UPDATED: Imports for icons ---
-import {
-  IconUser,
-  IconId,
-  IconCalendar,
-  IconGenderIntergender,
-  IconPhone,
-  IconMail,
-  IconMapPin,
-  IconFileDescription,
-  IconClipboardList,
-} from '@tabler/icons-react';
-import type { ReactElement } from 'react';
+import { IconUser, IconClipboardList } from '@tabler/icons-react';
 
 // Local shape for patients_clinic row (minimal fields used in UI)
 type PatientClinicRow = {
@@ -60,31 +51,7 @@ const LoadingSpinner = () => (
   </div>
 );
 
-const DetailItem = ({
-  icon,
-  label,
-  value,
-}: {
-  icon: ReactElement<{ className?: string }>;
-  label: string;
-  value: string | null | undefined;
-}) => (
-  <div>
-    <label className="block text-sm font-medium text-slate-500 mb-1">
-      {label}
-    </label>
-    <div className="relative">
-      <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-        {React.cloneElement(icon, {
-          className: 'h-5 w-5 text-slate-400',
-        })}
-      </span>
-      <div className="w-full min-h-[42px] flex items-center rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-3 py-2.5 text-slate-800 font-medium text-sm">
-        {value || <span className="text-slate-400 italic">—</span>}
-      </div>
-    </div>
-  </div>
-);
+// DetailItem moved to PatientDetailModal; keep consultation file lean
 
 
 export default function Consultation() {
@@ -100,91 +67,97 @@ export default function Consultation() {
   const [consultationId, setConsultationId] = useState<string | null>(null);
   const [isMedicalModalOpen, setIsMedicalModalOpen] = useState(false);
   const [isPatientModalOpen, setIsPatientModalOpen] = useState(false);
+  const [isFollowUpModalOpen, setIsFollowUpModalOpen] = useState(false);
+  const [resolvedDoctorProfileId, setResolvedDoctorProfileId] = useState<string | null>(null);
   const [patient, setPatient] = useState<PatientClinicRow | null>(null);
   const [patientLoading, setPatientLoading] = useState(false);
+
+  useEffect(() => {
+    if (isPatientModalOpen) console.debug('Opening Patient modal; patient:', patient, 'loading:', patientLoading);
+  }, [isPatientModalOpen, patient, patientLoading]);
 
   const [appointmentNotes, setAppointmentNotes] = useState('');
   const [isSavingAppointmentNotes, setIsSavingAppointmentNotes] = useState(false);
   const [appointmentNotesError, setAppointmentNotesError] = useState<string | null>(null);
   const [appointmentNotesSaved, setAppointmentNotesSaved] = useState(false);
-const [selectedMedicalHistory, setSelectedMedicalHistory] = useState<string[]>([]);
-const [isSavingHistory, setIsSavingHistory] = useState(false);
-const [isPrevSessionModalOpen, setIsPrevSessionModalOpen] = useState(false);
-const [prevConsultation, setPrevConsultation] = useState<
-  Partial<ConsultationRow> | null
->(null);
-const [loadingPrev, setLoadingPrev] = useState(false);
-const loadPreviousConsultation = async () => {
-  if (!appointment?.follow_up_for_consultation_id) return;
+  const [selectedMedicalHistory, setSelectedMedicalHistory] = useState<string[]>([]);
+  const [isSavingHistory, setIsSavingHistory] = useState(false);
+  const [isPrevSessionModalOpen, setIsPrevSessionModalOpen] = useState(false);
+  const [prevConsultation, setPrevConsultation] = useState<
+    Partial<ConsultationRow> | null
+  >(null);
+  const [loadingPrev, setLoadingPrev] = useState(false);
+  const loadPreviousConsultation = async () => {
+    if (!appointment?.follow_up_for_consultation_id) return;
 
-  setLoadingPrev(true);
-  try {
-    const response = await getConsultationById(appointment.follow_up_for_consultation_id);
-    
-    if (response.data && response.data.success && response.data.data) {
-      const consultation = response.data.data;
-      setPrevConsultation({
-        chief_complaints: consultation.chief_complaints,
-        on_examination: consultation.on_examination,
-        advice: consultation.advice,
-        notes: consultation.notes,
+    setLoadingPrev(true);
+    try {
+      const response = await getConsultationById(appointment.follow_up_for_consultation_id);
+
+      if (response.data && response.data.success && response.data.data) {
+        const consultation = response.data.data;
+        setPrevConsultation({
+          chief_complaints: consultation.chief_complaints,
+          on_examination: consultation.on_examination,
+          advice: consultation.advice,
+          notes: consultation.notes,
+        });
+        setIsPrevSessionModalOpen(true);
+      }
+    } catch (e: any) {
+      console.error("Failed to load previous consultation:", e.message);
+    } finally {
+      setLoadingPrev(false);
+    }
+  };
+
+
+
+  useEffect(() => {
+    if (consultationData?.medical_history) {
+      setSelectedMedicalHistory(consultationData.medical_history);
+    } else {
+      // Optional: If you want to auto-select all items from appointment by default:
+      // setSelectedMedicalHistory(appointment?.medical_conditions || []);
+      setSelectedMedicalHistory([]);
+    }
+  }, [consultationData]);
+
+
+  const handleSaveMedicalHistory = async () => {
+    if (!consultationId) return;
+    setIsSavingHistory(true);
+
+    try {
+      const response = await updateConsultation(consultationId, {
+        medical_history: selectedMedicalHistory
       });
-      setIsPrevSessionModalOpen(true);
+
+      if (response.data && response.data.success) {
+        // Update local state to reflect the change
+        setConsultationData(prev =>
+          prev ? { ...prev, medical_history: selectedMedicalHistory } : prev
+        );
+
+        // Optional: Close modal on success
+        // setIsMedicalModalOpen(false); 
+
+        // Or show a success toast (omitted for brevity)
+      }
+    } catch (e: any) {
+      console.error('Failed to save medical history:', e.message);
+    } finally {
+      setIsSavingHistory(false);
     }
-  } catch (e: any) {
-    console.error("Failed to load previous consultation:", e.message);
-  } finally {
-    setLoadingPrev(false);
-  }
-};
+  };
 
-
-
-useEffect(() => {
-  if (consultationData?.medical_history) {
-    setSelectedMedicalHistory(consultationData.medical_history);
-  } else {
-    // Optional: If you want to auto-select all items from appointment by default:
-    // setSelectedMedicalHistory(appointment?.medical_conditions || []);
-    setSelectedMedicalHistory([]); 
-  }
-}, [consultationData]);
-
-
-const handleSaveMedicalHistory = async () => {
-  if (!consultationId) return;
-  setIsSavingHistory(true);
-
-  try {
-    const response = await updateConsultation(consultationId, {
-      medical_history: selectedMedicalHistory
-    });
-    
-    if (response.data && response.data.success) {
-      // Update local state to reflect the change
-      setConsultationData(prev => 
-        prev ? { ...prev, medical_history: selectedMedicalHistory } : prev
-      );
-      
-      // Optional: Close modal on success
-      // setIsMedicalModalOpen(false); 
-      
-      // Or show a success toast (omitted for brevity)
-    }
-  } catch (e: any) {
-    console.error('Failed to save medical history:', e.message);
-  } finally {
-    setIsSavingHistory(false);
-  }
-};
-
-const toggleMedicalCondition = (condition: string) => {
-  setSelectedMedicalHistory(prev => 
-    prev.includes(condition)
-      ? prev.filter(c => c !== condition) // Uncheck
-      : [...prev, condition] // Check
-  );
-};
+  const toggleMedicalCondition = (condition: string) => {
+    setSelectedMedicalHistory(prev =>
+      prev.includes(condition)
+        ? prev.filter(c => c !== condition) // Uncheck
+        : [...prev, condition] // Check
+    );
+  };
 
   useEffect(() => {
     async function fetchAppointmentAndConsultation() {
@@ -226,7 +199,7 @@ const toggleMedicalCondition = (condition: string) => {
 
         try {
           const patientResponse = await get(`/api/patients/${apptData.patient_id}`);
-          
+
           if (patientResponse.data && patientResponse.data.success) {
             const patientData = patientResponse.data.data;
             if (patientData) {
@@ -246,6 +219,7 @@ const toggleMedicalCondition = (condition: string) => {
                 uhid: patientData.uhid,
               };
 
+              console.debug('Consultation: fetched patient', flatPatient);
               setPatient(flatPatient as unknown as PatientClinicRow);
             }
           } else {
@@ -259,7 +233,7 @@ const toggleMedicalCondition = (condition: string) => {
         // ---------------------------------------------------------
         // 2. GET or CREATE the consultation (Using MongoDB API)
         // ---------------------------------------------------------
-        
+
         try {
           const response = await getOrCreateConsultation(normalizedAppt.id, {
             clinic_id: normalizedAppt.clinic_id,
@@ -282,6 +256,39 @@ const toggleMedicalCondition = (condition: string) => {
           // Don't throw - allow page to load even if consultation creation fails
         }
 
+        // Attempt to resolve a Supabase profile id for the doctor so FollowUp can query slots
+        (async () => {
+          try {
+            const possible = (
+              mappedConsultation?.doctor_id ||
+              apptData?.doctor_id ||
+              (apptData as any)?.doctor?.profile_id ||
+              (apptData as any)?.doctor_profile_id ||
+              null
+            );
+
+            if (possible) {
+              // If it already looks like a Supabase profile id (string), use it directly
+              setResolvedDoctorProfileId(String(possible));
+              return;
+            }
+
+            // As a fallback, try fetching backend profile by the doctor reference (if present)
+            if (apptData?.doctor_id) {
+              try {
+                const profResp = await getProfileById(String(apptData.doctor_id));
+                const profPayload = profResp?.data?.data || profResp?.data || profResp;
+                const candidate = profPayload?.profile_id || profPayload?.supabase_id || profPayload?.id || null;
+                if (candidate) setResolvedDoctorProfileId(String(candidate));
+              } catch (e) {
+                // ignore; leave resolvedDoctorProfileId null
+              }
+            }
+          } catch (e) {
+            // ignore
+          }
+        })();
+
       } catch (e: any) {
         console.error('Failed to fetch or create consultation:', e);
         setError('An error occurred while fetching details.');
@@ -294,39 +301,39 @@ const toggleMedicalCondition = (condition: string) => {
   }, [appointmentId]);
 
   const handleSaveAppointmentNotes = async () => {
-  if (!appointmentId) return;
+    if (!appointmentId) return;
 
-  setIsSavingAppointmentNotes(true);
-  setAppointmentNotesError(null);
-  setAppointmentNotesSaved(false);
+    setIsSavingAppointmentNotes(true);
+    setAppointmentNotesError(null);
+    setAppointmentNotesSaved(false);
 
-  try {
-    const trimmed = appointmentNotes.trim();
+    try {
+      const trimmed = appointmentNotes.trim();
 
-    const { error } = await supabase
-      .from('appointments')
-      .update({
-        notes: trimmed === '' ? null : trimmed,
-      })
-      .eq('id', appointmentId);
+      const { error } = await supabase
+        .from('appointments')
+        .update({
+          notes: trimmed === '' ? null : trimmed,
+        })
+        .eq('id', appointmentId);
 
-    if (error) throw error;
+      if (error) throw error;
 
-    // keep local appointment in sync
-    setAppointment(prev =>
-      prev ? { ...prev, notes: trimmed === '' ? null : trimmed } : prev,
-    );
+      // keep local appointment in sync
+      setAppointment(prev =>
+        prev ? { ...prev, notes: trimmed === '' ? null : trimmed } : prev,
+      );
 
-    setAppointmentNotesSaved(true);
-  } catch (e: any) {
-    console.error('Failed to save appointment notes:', e);
-    setAppointmentNotesError(
-      e?.message ?? 'Failed to save notes. Please try again.',
-    );
-  } finally {
-    setIsSavingAppointmentNotes(false);
-  }
-};
+      setAppointmentNotesSaved(true);
+    } catch (e: any) {
+      console.error('Failed to save appointment notes:', e);
+      setAppointmentNotesError(
+        e?.message ?? 'Failed to save notes. Please try again.',
+      );
+    } finally {
+      setIsSavingAppointmentNotes(false);
+    }
+  };
 
 
   const handleSaveClinicalExamination = async (
@@ -428,7 +435,7 @@ const toggleMedicalCondition = (condition: string) => {
         discount: data.discount ?? 0,
         previous_outstanding_balance: data.previousOutstandingBalance ?? 0,
       });
-      
+
       if (updateResponse.data && updateResponse.data.success) {
         // Payments still handled via Supabase (separate table)
         if ((data.paid ?? 0) > 0) {
@@ -463,77 +470,67 @@ const toggleMedicalCondition = (condition: string) => {
   };
 
   const handleCompleteConsultation = async (data: FollowUpData) => {
-  if (!consultationId || !consultationData || !appointment) {
-    console.error('Missing data to complete consultation.');
-    return;
-  }
-
-  setIsSaving(true);
-
-  try {
-    // 1️⃣ Mark the consultation itself as completed via MongoDB API
-    const statusResponse = await updateConsultation(consultationId, { status: 'Completed' });
-    if (!statusResponse.data || !statusResponse.data.success) {
-      console.error('Failed to update consultation status');
+    if (!consultationId || !consultationData || !appointment) {
+      console.error('Missing data to complete consultation.');
+      return;
     }
 
-    // 2️⃣ Mark the *appointment* as completed
+    setIsSaving(true);
+
     try {
-      const { error: appointmentStatusError } = await supabase
-        .from('appointments')
-        .update({ status: 'completed' })
-        .eq('id', appointment.id);
-      if (appointmentStatusError) {
-        console.warn('Failed to update appointment status in Supabase:', appointmentStatusError);
-      } else {
-        setAppointment((prev) => prev ? { ...prev, status: 'completed' } : prev);
+      // 1️⃣ Mark the consultation itself as completed via MongoDB API
+      const statusResponse = await updateConsultation(consultationId, { status: 'Completed' });
+      if (!statusResponse.data || !statusResponse.data.success) {
+        console.error('Failed to update consultation status');
       }
-    } catch (supErr) {
-      console.warn('Supabase update error (non-fatal):', supErr);
-    }
 
-    // Optional but nice: keep local state in sync so if you ever stay
-    // on this page or show status, it's correct in memory too
-    setAppointment((prev) =>
-      prev ? { ...prev, status: 'completed' } : prev
-    );
-
-    // 3️⃣ Create follow-up appointment if user picked a date
-    if (data.followUpDate) {
-      const { error: followUpError } = await supabase
-        .from('appointments')
-        .insert({
-          clinic_id: consultationData.clinic_id,
-          patient_id: consultationData.patient_id,
-          doctor_id: consultationData.doctor_id,
-          full_name: appointment.full_name,
-          appointment_date: data.followUpDate,
-          appointment_time: data.followUpTime || '09:00:00',
-          status: 'scheduled',
-          follow_up_for_consultation_id: consultationId,
-        });
-
-      if (followUpError) {
-        console.warn('Failed to create follow-up appointment (non-fatal):', followUpError);
+      // 2️⃣ Mark the *appointment* as completed
+      try {
+        const { error: appointmentStatusError } = await supabase
+          .from('appointments')
+          .update({ status: 'completed' })
+          .eq('id', appointment.id);
+        if (appointmentStatusError) {
+          console.warn('Failed to update appointment status in Supabase:', appointmentStatusError);
+        } else {
+          setAppointment((prev) => prev ? { ...prev, status: 'completed' } : prev);
+        }
+      } catch (supErr) {
+        console.warn('Supabase update error (non-fatal):', supErr);
       }
-    }
 
-    // 4️⃣ Done → go back to dashboard
-    navigate('/appointments');
-  } catch (e: any) {
-    console.error('Failed to complete consultation:', e.message);
-  } finally {
-    setIsSaving(false);
-  }
-};
+      // Optional but nice: keep local state in sync so if you ever stay
+      // on this page or show status, it's correct in memory too
+      setAppointment((prev) =>
+        prev ? { ...prev, status: 'completed' } : prev
+      );
 
+      // 3️⃣ Create follow-up appointment if user picked a date
+      if (data.followUpDate) {
+        const { error: followUpError } = await supabase
+          .from('appointments')
+          .insert({
+            clinic_id: consultationData.clinic_id,
+            patient_id: consultationData.patient_id,
+            doctor_id: consultationData.doctor_id,
+            full_name: appointment.full_name,
+            appointment_date: data.followUpDate,
+            appointment_time: data.followUpTime || '09:00:00',
+            status: 'scheduled',
+            follow_up_for_consultation_id: consultationId,
+          });
 
-  const formatDate = (d: string | null | undefined) => {
-    if (!d) return '—';
-    try {
-      return new Date(d).toLocaleDateString();
-    } catch {
-      return String(d);
+        if (followUpError) {
+          console.warn('Failed to create follow-up appointment (non-fatal):', followUpError);
+        }
+      }
+
+      // 4️⃣ Done → go back to dashboard
+      navigate('/appointments');
+    } catch (e: any) {
+      console.error('Failed to complete consultation:', e.message);
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -586,12 +583,31 @@ const toggleMedicalCondition = (condition: string) => {
         );
       case 5:
         return (
-          <FollowUp
-  onComplete={handleCompleteConsultation}
-  isSaving={isSaving}
-  doctorId={consultationData.doctor_id ?? ''}
-  clinicId={consultationData.clinic_id}
-/>
+          (() => {
+            const followUpDoctorId = resolvedDoctorProfileId || (
+              consultationData?.doctor_id ||
+              appointment.doctor_id ||
+              (appointment as any)?.doctor?.id ||
+              (appointment as any)?.doctor?.profile_id ||
+              (appointment as any)?.doctor_profile_id ||
+              ''
+            );
+            console.debug('Consultation: Step-5 FollowUp using doctorId', followUpDoctorId, { consultationData, appointment, resolvedDoctorProfileId });
+
+            return (
+              <div>
+                {!followUpDoctorId && (
+                  <p className="text-sm text-amber-600 mb-3">Doctor identifier not found for follow-up scheduling — receptionist may need to pick a doctor.</p>
+                )}
+                <FollowUp
+                  onComplete={handleCompleteConsultation}
+                  isSaving={isSaving}
+                  doctorId={followUpDoctorId}
+                  clinicId={consultationData.clinic_id}
+                />
+              </div>
+            );
+          })()
         );
       default:
         return null;
@@ -622,320 +638,307 @@ const toggleMedicalCondition = (condition: string) => {
   }
 
   const getAge = (dob: string | null) => {
-  if (!dob) return '—';
-  const birth = new Date(dob);
-  const today = new Date();
-  let age = today.getFullYear() - birth.getFullYear();
-  const m = today.getMonth() - birth.getMonth();
-  if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) {
-    age--;
-  }
-  return age;
-};
+    if (!dob) return '—';
+    const birth = new Date(dob);
+    const today = new Date();
+    let age = today.getFullYear() - birth.getFullYear();
+    const m = today.getMonth() - birth.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) {
+      age--;
+    }
+    return age;
+  };
 
 
-return (
-  <div className="min-h-screen bg-slate-100 p-4 sm:p-6 lg:p-8">
-    <div className="max-w-7xl mx-auto space-y-6">
-      {/* Page Header */}
-      <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200">
-        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-          
-          {/* --- LEFT SIDE: Info & History --- */}
-          <div className="flex-1"> {/* Added flex-1 to utilize available space */}
-            <h1 className="text-2xl font-bold text-slate-800">
-              Consultation: {appointment.appointment_uid}
-            </h1>
-            
-            <div className="mt-1 flex flex-wrap items-center gap-y-2 gap-x-3">
-              <p className="text-slate-600 whitespace-nowrap">
-Patient: <span className="font-semibold">
-  {appointment.full_name} 
-  {patient?.date_of_birth ? ` (${getAge(patient.date_of_birth)} yrs)` : ''}
-</span>
-              </p>
+  return (
+    <div className="min-h-screen bg-slate-100 p-4 sm:p-6 lg:p-8">
+      <div className="max-w-7xl mx-auto space-y-6">
+        {/* Page Header */}
+        <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200">
+          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
 
-              {/* --- NEW SECTION: Display Checked Medical History --- */}
-              {selectedMedicalHistory && selectedMedicalHistory.length > 0 && (
-                <>
-                  <span className="hidden sm:inline text-slate-300">|</span>
-                  <div className="flex flex-wrap gap-2">
-                    {selectedMedicalHistory.map((condition) => (
-                      <span
-                        key={condition}
-                        className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200"
-                      >
-                        {condition}
-                      </span>
-                    ))}
+            {/* --- LEFT SIDE: Info & History --- */}
+            <div className="flex-1"> {/* Added flex-1 to utilize available space */}
+              <h1 className="text-2xl font-bold text-slate-800">
+                Consultation: {appointment.file_number ?? appointment.appointment_uid}
+              </h1>
+
+              <div className="mt-1 flex flex-wrap items-center gap-y-2 gap-x-3">
+                <p className="text-slate-600 whitespace-nowrap">
+                  Patient: <span className="font-semibold">
+                    {appointment.full_name}
+                    {patient?.date_of_birth ? ` (${getAge(patient.date_of_birth)} yrs)` : ''}
+                  </span>
+                </p>
+
+                {/* --- NEW SECTION: Display Checked Medical History --- */}
+                {selectedMedicalHistory && selectedMedicalHistory.length > 0 && (
+                  <>
+                    <span className="hidden sm:inline text-slate-300">|</span>
+                    <div className="flex flex-wrap gap-2">
+                      {selectedMedicalHistory.map((condition) => (
+                        <span
+                          key={condition}
+                          className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200"
+                        >
+                          {condition}
+                        </span>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+
+            {/* --- RIGHT SIDE: Buttons (Unchanged) --- */}
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setIsFollowUpModalOpen(true)}
+                className="inline-flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium rounded-xl border border-slate-300 text-slate-700 hover:bg-slate-50 active:bg-slate-100 transition-all w-full sm:w-auto"
+              >
+                Schedule Follow-up
+              </button>
+              {appointment.follow_up_for_consultation_id && (
+                <button
+                  type="button"
+                  onClick={loadPreviousConsultation}
+                  className="inline-flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium rounded-xl border border-slate-300 text-slate-700 hover:bg-slate-50 active:bg-slate-100 transition-all w-full sm:w-auto"
+                >
+                  Previous Session
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => setIsMedicalModalOpen(true)}
+                className="inline-flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium rounded-xl border border-slate-300 text-slate-700 hover:bg-slate-50 active:bg-slate-100 transition-all w-full sm:w-auto"
+              >
+                <IconClipboardList className="h-5 w-5" />
+                Medical History
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  console.debug('Consultation: Patient Details button clicked', { appointment, patient });
+                  setIsPatientModalOpen(true);
+                }}
+                className="inline-flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium rounded-xl bg-sky-600 text-white hover:bg-sky-700 active:bg-sky-800 shadow-sm transition-all w-full sm:w-auto"
+              >
+                <IconUser className="h-5 w-5" />
+                Patient Details
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <Modal
+          isOpen={isFollowUpModalOpen}
+          onClose={() => setIsFollowUpModalOpen(false)}
+          title="Schedule Follow-up"
+        >
+          {(() => {
+            // Try several places for a plausible doctor id (Supabase profiles id expected)
+            const followUpDoctorId = resolvedDoctorProfileId || (
+              consultationData?.doctor_id ||
+              appointment.doctor_id ||
+              // sometimes doctor is embedded
+              (appointment as any)?.doctor?.id ||
+              (appointment as any)?.doctor?.profile_id ||
+              (appointment as any)?.doctor_profile_id ||
+              ''
+            );
+            console.debug('Consultation: FollowUp modal using doctorId', followUpDoctorId, { appointment, resolvedDoctorProfileId });
+
+            return (
+              <FollowUp
+                onComplete={(data) => {
+                  setIsFollowUpModalOpen(false);
+                  handleCompleteConsultation(data);
+                }}
+                isSaving={isSaving}
+                doctorId={followUpDoctorId}
+                clinicId={consultationData?.clinic_id}
+              />
+            );
+          })()}
+        </Modal>
+        <Modal
+          isOpen={isMedicalModalOpen}
+          onClose={() => setIsMedicalModalOpen(false)}
+          title={`Medical History — APPOINTMENT ID: ${appointment.appointment_uid ?? 'N/A'}`}
+        >
+          <div className="space-y-6">
+
+            {/* 1. Verify Patient Conditions Section */}
+            <div>
+              <h3 className="text-sm font-semibold text-slate-800 mb-3">
+                Highlight the medical conditions by checking boxes-
+              </h3>
+
+              {Array.isArray(appointment.medical_conditions) && appointment.medical_conditions.length > 0 ? (
+                <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {appointment.medical_conditions.map((cond: string, idx: number) => {
+                      const isChecked = selectedMedicalHistory.includes(cond);
+                      return (
+                        <label
+                          key={`${cond}-${idx}`}
+                          className={`flex items-center gap-3 p-2 rounded-lg border cursor-pointer transition-all ${isChecked
+                              ? 'bg-sky-50 border-sky-200'
+                              : 'bg-white border-slate-200 hover:border-slate-300'
+                            }`}
+                        >
+                          <input
+                            type="checkbox"
+                            className="w-4 h-4 text-sky-600 rounded focus:ring-sky-500 border-gray-300"
+                            checked={isChecked}
+                            onChange={() => toggleMedicalCondition(cond)}
+                          />
+                          <span className={`text-sm ${isChecked ? 'text-sky-800 font-medium' : 'text-slate-700'}`}>
+                            {cond}
+                          </span>
+                        </label>
+                      );
+                    })}
                   </div>
-                </>
+
+                  <div className="mt-4 flex justify-end">
+                    <button
+                      type="button"
+                      onClick={handleSaveMedicalHistory}
+                      disabled={isSavingHistory}
+                      className="text-xs font-medium text-white bg-slate-700 hover:bg-slate-800 px-3 py-2 rounded-lg transition-colors disabled:opacity-50"
+                    >
+                      {isSavingHistory ? 'Saving...' : 'Check & Save'}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-sm text-slate-500 italic">
+                  No medical conditions reported by patient during booking.
+                </p>
               )}
             </div>
-          </div>
 
-          {/* --- RIGHT SIDE: Buttons (Unchanged) --- */}
-          <div className="flex items-center gap-3">
-            {appointment.follow_up_for_consultation_id && (
-    <button
-      type="button"
-      onClick={loadPreviousConsultation}
-      className="inline-flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium rounded-xl border border-slate-300 text-slate-700 hover:bg-slate-50 active:bg-slate-100 transition-all w-full sm:w-auto"
-    >
-      Previous Session
-    </button>
-  )}
-            <button
-              type="button"
-              onClick={() => setIsMedicalModalOpen(true)}
-              className="inline-flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium rounded-xl border border-slate-300 text-slate-700 hover:bg-slate-50 active:bg-slate-100 transition-all w-full sm:w-auto"
-            >
-              <IconClipboardList className="h-5 w-5" />
-              Medical History
-            </button>
-            <button
-              type="button"
-              onClick={() => setIsPatientModalOpen(true)}
-              className="inline-flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium rounded-xl bg-sky-600 text-white hover:bg-sky-700 active:bg-sky-800 shadow-sm transition-all w-full sm:w-auto"
-            >
-              <IconUser className="h-5 w-5" />
-              Patient Details
-            </button>
-          </div>
-        </div>
-      </div>
-      <Modal
-  isOpen={isMedicalModalOpen}
-  onClose={() => setIsMedicalModalOpen(false)}
-  title={`Medical History — APPOINTMENT ID: ${appointment.appointment_uid ?? 'N/A'}`}
->
-  <div className="space-y-6">
-    
-    {/* 1. Verify Patient Conditions Section */}
-    <div>
-      <h3 className="text-sm font-semibold text-slate-800 mb-3">
-        Highlight the medical conditions by checking boxes-
-      </h3>
-      
-      {Array.isArray(appointment.medical_conditions) && appointment.medical_conditions.length > 0 ? (
-        <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {appointment.medical_conditions.map((cond: string, idx: number) => {
-              const isChecked = selectedMedicalHistory.includes(cond);
-              return (
-                <label 
-                  key={`${cond}-${idx}`} 
-                  className={`flex items-center gap-3 p-2 rounded-lg border cursor-pointer transition-all ${
-                    isChecked 
-                      ? 'bg-sky-50 border-sky-200' 
-                      : 'bg-white border-slate-200 hover:border-slate-300'
-                  }`}
-                >
-                  <input
-                    type="checkbox"
-                    className="w-4 h-4 text-sky-600 rounded focus:ring-sky-500 border-gray-300"
-                    checked={isChecked}
-                    onChange={() => toggleMedicalCondition(cond)}
-                  />
-                  <span className={`text-sm ${isChecked ? 'text-sky-800 font-medium' : 'text-slate-700'}`}>
-                    {cond}
-                  </span>
-                </label>
-              );
-            })}
-          </div>
-          
-          <div className="mt-4 flex justify-end">
-            <button
-              type="button"
-              onClick={handleSaveMedicalHistory}
-              disabled={isSavingHistory}
-              className="text-xs font-medium text-white bg-slate-700 hover:bg-slate-800 px-3 py-2 rounded-lg transition-colors disabled:opacity-50"
-            >
-              {isSavingHistory ? 'Saving...' : 'Check & Save'}
-            </button>
-          </div>
-        </div>
-      ) : (
-        <p className="text-sm text-slate-500 italic">
-          No medical conditions reported by patient during booking.
-        </p>
-      )}
-    </div>
-
-    {/* 2. Patient Note (Read-Only) */}
-    {/* Only show if the note exists and is not an empty string */}
-    {appointment.patient_note && (
-      <div>
-        <h3 className="text-sm font-semibold text-slate-800 mb-2">
-          Patient's Note
-        </h3>
-        <div className="bg-amber-50 p-4 rounded-xl border border-amber-100 text-slate-700 text-sm whitespace-pre-wrap">
-          {appointment.patient_note}
-        </div>
-      </div>
-    )}
-
-    {/* Divider */}
-    <div className="border-t border-slate-200" />
-
-    {/* 3. Appointment Notes (Doctor's Editable Notes) */}
-    <div>
-      <label className="block text-sm font-semibold text-slate-800 mb-2">
-        Notes for this appointment
-      </label>
-      <textarea
-        value={appointmentNotes}
-        onChange={(e) => {
-          setAppointmentNotes(e.target.value);
-          if (appointmentNotesError) setAppointmentNotesError(null);
-          if (appointmentNotesSaved) setAppointmentNotesSaved(false);
-        }}
-        rows={3}
-        placeholder="Add or update simple notes for this appointment..."
-        className="w-full py-3 px-4 text-sm text-slate-900 bg-slate-50 border-2 border-slate-200 rounded-xl outline-none focus:ring-4 focus:ring-sky-500/20 focus:border-sky-500 transition-all placeholder:text-slate-400"
-      />
-
-      <div className="mt-3 flex items-center justify-between gap-3">
-        <div className="text-sm">
-          {appointmentNotesError && (
-            <span className="text-red-600">{appointmentNotesError}</span>
-          )}
-          {appointmentNotesSaved && !appointmentNotesError && (
-            <span className="text-emerald-600">Notes saved.</span>
-          )}
-        </div>
-        <button
-          type="button"
-          onClick={handleSaveAppointmentNotes}
-          disabled={isSavingAppointmentNotes}
-          className="inline-flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-semibold rounded-xl bg-sky-600 text-white hover:bg-sky-700 active:bg-sky-800 shadow-sm transition-all disabled:opacity-60 disabled:cursor-not-allowed"
-        >
-          {isSavingAppointmentNotes ? 'Saving…' : 'Save Notes'}
-        </button>
-      </div>
-    </div>
-  </div>
-</Modal>
-{/* ⭐ Previous Consultation Modal */}
-<Modal
-  isOpen={isPrevSessionModalOpen}
-  onClose={() => setIsPrevSessionModalOpen(false)}
-  title="Previous Consultation Details"
->
-  {loadingPrev ? (
-    <LoadingSpinner />
-  ) : prevConsultation ? (
-    <div className="space-y-4">
-
-      <div>
-        <h3 className="font-semibold text-slate-800 mb-1">Chief Complaints</h3>
-        <p className="text-slate-700 whitespace-pre-wrap">
-          {prevConsultation.chief_complaints || "—"}
-        </p>
-      </div>
-
-      <div>
-        <h3 className="font-semibold text-slate-800 mb-1">On Examination</h3>
-        <p className="text-slate-700 whitespace-pre-wrap">
-          {prevConsultation.on_examination || "—"}
-        </p>
-      </div>
-
-      <div>
-        <h3 className="font-semibold text-slate-800 mb-1">Advice</h3>
-        <p className="text-slate-700 whitespace-pre-wrap">
-          {prevConsultation.advice || "—"}
-        </p>
-      </div>
-
-      <div>
-        <h3 className="font-semibold text-slate-800 mb-1">Notes</h3>
-        <p className="text-slate-700 whitespace-pre-wrap">
-          {prevConsultation.notes || "—"}
-        </p>
-      </div>
-
-    </div>
-  ) : (
-    <p className="text-sm text-slate-600">No previous consultation found.</p>
-  )}
-</Modal>
-
-
-        {/* Patient Details Modal */}
-        <Modal
-          isOpen={isPatientModalOpen}
-          onClose={() => setIsPatientModalOpen(false)}
-          title="Patient Details"
-        >
-          {patientLoading ? (
-            <LoadingSpinner />
-          ) : patient ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <DetailItem
-                icon={<IconUser />}
-                label="Full Name"
-                value={patient.full_name}
-              />
-              <DetailItem icon={<IconId />} label="UHID" value={patient.uhid} />
-              <DetailItem
-                icon={<IconCalendar />}
-                label="Date of Birth"
-                value={formatDate(patient.date_of_birth)}
-              />
-              <DetailItem
-                icon={<IconGenderIntergender />}
-                label="Gender"
-                value={patient.gender}
-              />
-              <DetailItem
-                icon={<IconPhone />}
-                label="Contact"
-                value={patient.contact_number}
-              />
-              <DetailItem
-                icon={<IconMail />}
-                label="Email"
-                value={patient.email}
-              />
-              <div className="sm:col-span-2">
-                <DetailItem
-                  icon={<IconMapPin />}
-                  label="Address"
-                  value={patient.address}
-                />
+            {/* 2. Patient Note (Read-Only) */}
+            {/* Only show if the note exists and is not an empty string */}
+            {appointment.patient_note && (
+              <div>
+                <h3 className="text-sm font-semibold text-slate-800 mb-2">
+                  Patient's Note
+                </h3>
+                <div className="bg-amber-50 p-4 rounded-xl border border-amber-100 text-slate-700 text-sm whitespace-pre-wrap">
+                  {appointment.patient_note}
+                </div>
               </div>
-              <DetailItem
-                icon={<IconMapPin />}
-                label="City"
-                value={patient.city}
+            )}
+
+            {/* Divider */}
+            <div className="border-t border-slate-200" />
+
+            {/* 3. Appointment Notes (Doctor's Editable Notes) */}
+            <div>
+              <label className="block text-sm font-semibold text-slate-800 mb-2">
+                Notes for this appointment
+              </label>
+              <textarea
+                value={appointmentNotes}
+                onChange={(e) => {
+                  setAppointmentNotes(e.target.value);
+                  if (appointmentNotesError) setAppointmentNotesError(null);
+                  if (appointmentNotesSaved) setAppointmentNotesSaved(false);
+                }}
+                rows={3}
+                placeholder="Add or update simple notes for this appointment..."
+                className="w-full py-3 px-4 text-sm text-slate-900 bg-slate-50 border-2 border-slate-200 rounded-xl outline-none focus:ring-4 focus:ring-sky-500/20 focus:border-sky-500 transition-all placeholder:text-slate-400"
               />
-              <DetailItem
-                icon={<IconMapPin />}
-                label="State"
-                value={patient.state}
-              />
-              <div className="sm:col-span-2">
-                <DetailItem
-                  icon={<IconFileDescription />}
-                  label="File Number"
-                  value={patient.file_number}
-                />
+
+              <div className="mt-3 flex items-center justify-between gap-3">
+                <div className="text-sm">
+                  {appointmentNotesError && (
+                    <span className="text-red-600">{appointmentNotesError}</span>
+                  )}
+                  {appointmentNotesSaved && !appointmentNotesError && (
+                    <span className="text-emerald-600">Notes saved.</span>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={handleSaveAppointmentNotes}
+                  disabled={isSavingAppointmentNotes}
+                  className="inline-flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-semibold rounded-xl bg-sky-600 text-white hover:bg-sky-700 active:bg-sky-800 shadow-sm transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  {isSavingAppointmentNotes ? 'Saving…' : 'Save Notes'}
+                </button>
               </div>
             </div>
+          </div>
+        </Modal>
+        {/* ⭐ Previous Consultation Modal */}
+        <Modal
+          isOpen={isPrevSessionModalOpen}
+          onClose={() => setIsPrevSessionModalOpen(false)}
+          title="Previous Consultation Details"
+        >
+          {loadingPrev ? (
+            <LoadingSpinner />
+          ) : prevConsultation ? (
+            <div className="space-y-4">
+
+              <div>
+                <h3 className="font-semibold text-slate-800 mb-1">Chief Complaints</h3>
+                <p className="text-slate-700 whitespace-pre-wrap">
+                  {prevConsultation.chief_complaints || "—"}
+                </p>
+              </div>
+
+              <div>
+                <h3 className="font-semibold text-slate-800 mb-1">On Examination</h3>
+                <p className="text-slate-700 whitespace-pre-wrap">
+                  {prevConsultation.on_examination || "—"}
+                </p>
+              </div>
+
+              <div>
+                <h3 className="font-semibold text-slate-800 mb-1">Advice</h3>
+                <p className="text-slate-700 whitespace-pre-wrap">
+                  {prevConsultation.advice || "—"}
+                </p>
+              </div>
+
+              <div>
+                <h3 className="font-semibold text-slate-800 mb-1">Notes</h3>
+                <p className="text-slate-700 whitespace-pre-wrap">
+                  {prevConsultation.notes || "—"}
+                </p>
+              </div>
+
+            </div>
           ) : (
-            <p className="text-sm text-slate-600">
-              Patient details could not be loaded.
-            </p>
+            <p className="text-sm text-slate-600">No previous consultation found.</p>
           )}
         </Modal>
 
+
+        {(() => {
+          const modalPatientId = (appointment as any)?.patient_id || (appointment as any)?.patientId || (appointment as any)?._id || (appointment as any)?.patient?.id || (patient as any)?.patient_id || (patient as any)?.id || (patient as any)?._id;
+          console.debug('Consultation: Rendering PatientDetailModal with patientId', modalPatientId, { appointmentId: appointment?.id || appointment?._id, appointment, patient });
+          return (
+            <PatientDetailModal
+              isOpen={isPatientModalOpen}
+              onClose={() => setIsPatientModalOpen(false)}
+              patient={patient}
+              loading={patientLoading}
+              patientId={modalPatientId as string}
+            />
+          );
+        })()}
+
         {/* Progress Bar */}
         <ProgressBar
-  currentStep={currentStep}
-  onStepChange={setCurrentStep} // <-- This is the only line I added
-/>
+          currentStep={currentStep}
+          onStepChange={setCurrentStep} // <-- This is the only line I added
+        />
 
         {/* Step Content */}
         <div className="mt-6">{renderStepContent()}</div>

@@ -20,7 +20,6 @@ const AppointmentConfirmation: React.FC<AppointmentSummaryProps> = ({ selectedCl
     const { bookAppointment, loading: isBooking } = useBookAppointment();
     const { profile } = useProfile();
     const { appointments } = useGetAppointments();
-    const [consentChecked, setConsentChecked] = React.useState(false);
 
 
     // Get IST date for both display and API
@@ -224,15 +223,8 @@ const AppointmentConfirmation: React.FC<AppointmentSummaryProps> = ({ selectedCl
                     </div>
                 </div>
 
-                {/* Consent checkbox + Confirm Button */}
-                <div className='flex flex-col gap-2 mt-4'>
-                    <label className='flex items-center gap-2 text-sm'>
-                        <input type='checkbox' className='h-4 w-4' checked={consentChecked} onChange={(e) => setConsentChecked(e.target.checked)} />
-                        <span>I consent to the clinic's terms and agree to be contacted about this appointment.</span>
-                    </label>
-                    <div className='flex justify-center'>
-                        <button onClick={handleBookAppointment} disabled={!consentChecked || isBooking} className={`${(!consentChecked || isBooking) ? "bg-zinc-400 cursor-not-allowed" : "bg-sky-600 hover:bg-sky-800 cursor-pointer"} text-white w-full py-2 rounded-sm`}>{isBooking ? "Please wait..." : "Confirm"}</button>
-                    </div>
+                <div className='flex justify-center mt-4'>
+                    <button onClick={handleBookAppointment} disabled={isBooking} className={`${isBooking ? "bg-zinc-400 cursor-not-allowed" : "bg-sky-600 hover:bg-sky-800"} text-white w-full py-2 rounded-sm`}>{isBooking ? "Please wait..." : "Confirm"}</button>
                 </div>
             </div>
 

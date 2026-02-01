@@ -3,6 +3,7 @@
 import React from 'react';
 import type { AppointmentDetails } from '../types';
 import AppointmentActions from './AppointmentActions';
+import ConsentModal from './ConsentModal';
 import { IconPlayerPlay } from '@tabler/icons-react';
 import { useNavigate } from 'react-router-dom';
 
@@ -57,44 +58,45 @@ export default function AppointmentTable({
   const navigate = useNavigate();
   const [editorOpenId, setEditorOpenId] = React.useState<string | null>(null);
   const [noteOpenId, setNoteOpenId] = React.useState<string | null>(null); // State for tracking open notes
-  
+  const [consentOpenId, setConsentOpenId] = React.useState<string | null>(null);
+
   // Stores the selected condition names (e.g., ["Fever", "Cough"])
   const [draftMap, setDraftMap] = React.useState<Record<string, string[]>>({});
-  
+
   // Stores the values for conditions that have has_value=true (e.g., { "appointment_id": { "Fever": "101.2" } })
   const [draftValues, setDraftValues] = React.useState<Record<string, Record<string, string>>>({});
 
   const openEditor = (appt: AppointmentDetails) => {
     setEditorOpenId(appt.id);
     setNoteOpenId(null); // Close note if open
-    
+
     const currentConditions = appt.medical_conditions ?? [];
     const selectedNames: string[] = [];
     const values: Record<string, string> = {};
 
     // Parse existing strings. Expecting format "Name" or "Name: Value"
     currentConditions.forEach(condString => {
-        const separatorIndex = condString.indexOf(': ');
-        if (separatorIndex !== -1) {
-            // Has a value
-            const name = condString.substring(0, separatorIndex);
-            const value = condString.substring(separatorIndex + 2);
-            selectedNames.push(name);
-            values[name] = value;
-        } else {
-            // No value
-            selectedNames.push(condString);
-        }
+      const separatorIndex = condString.indexOf(': ');
+      if (separatorIndex !== -1) {
+        // Has a value
+        const name = condString.substring(0, separatorIndex);
+        const value = condString.substring(separatorIndex + 2);
+        selectedNames.push(name);
+        values[name] = value;
+      } else {
+        // No value
+        selectedNames.push(condString);
+      }
     });
 
     setDraftMap((m) => ({
       ...m,
       [appt.id]: selectedNames,
     }));
-    
+
     setDraftValues((v) => ({
-        ...v,
-        [appt.id]: values
+      ...v,
+      [appt.id]: values
     }));
   };
 
@@ -104,9 +106,9 @@ export default function AppointmentTable({
     setDraftMap((m) => {
       const curr = new Set(m[apptId] ?? []);
       if (curr.has(name)) {
-          curr.delete(name);
-          // Optional: Clean up value from draftValues if unchecked, 
-          // but keeping it allows persistence if user re-checks immediately
+        curr.delete(name);
+        // Optional: Clean up value from draftValues if unchecked, 
+        // but keeping it allows persistence if user re-checks immediately
       }
       else curr.add(name);
       return { ...m, [apptId]: Array.from(curr) };
@@ -114,13 +116,13 @@ export default function AppointmentTable({
   };
 
   const handleValueChange = (apptId: string, conditionName: string, value: string) => {
-      setDraftValues(prev => ({
-          ...prev,
-          [apptId]: {
-              ...(prev[apptId] || {}),
-              [conditionName]: value
-          }
-      }));
+    setDraftValues(prev => ({
+      ...prev,
+      [apptId]: {
+        ...(prev[apptId] || {}),
+        [conditionName]: value
+      }
+    }));
   };
 
   const saveDraft = async (apptId: string) => {
@@ -130,22 +132,31 @@ export default function AppointmentTable({
     // Reconstruct the string array. 
     // If condition has_value=true, format as "Name: Value", otherwise "Name".
     const finalStrings = selectedNames.map(name => {
-        const config = clinicConditions.find(c => c.name === name);
-        if (config?.has_value) {
-            const val = currentValues[name] || '';
-            // Only append value if it's not empty, or strictly follow format "Name: Value"
-            return val.trim() ? `${name}: ${val}` : name; 
-        }
-        return name;
+      const config = clinicConditions.find(c => c.name === name);
+      if (config?.has_value) {
+        const val = currentValues[name] || '';
+        // Only append value if it's not empty, or strictly follow format "Name: Value"
+        return val.trim() ? `${name}: ${val}` : name;
+      }
+      return name;
     });
 
     await onUpdateConditions(apptId, finalStrings);
     closeEditor();
   };
-  
+
   const handleStartConsultation = (appointmentId: string) => {
-    onStatusChange(appointmentId, 'in-progress');
-    navigate(`/consultation/${appointmentId}`);
+    // open consent confirmation modal for staff to confirm patient consent
+    setConsentOpenId(appointmentId);
+  };
+
+  const proceedToConsultation = async (appointmentId: string) => {
+    try {
+      await onStatusChange(appointmentId, 'in-progress');
+    } finally {
+      setConsentOpenId(null);
+      navigate(`/consultation/${appointmentId}`);
+    }
   };
 
   // Helper to toggle note visibility
@@ -157,6 +168,8 @@ export default function AppointmentTable({
       setEditorOpenId(null); // Close conditions editor if open
     }
   };
+
+  const consentAppt = consentOpenId ? (appointments.find(a => a.id === consentOpenId) || null) : null;
 
   if (loading) {
     return (
@@ -175,8 +188,8 @@ export default function AppointmentTable({
     );
   }
 
-  return (
-       <div className="mt-6 -mx-4 sm:mx-0 overflow-x-auto">
+  return (<>
+    <div className="mt-6 -mx-4 sm:mx-0 overflow-x-auto">
       <table className="min-w-full divide-y divide-slate-200 table-auto">
         <thead className="bg-slate-50">
           <tr>
@@ -214,8 +227,8 @@ export default function AppointmentTable({
                         onClick={() => toggleNote(appt.id)}
                         className="text-sm text-slate-600 hover:text-sky-600 underline decoration-dotted underline-offset-4 focus:outline-none max-w-[150px] truncate block"
                       >
-                        {appt.patient_note.length > 10 
-                          ? `${appt.patient_note.substring(0, 10)}...` 
+                        {appt.patient_note.length > 10
+                          ? `${appt.patient_note.substring(0, 10)}...`
                           : appt.patient_note}
                       </button>
 
@@ -224,13 +237,13 @@ export default function AppointmentTable({
                           className="absolute top-full left-0 mt-2 w-full sm:w-72 bg-white border border-slate-200 shadow-xl rounded-xl z-40 p-4"
                         >
                           <div className="flex justify-between items-start mb-2">
-                             <h5 className="text-xs font-bold text-slate-500 uppercase tracking-wide">Patient Note</h5>
-                             <button 
-                                onClick={() => setNoteOpenId(null)}
-                                className="text-slate-400 hover:text-slate-600"
-                             >
-                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor" fill="none" strokeLinecap="round" strokeLinejoin="round"><path stroke="none" d="M0 0h24v24v0z" fill="none"/><path d="M18 6l-12 12" /><path d="M6 6l12 12" /></svg>
-                             </button>
+                            <h5 className="text-xs font-bold text-slate-500 uppercase tracking-wide">Patient Note</h5>
+                            <button
+                              onClick={() => setNoteOpenId(null)}
+                              className="text-slate-400 hover:text-slate-600"
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor" fill="none" strokeLinecap="round" strokeLinejoin="round"><path stroke="none" d="M0 0h24v24v0z" fill="none" /><path d="M18 6l-12 12" /><path d="M6 6l12 12" /></svg>
+                            </button>
                           </div>
                           <p className="text-sm text-slate-800 whitespace-pre-wrap leading-relaxed">
                             {appt.patient_note}
@@ -251,11 +264,11 @@ export default function AppointmentTable({
                     onClick={() => openEditor(appt)}
                     className="inline-flex w-full sm:w-auto items-center gap-2 px-3 py-2 sm:py-1.5 text-sm sm:text-xs font-semibold bg-slate-100 text-slate-700 rounded-md hover:bg-slate-200 transition justify-center"
                   >
-                    { (appt.medical_conditions?.length ?? 0) > 0
+                    {(appt.medical_conditions?.length ?? 0) > 0
                       ? `Conditions (${appt.medical_conditions!.length})`
-                      : 'Add Conditions' }
+                      : 'Add Conditions'}
                   </button>
-                    
+
                   {editorOpenId === appt.id && (
                     <div
                       className="absolute top-full mt-2 w-full sm:w-80 left-0 sm:left-1/2 sm:-translate-x-1/2 bg-white border border-slate-200 shadow-lg rounded-xl z-30"
@@ -264,12 +277,12 @@ export default function AppointmentTable({
                       <h4 className="text-sm font-semibold text-slate-900 px-4 pt-4">
                         Edit Medical Conditions
                       </h4>
-                      
+
                       <div className="max-h-80 overflow-auto p-4">
                         {clinicConditions.length === 0 ? (
                           <p className="text-sm text-slate-500">No conditions configured.</p>
                         ) : (
-                        <ul className="space-y-2">
+                          <ul className="space-y-2">
                             {clinicConditions.map((c) => {
                               const checked = (draftMap[appt.id] ?? []).includes(c.name);
                               return (
@@ -292,16 +305,16 @@ export default function AppointmentTable({
 
                                   {/* Render input box if checked and has_value is true */}
                                   {checked && c.has_value && (
-                                      <div className="mt-2 ml-7">
-                                          <input 
-                                            type="text" 
-                                            placeholder="Value (e.g. 102 F)"
-                                            className="w-full px-2 py-1 text-sm border border-slate-300 rounded-md focus:ring-2 focus:ring-sky-200 outline-none"
-                                            value={draftValues[appt.id]?.[c.name] || ''}
-                                            onChange={(e) => handleValueChange(appt.id, c.name, e.target.value)}
-                                            onClick={(e) => e.stopPropagation()} 
-                                          />
-                                      </div>
+                                    <div className="mt-2 ml-7">
+                                      <input
+                                        type="text"
+                                        placeholder="Value (e.g. 102 F)"
+                                        className="w-full px-2 py-1 text-sm border border-slate-300 rounded-md focus:ring-2 focus:ring-sky-200 outline-none"
+                                        value={draftValues[appt.id]?.[c.name] || ''}
+                                        onChange={(e) => handleValueChange(appt.id, c.name, e.target.value)}
+                                        onClick={(e) => e.stopPropagation()}
+                                      />
+                                    </div>
                                   )}
                                 </li>
                               );
@@ -359,5 +372,12 @@ export default function AppointmentTable({
         </tbody>
       </table>
     </div>
-  );
+
+    <ConsentModal
+      isOpen={!!consentAppt}
+      appointment={consentAppt}
+      onClose={() => setConsentOpenId(null)}
+      onProceed={(id) => proceedToConsultation(id)}
+    />
+  </>);
 }

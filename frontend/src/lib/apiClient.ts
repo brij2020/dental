@@ -301,6 +301,13 @@ export const getPatientByEmail = async (email: string): Promise<AxiosResponse<an
 };
 
 /**
+ * Get patient by ID (MongoDB _id or id)
+ */
+export const getPatientById = async (id: string): Promise<AxiosResponse<any>> => {
+  return get(`/api/patients/${id}`);
+};
+
+/**
  * Check if patient exists
  */
 export const checkPatientExists = async (email: string): Promise<AxiosResponse<any>> => {
