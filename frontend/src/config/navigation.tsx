@@ -5,7 +5,6 @@ import {
   IconSettings,
   IconVideoPlus,
   IconBuildingHospital,
-  IconShield,
 } from "@tabler/icons-react";
 import type { ReactNode } from "react";
 

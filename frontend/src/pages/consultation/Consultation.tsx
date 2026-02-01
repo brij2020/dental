@@ -9,7 +9,10 @@ import {
   getAppointmentById,
   get,
   getProfileById,
+  bookAppointmentAPI,
+  getTreatmentProceduresByConsultationId,
 } from '../../lib/apiClient';
+import { format } from 'date-fns';
 import { prescriptionAPI } from '../../lib/prescriptionAPI';
 import type { AppointmentDetails } from '../appointments/types';
 import ProgressBar from './components/ProgressBar';
@@ -68,6 +71,58 @@ export default function Consultation() {
   const [isMedicalModalOpen, setIsMedicalModalOpen] = useState(false);
   const [isPatientModalOpen, setIsPatientModalOpen] = useState(false);
   const [isFollowUpModalOpen, setIsFollowUpModalOpen] = useState(false);
+  const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
+  const [prescriptions, setPrescriptions] = useState<any[] | null>(null);
+  const [procedures, setProcedures] = useState<any[] | null>(null);
+  const [payments, setPayments] = useState<any[] | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+
+  useEffect(() => {
+    if (!isPreviewModalOpen || !consultationId) return;
+    let mounted = true;
+    (async () => {
+      setPreviewLoading(true);
+      try {
+        // Prescriptions
+        try {
+          const rx = await prescriptionAPI.getByConsultation(consultationId);
+          if (mounted) setPrescriptions(Array.isArray(rx) ? rx : (rx?.data || rx));
+        } catch (rxErr) {
+          console.warn('Failed to load prescriptions for preview:', rxErr);
+          if (mounted) setPrescriptions([]);
+        }
+
+        // Procedures
+        try {
+          const procResp = await getTreatmentProceduresByConsultationId(consultationId);
+          const procData = procResp?.data?.data || procResp?.data || procResp;
+          if (mounted) setProcedures(Array.isArray(procData) ? procData : (procData ? [procData] : []));
+        } catch (procErr) {
+          console.warn('Failed to load procedures for preview:', procErr);
+          if (mounted) setProcedures([]);
+        }
+
+        // Payments — stored in Supabase table `payments`
+        try {
+          const { data: pays, error: paysErr } = await supabase
+            .from('payments')
+            .select('*')
+            .eq('consultation_id', consultationId)
+            .order('created_at', { ascending: false });
+          if (paysErr) throw paysErr;
+          if (mounted) setPayments(pays || []);
+        } catch (payErr) {
+          console.warn('Failed to load payments for preview:', payErr);
+          if (mounted) setPayments([]);
+        }
+      } finally {
+        if (mounted) setPreviewLoading(false);
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, [isPreviewModalOpen, consultationId]);
   const [resolvedDoctorProfileId, setResolvedDoctorProfileId] = useState<string | null>(null);
   const [patient, setPatient] = useState<PatientClinicRow | null>(null);
   const [patientLoading, setPatientLoading] = useState(false);
@@ -260,7 +315,7 @@ export default function Consultation() {
         (async () => {
           try {
             const possible = (
-              mappedConsultation?.doctor_id ||
+              consultationData?.doctor_id ||
               apptData?.doctor_id ||
               (apptData as any)?.doctor?.profile_id ||
               (apptData as any)?.doctor_profile_id ||
@@ -505,23 +560,32 @@ export default function Consultation() {
         prev ? { ...prev, status: 'completed' } : prev
       );
 
-      // 3️⃣ Create follow-up appointment if user picked a date
+      // 3️⃣ Create follow-up appointment via backend API if user picked a date
       if (data.followUpDate) {
-        const { error: followUpError } = await supabase
-          .from('appointments')
-          .insert({
-            clinic_id: consultationData.clinic_id,
-            patient_id: consultationData.patient_id,
-            doctor_id: consultationData.doctor_id,
-            full_name: appointment.full_name,
-            appointment_date: data.followUpDate,
-            appointment_time: data.followUpTime || '09:00:00',
-            status: 'scheduled',
-            follow_up_for_consultation_id: consultationId,
-          });
+        const payload = {
+          clinic_id: consultationData.clinic_id,
+          patient_id: consultationData.patient_id,
+          doctor_id:
+            consultationData.doctor_id ||
+            (appointment as any)?.doctor_id ||
+            (appointment as any)?.doctor?.profile_id ||
+            (appointment as any)?.doctor?.id ||
+            null,
+          full_name: appointment.full_name,
+          appointment_date: format(data.followUpDate, 'yyyy-MM-dd'),
+          // backend expects HH:mm (no seconds)
+          appointment_time: data.followUpTime ? data.followUpTime : '09:00',
+          status: 'scheduled',
+          follow_up_for_consultation_id: consultationId,
+        };
 
-        if (followUpError) {
-          console.warn('Failed to create follow-up appointment (non-fatal):', followUpError);
+        try {
+          const resp = await bookAppointmentAPI(payload);
+          if (!resp?.data?.success) {
+            console.warn('Failed to create follow-up appointment via API:', resp?.data || resp);
+          }
+        } catch (apiErr) {
+          console.warn('Failed to create follow-up appointment via API (non-fatal):', apiErr);
         }
       }
 
@@ -586,9 +650,9 @@ export default function Consultation() {
           (() => {
             const followUpDoctorId = resolvedDoctorProfileId || (
               consultationData?.doctor_id ||
-              appointment.doctor_id ||
-              (appointment as any)?.doctor?.id ||
+              (appointment as any)?.doctor_id ||
               (appointment as any)?.doctor?.profile_id ||
+              (appointment as any)?.doctor?.id ||
               (appointment as any)?.doctor_profile_id ||
               ''
             );
@@ -603,7 +667,6 @@ export default function Consultation() {
                   onComplete={handleCompleteConsultation}
                   isSaving={isSaving}
                   doctorId={followUpDoctorId}
-                  clinicId={consultationData.clinic_id}
                 />
               </div>
             );
@@ -694,10 +757,10 @@ export default function Consultation() {
             <div className="flex items-center gap-3">
               <button
                 type="button"
-                onClick={() => setIsFollowUpModalOpen(true)}
+                onClick={() => setIsPreviewModalOpen(true)}
                 className="inline-flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium rounded-xl border border-slate-300 text-slate-700 hover:bg-slate-50 active:bg-slate-100 transition-all w-full sm:w-auto"
               >
-                Schedule Follow-up
+                Preview
               </button>
               {appointment.follow_up_for_consultation_id && (
                 <button
@@ -738,15 +801,15 @@ export default function Consultation() {
         >
           {(() => {
             // Try several places for a plausible doctor id (Supabase profiles id expected)
-            const followUpDoctorId = resolvedDoctorProfileId || (
-              consultationData?.doctor_id ||
-              appointment.doctor_id ||
-              // sometimes doctor is embedded
-              (appointment as any)?.doctor?.id ||
-              (appointment as any)?.doctor?.profile_id ||
-              (appointment as any)?.doctor_profile_id ||
-              ''
-            );
+              const followUpDoctorId = resolvedDoctorProfileId || (
+                consultationData?.doctor_id ||
+                (appointment as any)?.doctor_id ||
+                // sometimes doctor is embedded
+                (appointment as any)?.doctor?.id ||
+                (appointment as any)?.doctor?.profile_id ||
+                (appointment as any)?.doctor_profile_id ||
+                ''
+              );
             console.debug('Consultation: FollowUp modal using doctorId', followUpDoctorId, { appointment, resolvedDoctorProfileId });
 
             return (
@@ -757,11 +820,147 @@ export default function Consultation() {
                 }}
                 isSaving={isSaving}
                 doctorId={followUpDoctorId}
-                clinicId={consultationData?.clinic_id}
               />
             );
           })()}
         </Modal>
+        {/* Preview Modal */}
+        <Modal
+          isOpen={isPreviewModalOpen}
+          onClose={() => setIsPreviewModalOpen(false)}
+          title="Preview — Full Consultation"
+        >
+          <div className="space-y-4">
+            <div id="consultation-preview" className="max-w-none">
+              <h2 className="text-lg font-semibold mb-2">Consultation Summary</h2>
+
+              <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+                <div className="p-4 border-b border-dotted border-slate-200 last:border-b-0">
+                  <h3 className="text-sm font-medium text-slate-700 mb-2">Appointment</h3>
+                  <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1">
+                    <div><dt className="text-xs text-slate-500">Appointment ID</dt><dd className="font-medium">{appointment?.appointment_uid || appointment?.id || '—'}</dd></div>
+                    <div><dt className="text-xs text-slate-500">Status</dt><dd className="font-medium">{appointment?.status || '—'}</dd></div>
+                    <div><dt className="text-xs text-slate-500">Date</dt><dd className="font-medium">{appointment?.appointment_date || '—'}</dd></div>
+                    <div><dt className="text-xs text-slate-500">Time</dt><dd className="font-medium">{appointment?.appointment_time || '—'}</dd></div>
+                  </dl>
+                </div>
+
+                <div className="p-4 border-b border-dotted border-slate-200 last:border-b-0">
+                  <h3 className="text-sm font-medium text-slate-700 mb-2">Patient</h3>
+                  <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1">
+                    <div><dt className="text-xs text-slate-500">Name</dt><dd className="font-medium">{patient?.full_name || appointment?.full_name || '—'}</dd></div>
+                    <div><dt className="text-xs text-slate-500">File Number</dt><dd className="font-medium">{patient?.file_number || appointment?.file_number || '—'}</dd></div>
+                    <div><dt className="text-xs text-slate-500">Contact</dt><dd className="font-medium">{patient?.contact_number || (appointment as any)?.contact_number || '—'}</dd></div>
+                    <div><dt className="text-xs text-slate-500">Age</dt><dd className="font-medium">{getAge(patient?.date_of_birth || null)}</dd></div>
+                  </dl>
+                </div>
+
+                <div className="p-4 border-b border-dotted border-slate-200 last:border-b-0">
+                  <h3 className="text-sm font-medium text-slate-700 mb-2">Consultation Notes</h3>
+                  <div className="space-y-3 text-sm text-slate-700">
+                    <div><strong>Chief Complaints</strong><div className="mt-1 whitespace-pre-wrap">{consultationData?.chief_complaints || '—'}</div></div>
+                    <div><strong>On Examination</strong><div className="mt-1 whitespace-pre-wrap">{consultationData?.on_examination || '—'}</div></div>
+                    <div><strong>Advice</strong><div className="mt-1 whitespace-pre-wrap">{consultationData?.advice || '—'}</div></div>
+                    <div><strong>Notes</strong><div className="mt-1 whitespace-pre-wrap">{consultationData?.notes || '—'}</div></div>
+                  </div>
+                </div>
+
+                <div className="p-4 border-b border-dotted border-slate-200 last:border-b-0">
+                  <h3 className="text-sm font-medium text-slate-700 mb-2">Treatment Procedures</h3>
+                  {previewLoading && !procedures ? (
+                    <p className="text-sm text-slate-500">Loading procedures…</p>
+                  ) : procedures && procedures.length > 0 ? (
+                    <ol className="list-decimal list-inside text-sm space-y-2">
+                      {procedures.map((p) => (
+                        <li key={p.id || p._id} className="pb-1">
+                          <div className="font-medium">{p.name || p.procedure_name || 'Procedure'}</div>
+                          <div className="text-xs text-slate-600">{p.problems?.join?.(', ') || ''}{p.tooth_number ? ` • Tooth ${p.tooth_number}` : ''}</div>
+                          <div className="text-xs text-slate-600">Cost: {p.cost ?? p.amount ?? '—'}</div>
+                        </li>
+                      ))}
+                    </ol>
+                  ) : (
+                    <p className="text-sm text-slate-500">No procedures recorded.</p>
+                  )}
+                </div>
+
+                <div className="p-4 border-b border-dotted border-slate-200 last:border-b-0">
+                  <h3 className="text-sm font-medium text-slate-700 mb-2">Prescriptions</h3>
+                  {previewLoading && !prescriptions ? (
+                    <p className="text-sm text-slate-500">Loading prescriptions…</p>
+                  ) : prescriptions && prescriptions.length > 0 ? (
+                    <ul className="text-sm space-y-2">
+                      {prescriptions.map((rx) => (
+                        <li key={rx.id || rx._id} className="pb-1">
+                          <div className="font-medium">{rx.medicine_name}</div>
+                          <div className="text-xs text-slate-600">Times: {rx.times || '—'} • Qty: {rx.quantity || '—'} • Days: {rx.days || '—'}</div>
+                          {rx.note && <div className="text-xs text-slate-600">Note: {rx.note}</div>}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-sm text-slate-500">No prescriptions recorded.</p>
+                  )}
+                </div>
+
+                <div className="p-4 last:border-b-0">
+                  <h3 className="text-sm font-medium text-slate-700 mb-2">Billing & Payments</h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <div><span className="text-slate-500">Consultation Fee:</span> <span className="font-medium">{consultationData?.consultation_fee ?? '—'}</span></div>
+                      <div><span className="text-slate-500">Procedure Amount:</span> <span className="font-medium">{consultationData?.procedure_amount ?? '—'}</span></div>
+                      <div><span className="text-slate-500">Other Amount:</span> <span className="font-medium">{consultationData?.other_amount ?? '—'}</span></div>
+                      <div><span className="text-slate-500">Discount:</span> <span className="font-medium">{consultationData?.discount ?? '—'}</span></div>
+                    </div>
+                    <div>
+                      <div><span className="text-slate-500">Total Paid:</span> <span className="font-medium">{consultationData?.total_paid ?? '—'}</span></div>
+                      <div><span className="text-slate-500">Amount Due:</span> <span className="font-medium">{consultationData?.amount_due ?? '—'}</span></div>
+                      <div><span className="text-slate-500">Previous Outstanding:</span> <span className="font-medium">{consultationData?.previous_outstanding_balance ?? '—'}</span></div>
+                    </div>
+                  </div>
+
+                  <div className="mt-3">
+                    <h4 className="text-sm font-medium mb-2">Payments</h4>
+                    {previewLoading && payments === null ? (
+                      <p className="text-sm text-slate-500">Loading payments…</p>
+                    ) : payments && payments.length > 0 ? (
+                      <ul className="text-sm space-y-1">
+                        {payments.map((pay) => (
+                          <li key={pay.id || pay.payment_id} className="text-slate-700">{pay.amount} — {pay.payment_mode || pay.mode || '—'} — {new Date(pay.created_at || pay.payment_date || Date.now()).toLocaleString()}</li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="text-sm text-slate-500">No payments recorded.</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  const el = document.getElementById('consultation-preview');
+                  if (!el) return;
+                  const w = window.open('', '_blank');
+                  if (!w) return;
+                  const style = `body{font-family:Inter,ui-sans-serif,system-ui,-apple-system,'Segoe UI',Roboto,'Helvetica Neue',Arial;padding:24px;color:#0f172a;} h2{font-size:20px;} h3{font-size:16px;margin-top:18px;} li{margin-bottom:8px;}`;
+                  const doc = `<!doctype html><html><head><meta charset="utf-8"><title>Consultation Preview</title><style>${style}</style></head><body>${el.innerHTML}</body></html>`;
+                  w.document.open();
+                  w.document.write(doc);
+                  w.document.close();
+                  w.focus();
+                  w.print();
+                }}
+                className="inline-flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium rounded-xl bg-sky-600 text-white hover:bg-sky-700"
+              >
+                Download PDF
+              </button>
+            </div>
+          </div>
+        </Modal>
+        
         <Modal
           isOpen={isMedicalModalOpen}
           onClose={() => setIsMedicalModalOpen(false)}
@@ -922,7 +1121,7 @@ export default function Consultation() {
 
         {(() => {
           const modalPatientId = (appointment as any)?.patient_id || (appointment as any)?.patientId || (appointment as any)?._id || (appointment as any)?.patient?.id || (patient as any)?.patient_id || (patient as any)?.id || (patient as any)?._id;
-          console.debug('Consultation: Rendering PatientDetailModal with patientId', modalPatientId, { appointmentId: appointment?.id || appointment?._id, appointment, patient });
+          console.debug('Consultation: Rendering PatientDetailModal with patientId', modalPatientId, { appointmentId: appointment?.id || (appointment as any)?._id, appointment, patient });
           return (
             <PatientDetailModal
               isOpen={isPatientModalOpen}

@@ -9,7 +9,7 @@ import NewPatientModal from './components/NewPatientModal';
 import BookAppointmentModal from './components/BookAppointmentModal';
 
 import { searchClinicPatients } from './api';
-import { getAllPatients, getAllClinicPanels, getClinicAppointments, deleteAppointment, getProfileById } from '../../lib/apiClient';
+import { getAllPatients, getAllClinicPanels, getClinicAppointments, deleteAppointment } from '../../lib/apiClient';
 import type { ClinicPatientRow } from './types';
 
 export default function Patients() {

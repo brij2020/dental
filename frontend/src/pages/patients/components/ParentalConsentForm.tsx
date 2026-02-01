@@ -1,4 +1,4 @@
-import React from 'react';
+
 import './ParentalConsentForm.css';
 
 export default function ParentalConsentForm() {

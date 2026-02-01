@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { getAnalyticsOverview, getAnalyticsTrends, getConsultationsByClinicId } from '../../lib/apiClient';
 
 type Props = { clinicId: string };

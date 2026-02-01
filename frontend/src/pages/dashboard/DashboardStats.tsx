@@ -1,5 +1,5 @@
 // src/pages/dashboard/DashboardStats.tsx
-import React from 'react';
+
 import { IconCalendarTime, IconUsers } from '@tabler/icons-react';
 
 type TrendPoint = { x: string; y: number };

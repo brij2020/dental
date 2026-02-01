@@ -1,4 +1,4 @@
-import React from 'react';
+
 import ParentalConsentForm from '../../patients/components/ParentalConsentForm';
 
 export default function ConsentFormPanel() {

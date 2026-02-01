@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { getDoctorLeavesByClinic, getProfileById, getClinicById } from '../../lib/apiClient';
 import fallbackAvatar from '../../assets/spai.jpeg';
 
