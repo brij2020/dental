@@ -211,7 +211,7 @@ const getProfileSlots = async (id) => {
       throw new Error("Profile ID is required");
     }
 
-    const profile = await Profile.findById(id).select('availability slot_duration_minutes full_name');
+    const profile = await Profile.findById(id).select('availability slot_duration_minutes full_name capacity');
 
     if (!profile) {
       throw new Error("Doctor profile not found");
@@ -225,7 +225,8 @@ const getProfileSlots = async (id) => {
       doctor_id: profile._id,
       full_name: profile.full_name,
       availability: profile.availability,
-      slot_duration_minutes: profile.slot_duration_minutes
+      slot_duration_minutes: profile.slot_duration_minutes,
+      capacity: profile.capacity
     };
   } catch (err) {
     logger.error(`Error retrieving doctor slots: ${err.message}`, {
