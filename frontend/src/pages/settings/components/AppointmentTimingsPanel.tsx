@@ -165,7 +165,7 @@ export default function AppointmentTimingsPanel() {
 
   const [schedule, setSchedule] = useState<DaySchedule[]>([]);
   const [slotDuration, setSlotDuration] = useState<number>(15);
-  const [capacity, setCapacity] = useState<string>('2x');
+  const [capacity, setCapacity] = useState<string>('1x');
 
   const [hasSchedule, setHasSchedule] = useState(false);
   const [isListLoading, setIsListLoading] = useState(true);
@@ -219,15 +219,16 @@ export default function AppointmentTimingsPanel() {
     const fetchSchedule = async () => {
       setIsScheduleLoading(true);
       setHasSchedule(false);
-
       try {
         const response = await getProfileSlots(selectedDoctorId);
-        
         if (response.status === 200 && response.data) {
-          const { availability, slot_duration_minutes } = response.data.data;
-          
+          const { availability, slot_duration_minutes, capacity: fetchedCapacity } = response.data.data;
           setSlotDuration(slot_duration_minutes || 15);
-
+          if (fetchedCapacity) {
+            setCapacity(fetchedCapacity);
+          } else {
+            setCapacity('1x');
+          }
           if (availability && Array.isArray(availability) && availability.length > 0) {
             setSchedule(availability as DaySchedule[]);
             setHasSchedule(true);
@@ -239,12 +240,12 @@ export default function AppointmentTimingsPanel() {
       } catch (error: any) {
         toast.error("Failed to fetch doctor's schedule.");
         setSchedule(generateBlankSchedule());
+        setCapacity('1x');
         console.error('Error fetching schedule:', error);
       } finally {
         setIsScheduleLoading(false);
       }
     };
-
     fetchSchedule();
   }, [selectedDoctorId]);
 

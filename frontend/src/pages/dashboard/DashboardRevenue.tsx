@@ -58,7 +58,7 @@ export default function DashboardRevenue({ clinicId }: Props) {
               const paid = Number(c.amount_paid || 0) || 0;
               const created = c.created_at ? String(c.created_at).slice(0,10) : null;
               if (created === todayStr) tRev += paid;
-              if (created >= monthStart && created <= todayStr) mRev += paid;
+              if (created && created >= monthStart && created <= todayStr) mRev += paid;
             });
             if (todayRevenue === null) setTodayRevenue(tRev);
             if (monthRevenue === null) setMonthRevenue(mRev);
