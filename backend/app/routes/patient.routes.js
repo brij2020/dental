@@ -23,6 +23,9 @@ module.exports = app => {
   // Get patient by email
   router.get("/email/:email", verifyToken, patient.findByEmail);
 
+  // Get current authenticated patient
+  router.get("/me", verifyToken, patient.me);
+
   // Get patient by ID
   router.get("/:id", verifyToken, patient.findOne);
 

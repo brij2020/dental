@@ -445,8 +445,10 @@ const ToothDamageModal: React.FC<Props> = ({
         });
         
         if (!response.data || !response.data.success) {
+
           throw new Error('Failed to create treatment procedure');
         }
+        onSaveSuccess();
       } else {
         // Multiple teeth procedure
         const perToothCost: number | null =

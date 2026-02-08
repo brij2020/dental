@@ -111,6 +111,24 @@ exports.findOne = async (req, res) => {
 };
 
 /**
+ * Get current authenticated patient (/me)
+ */
+exports.me = async (req, res) => {
+  try {
+    const userId = req.user?.patient_id || req.user?.id;
+    if (!userId) {
+      return res.status(401).send({ message: 'Unauthorized' });
+    }
+
+    const patient = await patientService.getPatientById(userId);
+    res.send({ data: formatPatientResponse(patient) });
+  } catch (err) {
+    logger.error(`Error in patient.me: ${err.message}`);
+    res.status(500).send({ message: err.message || 'Error fetching patient profile' });
+  }
+};
+
+/**
  * Get patient by UHID
  */
 exports.findByUhid = async (req, res) => {

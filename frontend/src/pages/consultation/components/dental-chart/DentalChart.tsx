@@ -177,16 +177,12 @@ const DentalChart: React.FC<DentalChartProps> = ({ consultationId, clinicId }) =
         isOpen={isDamageOpen}
         toothNumber={selectedToothDisplay}
         onClose={() => setDamageOpen(false)}
-        // Pass the required IDs
         consultationId={consultationId}
         clinicId={clinicId}
-        // Renamed onSave to onSaveSuccess
         onSaveSuccess={() => {
           console.log('Tooth damage saved!');
           setDamageOpen(false);
-          // Here you could also trigger a refetch of procedures
-          // for the main Procedure.tsx component, e.g., using a
-          // context or state management library.
+          // Optionally trigger a refetch of procedures here
         }}
       />
     </div>

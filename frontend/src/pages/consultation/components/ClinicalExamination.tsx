@@ -28,22 +28,33 @@ export type ClinicalExaminationData = {
     notes: string;
 };
 
-type Props = {
-    onSaveAndContinue: (data: ClinicalExaminationData) => void;
-    isSaving: boolean;
-    initialData: ClinicalExaminationData | null; 
-    consultationId: string; // <-- ADD THIS
-    clinicId: string;     // <-- ADD THIS
+type ProcedureType = {
+  id?: string;
+  _id?: string;
+  tooth_number?: string | number;
+  problems?: string[];
+  solutions?: string[];
+  cost?: number;
+  amount?: number;
 };
 
-export default function ClinicalExamination({ onSaveAndContinue, isSaving, initialData, consultationId, clinicId }: Props) { // <-- UPDATED: Destructure initialData
+type Props = {
+  onSaveAndContinue: (data: ClinicalExaminationData) => void;
+  isSaving: boolean;
+  initialData: ClinicalExaminationData | null;
+  consultationId: string;
+  clinicId: string;
+  procedures?: ProcedureType[];
+};
+
+export default function ClinicalExamination({ onSaveAndContinue, isSaving, initialData, consultationId, clinicId, procedures = [] }: Props) {
   const [formData, setFormData] = useState<ClinicalExaminationData>({
     chiefComplaints: '',
     onExamination: '',
     advice: '',
     notes: '',
   });
-
+  const [consultationData, setData] = useState<ClinicalExaminationData | null>(null); 
   // NEW: This effect syncs the component's state with the initial data
   // when it's passed from the parent component.
   useEffect(() => {
@@ -60,7 +71,9 @@ export default function ClinicalExamination({ onSaveAndContinue, isSaving, initi
   const handleSave = () => {
     onSaveAndContinue(formData);
   };
-
+  const setConsultationData = (data: ClinicalExaminationData) => {
+    setData(data);
+  };
   return (
     <div className="space-y-6">
       {/* Top section: Examination and placeholder */}
@@ -98,11 +111,48 @@ export default function ClinicalExamination({ onSaveAndContinue, isSaving, initi
         </div>
         {/* --- DENTAL CHART INTEGRATION --- */}
         <div className="lg:col-span-3 bg-white p-4 rounded-2xl shadow-sm border border-slate-200/80 flex flex-col items-center justify-center aspect-square">
-          <DentalChart consultationId={consultationId} 
-          clinicId={clinicId}/>
+          <DentalChart consultationId={consultationId} clinicId={clinicId} />
         </div>
       </div>
-      
+      {/* 
+      START 
+      */}
+
+      {/* Tooth Damage Table: Show after On Examination */}
+      {(() => {
+        if (!procedures || procedures.length === 0) return null;
+        const toothDamageProcedures = procedures.filter((p) =>
+          (Array.isArray(p.problems) && p.problems.some((pr) => typeof pr === 'string' && pr.toLowerCase().includes('damage')))
+          || (Array.isArray(p.solutions) && p.solutions.some((sol) => typeof sol === 'string' && sol.toLowerCase().includes('damage')))
+        );
+        if (!toothDamageProcedures.length) return null;
+        return (
+          <div className="mt-4">
+            <strong className="block mb-1">Tooth Damage</strong>
+            <table className="min-w-full border text-xs">
+              <thead>
+                <tr className="bg-slate-50">
+                  <th className="border px-2 py-1">Tooth</th>
+                  <th className="border px-2 py-1">Problem(s)</th>
+                  <th className="border px-2 py-1">Solution(s)</th>
+                  <th className="border px-2 py-1">Cost</th>
+                </tr>
+              </thead>
+              <tbody>
+                {toothDamageProcedures.map((p) => (
+                  <tr key={p.id || p._id}>
+                    <td className="border px-2 py-1">{p.tooth_number ?? '-'}</td>
+                    <td className="border px-2 py-1">{Array.isArray(p.problems) ? p.problems.join(', ') : '-'}</td>
+                    <td className="border px-2 py-1">{Array.isArray(p.solutions) ? p.solutions.join(', ') : '-'}</td>
+                    <td className="border px-2 py-1">{p.cost ?? p.amount ?? '-'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        );
+      })()}
+      {/* END */}
       {/* Bottom section: Notes */}
       <div className="bg-white p-6 sm:p-8 rounded-2xl shadow-sm border border-slate-200/80">
         <TextArea 

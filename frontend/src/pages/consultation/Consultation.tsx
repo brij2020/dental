@@ -76,6 +76,8 @@ export default function Consultation() {
   const [procedures, setProcedures] = useState<any[] | null>(null);
   const [payments, setPayments] = useState<any[] | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
+  // Track if a procedure was just saved so preview can refresh
+  const [procedureJustSaved, setProcedureJustSaved] = useState(false);
 
   useEffect(() => {
     if (!isPreviewModalOpen || !consultationId) return;
@@ -117,12 +119,14 @@ export default function Consultation() {
         }
       } finally {
         if (mounted) setPreviewLoading(false);
+        // Reset the flag after refresh
+        setProcedureJustSaved(false);
       }
     })();
     return () => {
       mounted = false;
     };
-  }, [isPreviewModalOpen, consultationId]);
+  }, [isPreviewModalOpen, consultationId, procedureJustSaved]);
   const [resolvedDoctorProfileId, setResolvedDoctorProfileId] = useState<string | null>(null);
   const [patient, setPatient] = useState<PatientClinicRow | null>(null);
   const [patientLoading, setPatientLoading] = useState(false);
@@ -436,6 +440,16 @@ export default function Consultation() {
         setConsultationData(mappedConsultation as ConsultationRow);
         setCurrentStep(3);
       }
+      // Refresh procedures list after save
+      try {
+        const procResp = await getTreatmentProceduresByConsultationId(consultationId);
+        const procData = procResp?.data?.data || procResp?.data || procResp;
+        setProcedures(Array.isArray(procData) ? procData : (procData ? [procData] : []));
+        // Mark that a procedure was just saved so preview modal can refresh if open
+        setProcedureJustSaved(true);
+      } catch (procErr) {
+        setProcedures([]);
+      }
     } finally {
       setIsSaving(false);
     }
@@ -617,6 +631,7 @@ export default function Consultation() {
             initialData={initialExamData}
             consultationId={consultationId}
             clinicId={consultationData.clinic_id}
+            procedures={procedures || []}
           />
         );
       }
@@ -861,6 +876,7 @@ export default function Consultation() {
                     <div><strong>Chief Complaints</strong><div className="mt-1 whitespace-pre-wrap">{consultationData?.chief_complaints || '—'}</div></div>
                     <div><strong>On Examination</strong><div className="mt-1 whitespace-pre-wrap">{consultationData?.on_examination || '—'}</div></div>
                     <div><strong>Advice</strong><div className="mt-1 whitespace-pre-wrap">{consultationData?.advice || '—'}</div></div>
+                    
                     <div><strong>Notes</strong><div className="mt-1 whitespace-pre-wrap">{consultationData?.notes || '—'}</div></div>
                   </div>
                 </div>
