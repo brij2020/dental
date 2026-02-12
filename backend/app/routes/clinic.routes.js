@@ -1,4 +1,5 @@
 const { verifyToken, allowRoles } = require("../middleware/auth.middleware");
+const { uploadClinicLogo, handleUploadError } = require("../middleware/upload.middleware");
 
 module.exports = app => {
   const clinic = require("../controllers/clinic.controller");
@@ -39,6 +40,15 @@ module.exports = app => {
 
   // Update clinic by id
   router.put("/:id", verifyToken, clinic.update);
+
+  // Upload clinic logo/profile image
+  router.post(
+    "/:id/upload-logo",
+    verifyToken,
+    uploadClinicLogo.single("logo"),
+    handleUploadError,
+    clinic.uploadLogo
+  );
 
   // Delete clinic by id
   router.delete("/:id", verifyToken, clinic.delete);

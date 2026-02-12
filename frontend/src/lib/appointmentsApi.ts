@@ -12,19 +12,28 @@ const APPOINTMENTS_API = {
 /**
  * Fetch all appointments for a clinic with optional filters
  */
+type GetAppointmentsOptions = {
+  date?: string;
+  searchTerm?: string;
+  appointmentType?: 'in_person' | 'video';
+};
+
 export async function getAppointments(
   clinicId: string,
-  date: string, // YYYY-MM-DD format
-  searchTerm: string
+  options: GetAppointmentsOptions = {}
 ): Promise<AppointmentDetails[]> {
   try {
+    const { date, searchTerm = '', appointmentType } = options;
     const params = new URLSearchParams();
     params.append('clinic_id', clinicId);
 
     if (searchTerm.trim()) {
       params.append('search', searchTerm.trim());
-    } else {
+    } else if (date) {
       params.append('date', date);
+    }
+    if (appointmentType) {
+      params.append('appointment_type', appointmentType);
     }
 
     const response = await get(
@@ -81,6 +90,7 @@ function mapAppointmentData(appointment: any): AppointmentDetails {
     id: appointment._id || appointment.id,
     appointment_uid: appointment.appointment_uid,
     file_number: appointment.file_number || undefined,
+    appointment_type: appointment.appointment_type || 'in_person',
     full_name: appointment.full_name,
     appointment_date: appointment.appointment_date,
     appointment_time: appointment.appointment_time,

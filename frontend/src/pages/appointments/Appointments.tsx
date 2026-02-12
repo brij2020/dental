@@ -4,7 +4,6 @@ import { toast } from 'react-toastify';
 import { useAuth } from '../../state/useAuth';
 import type { AppointmentDetails, MedicalCondition } from './types';
 import AppointmentTable from './components/AppointmentTable';
-import { getTodayISTString } from '../../lib/istDateUtils';
 import {
   getAppointments,
   updateAppointmentStatus,
@@ -55,6 +54,7 @@ function SearchBar({ value, onChange, disabled, placeholder }: SearchBarProps) {
 export default function Appointments() {
   const { user } = useAuth();
   const clinicId = user?.clinic_id ?? null;
+  const [appointmentType, setAppointmentType] = useState<'in_person' | 'video'>('in_person');
 
   const [appointments, setAppointments] = useState<AppointmentDetails[]>([]);
   const [loading, setLoading] = useState(true);
@@ -84,16 +84,17 @@ const [clinicConditions, setClinicConditions] = useState<MedicalCondition[]>([])
     }
     setLoading(true);
     try {
-      const today = getTodayISTString();
-      
-      const data = await getAppointments(clinicId, today, searchTerm);
+      const data = await getAppointments(clinicId, {
+        searchTerm,
+        appointmentType,
+      });
       setAppointments(data);
     } catch (error) {
       toast.error('Failed to fetch appointments.');
     } finally {
       setLoading(false);
     }
-  }, [clinicId, searchTerm]);
+  }, [clinicId, searchTerm, appointmentType]);
 
   const handleUpdateConditions = async (appointmentId: string, names: string[]) => {
     // optimistic UI
@@ -139,10 +140,34 @@ const [clinicConditions, setClinicConditions] = useState<MedicalCondition[]>([])
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-slate-800 mb-2">Today's Appointments</h1>
-      <p className="text-slate-600 mb-6">View and manage the appointment queue for today.</p>
+      <h1 className="text-2xl font-bold text-slate-800 mb-2">Appointments</h1>
+      <p className="text-slate-600 mb-6">View and manage appointments for your clinic.</p>
 
       <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+        <div className="mb-4 inline-flex rounded-xl border border-slate-200 bg-slate-50 p-1">
+          <button
+            type="button"
+            onClick={() => setAppointmentType('in_person')}
+            className={`px-4 py-2 text-sm font-medium rounded-lg transition ${
+              appointmentType === 'in_person'
+                ? 'bg-white text-slate-900 shadow-sm'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            In-Person
+          </button>
+          <button
+            type="button"
+            onClick={() => setAppointmentType('video')}
+            className={`px-4 py-2 text-sm font-medium rounded-lg transition ${
+              appointmentType === 'video'
+                ? 'bg-white text-slate-900 shadow-sm'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            Video
+          </button>
+        </div>
         <SearchBar
           value={searchTerm}
           onChange={setSearchTerm}

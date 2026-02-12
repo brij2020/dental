@@ -210,7 +210,7 @@ exports.getBookedSlots = async (req, res) => {
 exports.getByClinic = async (req, res) => {
   try {
     const { clinic_id } = req.params;
-    const { status, doctorId, patientId, startDate, endDate, date, search, provisional } = req.query;
+    const { status, doctorId, patientId, startDate, endDate, date, search, provisional, appointment_type } = req.query;
 
     if (!clinic_id) {
       return res.status(400).json({
@@ -227,6 +227,15 @@ exports.getByClinic = async (req, res) => {
         success: false,
         message: `Invalid status. Allowed values: ${validStatuses.join(', ')}`,
         code: 'INVALID_STATUS_VALUE',
+      });
+    }
+
+    const validAppointmentTypes = ['in_person', 'video'];
+    if (appointment_type && !validAppointmentTypes.includes(appointment_type)) {
+      return res.status(422).json({
+        success: false,
+        message: `Invalid appointment_type. Allowed values: ${validAppointmentTypes.join(', ')}`,
+        code: 'INVALID_APPOINTMENT_TYPE',
       });
     }
 
@@ -265,6 +274,7 @@ exports.getByClinic = async (req, res) => {
       date: date || undefined,
       search: search || undefined,
       provisional: provisional || undefined,
+      appointment_type: appointment_type || undefined,
     };
 
     // Remove undefined filters
@@ -596,4 +606,3 @@ exports.getSlotStatus = async (req, res) => {
 };
 
 // ================== APPOINTMENT BOOKING ===================
-

@@ -3,6 +3,7 @@ export type AppointmentDetails = {
   id: string; // Appointment UUID
   appointment_uid: string; // User-friendly ID
   file_number?: string; // Patient file number (optional)
+  appointment_type: 'in_person' | 'video';
   full_name: string; // Patient's full name
   appointment_date: string;
   appointment_time: string;

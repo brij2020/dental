@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
-import { getClinicById, updateClinicById } from '../../../lib/apiClient';
+import { getClinicById, updateClinicById, uploadClinicLogo } from '../../../lib/apiClient';
 import { useAuth } from '../../../state/useAuth';
 import { toast } from 'react-toastify';
 import {
@@ -12,7 +12,6 @@ import {
   IconWorld,
   IconMail,
   IconPhone,
-  IconUser,
   IconEdit,
 } from '@tabler/icons-react';
 
@@ -41,6 +40,7 @@ const Button = ({ children, loading, ...props }: any) => (
 type ClinicProfile = {
   _id: string;
   name: string;
+  logo?: string;
   address: {
     street: string;
     city: string;
@@ -69,6 +69,7 @@ export default function ClinicInformationPanel() {
   const [formData, setFormData] = useState<Partial<ClinicProfile>>({});
   const [loading, setLoading] = useState(true);
   const [formLoading, setFormLoading] = useState(false);
+  const [logoUploading, setLogoUploading] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
 
   useEffect(() => {
@@ -134,11 +135,40 @@ export default function ClinicInformationPanel() {
         error: 'Failed to update details.',
       });
       setClinic(updatedData);
+      window.dispatchEvent(new Event('clinic-profile-updated'));
       setIsEditing(false);
     } catch (error) {
       console.error(error);
     } finally {
       setFormLoading(false);
+    }
+  };
+
+  const handleLogoFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    const clinicId = user?.clinic_id;
+
+    if (!file || !clinicId) return;
+
+    setLogoUploading(true);
+    try {
+      const response = await uploadClinicLogo(clinicId, file);
+      const logoUrl = response?.data?.data?.logo;
+
+      if (!logoUrl) {
+        throw new Error('Logo URL missing in upload response');
+      }
+
+      setFormData(prev => ({ ...prev, logo: logoUrl }));
+      setClinic(prev => (prev ? { ...prev, logo: logoUrl } : prev));
+      window.dispatchEvent(new Event('clinic-profile-updated'));
+      toast.success('Clinic image uploaded successfully.');
+    } catch (error: any) {
+      const message = error?.response?.data?.message || error?.message || 'Failed to upload clinic image.';
+      toast.error(message);
+    } finally {
+      setLogoUploading(false);
+      e.target.value = '';
     }
   };
 
@@ -188,6 +218,26 @@ export default function ClinicInformationPanel() {
                   <p className="text-xs text-slate-500 uppercase tracking-wide font-medium">Branding Motto</p>
                   <p className="text-base text-slate-800 mt-1">{clinic?.branding_moto || '—'}</p>
                 </div>
+                <div className="md:col-span-2">
+                  <p className="text-xs text-slate-500 uppercase tracking-wide font-medium">Clinic Image</p>
+                </div>
+                {clinic?.logo && (
+                  <div className="md:col-span-2">
+                    <img
+                      src={clinic.logo}
+                      alt={clinic?.name || 'Clinic'}
+                      className="h-20 w-20 rounded-full border border-slate-200 object-cover"
+                      onError={(e) => {
+                        (e.currentTarget as HTMLImageElement).style.display = 'none';
+                      }}
+                    />
+                  </div>
+                )}
+                {!clinic?.logo && (
+                  <div className="md:col-span-2">
+                    <p className="text-base text-slate-800 mt-1">—</p>
+                  </div>
+                )}
                 <div className="md:col-span-2">
                   <p className="text-xs text-slate-500 uppercase tracking-wide font-medium">Description</p>
                   <p className="text-base text-slate-800 mt-1">{clinic?.description || '—'}</p>
@@ -296,9 +346,38 @@ export default function ClinicInformationPanel() {
                       <option value="Inactive">Inactive</option>
                     </select>
                   </div>
+                  <div>
+                    <label htmlFor="logo-file" className="block text-sm font-medium text-slate-700 mb-1">
+                      Upload Clinic Image
+                    </label>
+                    <input
+                      id="logo-file"
+                      type="file"
+                      accept="image/*"
+                      onChange={handleLogoFileChange}
+                      disabled={logoUploading}
+                      className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-slate-900 outline-none focus:ring-4 focus:ring-sky-300/40 focus:border-sky-400 transition disabled:opacity-60"
+                    />
+                    <p className="mt-1 text-xs text-slate-500">
+                      {logoUploading ? 'Uploading image...' : 'Choose an image from your device (max 10MB). Last uploaded or new image is shown below.'}
+                    </p>
+                  </div>
                   <Input id="branding_moto" name="branding_moto" label="Branding Motto" icon={IconEdit} value={formData.branding_moto || ''} onChange={handleInputChange} />
                   <Input id="description" name="description" label="Description" icon={IconEdit} value={formData.description || ''} onChange={handleInputChange} />
                 </div>
+                {formData.logo && (
+                  <div className="mt-4">
+                    <p className="text-xs text-slate-500 uppercase tracking-wide font-medium mb-2">Image Preview</p>
+                    <img
+                      src={formData.logo}
+                      alt={formData.name || 'Clinic'}
+                      className="h-20 w-20 rounded-lg border border-slate-200 object-cover"
+                      onError={(e) => {
+                        (e.currentTarget as HTMLImageElement).style.display = 'none';
+                      }}
+                    />
+                  </div>
+                )}
               </div>
 
               {/* Contact Information Card */}

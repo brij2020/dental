@@ -4,6 +4,7 @@ import { IconHelpCircle } from "@tabler/icons-react";
 import { useAuth } from "../state/useAuth"; 
 import { useEffect, useMemo, useState } from "react";
 import { getClinicById } from "../lib/apiClient";
+import { environment } from "../config/environment";
 import fallbackLogo from "../assets/spai.jpeg";
 
 type Props = { onNavigate?: () => void };
@@ -24,10 +25,21 @@ export default function Sidebar({ onNavigate }: Props) {
   const [clinicName, setClinicName] = useState<string | null>(null);
   const [clinicLogoUrl, setClinicLogoUrl] = useState<string | null>(null);
 
+  const normalizeLogoUrl = (rawUrl: string | null): string | null => {
+    if (!rawUrl) return null;
+    if (rawUrl.startsWith("http://") || rawUrl.startsWith("https://") || rawUrl.startsWith("data:")) {
+      return rawUrl;
+    }
+    if (rawUrl.startsWith("/")) {
+      return `${environment.getApiUrl()}${rawUrl}`;
+    }
+    return `${environment.getApiUrl()}/${rawUrl}`;
+  };
+
   useEffect(() => {
     let alive = true;
 
-    (async () => {
+    const loadClinicInfo = async () => {
       setClinicName(null);
       setClinicLogoUrl(null);
 
@@ -38,15 +50,24 @@ export default function Sidebar({ onNavigate }: Props) {
         const data = resp?.data?.data || resp?.data;
         if (!alive || !data) return;
         setClinicName(data.name ?? "Clinic");
-        // prefer explicit full URL fields if present
-        const logoUrl = data.clinic_logo_url || data.clinic_logo_path || data.profile_pic || null;
-        setClinicLogoUrl(logoUrl);
+        // prefer explicit full URL fields if present, fallback to clinic logo field
+        const rawLogoUrl = data.clinic_logo_url || data.clinic_logo_path || data.logo || data.profile_pic || null;
+        setClinicLogoUrl(normalizeLogoUrl(rawLogoUrl));
       } catch (e) {
         // keep nulls on error
       }
-    })();
+    };
 
-    return () => { alive = false; };
+    loadClinicInfo();
+    const onClinicProfileUpdated = () => {
+      loadClinicInfo();
+    };
+    window.addEventListener("clinic-profile-updated", onClinicProfileUpdated);
+
+    return () => {
+      alive = false;
+      window.removeEventListener("clinic-profile-updated", onClinicProfileUpdated);
+    };
   }, [user?.clinic_id]);
 
   const accessibleNavItems = useMemo(() => {

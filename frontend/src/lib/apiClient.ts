@@ -141,6 +141,20 @@ export const updateProfile = async (id: string, data: any): Promise<AxiosRespons
   return put(`/api/profile/${id}`, data);
 };
 
+/**
+ * Upload profile picture by profile ID
+ */
+export const uploadProfilePic = async (id: string, file: File): Promise<AxiosResponse<any>> => {
+  const formData = new FormData();
+  formData.append('profile_pic', file);
+
+  return post(`/api/profile/${id}/upload-profile-pic`, formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  });
+};
+
 
 /**
  * Delete profile
@@ -515,6 +529,20 @@ export const getClinicById = async (): Promise<AxiosResponse<any>> => {
  */
 export const updateClinicById = async (id: string, data: any): Promise<AxiosResponse<any>> => {
   return put(`/api/clinics/${id}`, data);
+};
+
+/**
+ * Upload clinic logo/profile image
+ */
+export const uploadClinicLogo = async (clinicId: string, file: File): Promise<AxiosResponse<any>> => {
+  const formData = new FormData();
+  formData.append('logo', file);
+
+  return post(`/api/clinics/${clinicId}/upload-logo`, formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  });
 };
 
 /**

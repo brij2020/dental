@@ -1,5 +1,6 @@
 const { logger } = require("../config/logger");
 const profileService = require("../services/profile.service");
+const fs = require("fs");
 
 /**
  * Create Doctor Profile (HTTP handler)
@@ -207,6 +208,58 @@ exports.getSlots = async (req, res) => {
   } catch (err) {
     res.status(404).send({
       message: err.message || "Error retrieving doctor slots"
+    });
+  }
+};
+
+/**
+ * Upload profile picture
+ */
+exports.uploadProfilePic = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).send({
+        success: false,
+        message: "No file uploaded"
+      });
+    }
+
+    const profileId = req.params.id;
+    if (!profileId) {
+      return res.status(400).send({
+        success: false,
+        message: "Profile ID is required"
+      });
+    }
+
+    const filename = req.file.filename;
+    const profilePicUrl = `/uploads/profiles/${filename}`;
+
+    const updated = await profileService.updateProfile(profileId, {
+      profile_pic: profilePicUrl
+    });
+
+    return res.status(200).send({
+      success: true,
+      message: "Profile picture uploaded successfully",
+      data: {
+        profile: updated,
+        profile_pic: profilePicUrl,
+        filename
+      }
+    });
+  } catch (err) {
+    logger.error({ err }, "Error uploading profile picture");
+
+    if (req.file?.path) {
+      fs.unlink(req.file.path, (unlinkErr) => {
+        if (unlinkErr) logger.error({ err: unlinkErr }, "Error deleting uploaded profile image after failure");
+      });
+    }
+
+    return res.status(500).send({
+      success: false,
+      message: err.message || "Error uploading profile picture"
     });
   }
 };

@@ -2,6 +2,7 @@ const { logger } = require("../config/logger");
 const clinicService = require("../services/clinic.service");
 const profileService = require("../services/profile.service");
 const emailService = require('../services/email.service');
+const fs = require('fs');
 /**
  * Create Clinic
  */
@@ -163,6 +164,58 @@ exports.update = async (req, res) => {
     }
     res.status(500).send({
       message: err.message || "Error updating clinic"
+    });
+  }
+};
+
+/**
+ * Upload clinic logo/profile image
+ */
+exports.uploadLogo = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).send({
+        success: false,
+        message: "No file uploaded"
+      });
+    }
+
+    const clinicId = req.params.id || req.user?.clinic_id;
+    if (!clinicId) {
+      return res.status(400).send({
+        success: false,
+        message: "Clinic ID is required"
+      });
+    }
+
+    const filename = req.file.filename;
+    const logoUrl = `/uploads/clinics/${filename}`;
+
+    const clinic = await clinicService.updateClinic(clinicId, {
+      logo: logoUrl
+    });
+
+    return res.status(200).send({
+      success: true,
+      message: "Clinic logo uploaded successfully",
+      data: {
+        clinic,
+        logo: logoUrl,
+        filename
+      }
+    });
+  } catch (err) {
+    logger.error({ err }, 'Error uploading clinic logo');
+
+    if (req.file?.path) {
+      fs.unlink(req.file.path, (unlinkErr) => {
+        if (unlinkErr) logger.error({ err: unlinkErr }, 'Error deleting uploaded clinic logo after failure');
+      });
+    }
+
+    return res.status(500).send({
+      success: false,
+      message: err.message || "Error uploading clinic logo"
     });
   }
 };

@@ -1,5 +1,6 @@
 
 const { verifyToken, allowRoles } = require("../middleware/auth.middleware");
+const { uploadProfilePic, handleUploadError } = require("../middleware/upload.middleware");
 module.exports = app => {
   const profile = require("../controllers/profile.controller");
   const router = require("express").Router();
@@ -27,6 +28,15 @@ module.exports = app => {
 
   // Update doctor profile by id
   router.put("/:id", verifyToken, profile.update);
+
+  // Upload profile picture by id
+  router.post(
+    "/:id/upload-profile-pic",
+    verifyToken,
+    uploadProfilePic.single("profile_pic"),
+    handleUploadError,
+    profile.uploadProfilePic
+  );
   
   // Admin reset password for a profile
   router.put("/:id/reset-password", verifyToken, profile.adminResetPassword);

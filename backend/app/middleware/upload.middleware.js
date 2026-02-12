@@ -8,6 +8,14 @@ const uploadDir = path.join(__dirname, '../../uploads/avatars');
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }
+const clinicUploadDir = path.join(__dirname, '../../uploads/clinics');
+if (!fs.existsSync(clinicUploadDir)) {
+  fs.mkdirSync(clinicUploadDir, { recursive: true });
+}
+const profileUploadDir = path.join(__dirname, '../../uploads/profiles');
+if (!fs.existsSync(profileUploadDir)) {
+  fs.mkdirSync(profileUploadDir, { recursive: true });
+}
 
 // Configure storage
 const storage = multer.diskStorage({
@@ -44,6 +52,48 @@ const upload = multer({
   }
 });
 
+const clinicStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, clinicUploadDir);
+  },
+  filename: (req, file, cb) => {
+    const clinicId = req.params.id || req.user?.clinic_id || 'unknown';
+    const timestamp = Date.now();
+    const ext = path.extname(file.originalname);
+    const filename = `${timestamp}-${clinicId}${ext}`;
+    cb(null, filename);
+  }
+});
+
+const uploadClinicLogo = multer({
+  storage: clinicStorage,
+  fileFilter: fileFilter,
+  limits: {
+    fileSize: 10 * 1024 * 1024 // 10MB max file size
+  }
+});
+
+const profileStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, profileUploadDir);
+  },
+  filename: (req, file, cb) => {
+    const profileId = req.params.id || req.user?.id || 'unknown';
+    const timestamp = Date.now();
+    const ext = path.extname(file.originalname);
+    const filename = `${timestamp}-${profileId}${ext}`;
+    cb(null, filename);
+  }
+});
+
+const uploadProfilePic = multer({
+  storage: profileStorage,
+  fileFilter: fileFilter,
+  limits: {
+    fileSize: 10 * 1024 * 1024 // 10MB max file size
+  }
+});
+
 // Error handling middleware for multer
 const handleUploadError = (err, req, res, next) => {
   if (err instanceof multer.MulterError) {
@@ -70,6 +120,10 @@ const handleUploadError = (err, req, res, next) => {
 
 module.exports = {
   upload,
+  uploadClinicLogo,
+  uploadProfilePic,
   uploadDir,
+  clinicUploadDir,
+  profileUploadDir,
   handleUploadError
 };
