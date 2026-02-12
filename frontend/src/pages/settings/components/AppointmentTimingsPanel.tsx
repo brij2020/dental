@@ -162,6 +162,7 @@ export default function AppointmentTimingsPanel() {
   const { user } = useAuth();
   const [doctors, setDoctors] = useState<DoctorProfile[]>([]);
   const [selectedDoctorId, setSelectedDoctorId] = useState('');
+  const [consultationType, setConsultationType] = useState<'in_person' | 'video'>('in_person');
 
   const [schedule, setSchedule] = useState<DaySchedule[]>([]);
   const [slotDuration, setSlotDuration] = useState<number>(15);
@@ -220,7 +221,9 @@ export default function AppointmentTimingsPanel() {
       setIsScheduleLoading(true);
       setHasSchedule(false);
       try {
-        const response = await getProfileSlots(selectedDoctorId);
+        const response = await getProfileSlots(selectedDoctorId, {
+          consultation_type: consultationType,
+        });
         if (response.status === 200 && response.data) {
           const { availability, slot_duration_minutes, capacity: fetchedCapacity } = response.data.data;
           setSlotDuration(slot_duration_minutes || 15);
@@ -247,7 +250,7 @@ export default function AppointmentTimingsPanel() {
       }
     };
     fetchSchedule();
-  }, [selectedDoctorId]);
+  }, [selectedDoctorId, consultationType]);
 
   // State handler with validation + trigger copy popup
   const handleScheduleChange = (
@@ -293,10 +296,12 @@ export default function AppointmentTimingsPanel() {
       let doc_id = selectedDoctorId;
      const isAdmin =  doctors.find(d => d._id === selectedDoctorId)?.role === 'admin'
       
-      const response = await updateProfile(
-       doc_id,
-        { availability: schedule, slot_duration_minutes: slotDuration, capacity: isAdmin ? capacity : undefined }
-      );
+      const availabilityKey = consultationType === 'video' ? 'v_availability' : 'availability';
+      const response = await updateProfile(doc_id, {
+        [availabilityKey]: schedule,
+        slot_duration_minutes: slotDuration,
+        capacity: isAdmin ? capacity : undefined,
+      });
 
       if (response.status === 200) {
         toast.success(`Schedule has been updated!`);
@@ -323,10 +328,33 @@ export default function AppointmentTimingsPanel() {
       </Link>
 
       <div className="p-6 bg-white border rounded-2xl">
-        <h2 className="text-lg font-semibold text-slate-800">Appointment Timings</h2>
-        <p className="text-sm text-slate-500 mt-1">
-          Set the weekly consultation hours and appointment duration for each doctor.
-        </p>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <h2 className="text-lg font-semibold text-slate-800">Appointment Timings</h2>
+            <p className="text-sm text-slate-500 mt-1">
+              Set the weekly consultation hours and appointment duration for each doctor.
+            </p>
+          </div>
+
+          <div className="w-full sm:w-64">
+            <label
+              htmlFor="consultation-type"
+              className="block text-sm font-medium text-slate-700 mb-1"
+            >
+              Consultation Type
+            </label>
+            <select
+              id="consultation-type"
+              value={consultationType}
+              onChange={(e) => setConsultationType(e.target.value as 'in_person' | 'video')}
+              className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-slate-900 outline-none 
+                         focus:ring-4 focus:ring-sky-300/40 focus:border-sky-400 transition"
+            >
+              <option value="in_person">In-person Consultation</option>
+              <option value="video">Video Consultation</option>
+            </select>
+          </div>
+        </div>
 
         <form onSubmit={handleSubmit}>
           <div className="my-6 grid grid-cols-1 md:grid-cols-3 gap-6 items-end">

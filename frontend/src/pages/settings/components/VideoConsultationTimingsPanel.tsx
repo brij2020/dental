@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   IconChevronLeft,
   IconToolsOff,
@@ -11,6 +11,7 @@ import {
  * Under construction page for video consultation timings feature
  */
 export default function VideoConsultationTimingsPanel() {
+  const navigate = useNavigate();
   return (
     <div>
       <Link
@@ -22,6 +23,38 @@ export default function VideoConsultationTimingsPanel() {
       </Link>
 
       <div className="rounded-2xl border bg-white p-12">
+        <div className="mb-8 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <h2 className="text-lg font-semibold text-slate-800">Video Consultation Timings</h2>
+            <p className="text-sm text-slate-500 mt-1">
+              Configure video consultation availability.
+            </p>
+          </div>
+
+          <div className="w-full sm:w-64">
+            <label
+              htmlFor="consultation-type"
+              className="block text-sm font-medium text-slate-700 mb-1"
+            >
+              Consultation Type
+            </label>
+            <select
+              id="consultation-type"
+              value="video"
+              onChange={(e) => {
+                if (e.target.value === 'in_person') {
+                  navigate('/settings/timings');
+                }
+              }}
+              className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-slate-900 outline-none 
+                         focus:ring-4 focus:ring-sky-300/40 focus:border-sky-400 transition"
+            >
+              <option value="in_person">In-person Consultation</option>
+              <option value="video">Video Consultation</option>
+            </select>
+          </div>
+        </div>
+
         <div className="flex flex-col items-center justify-center min-h-[500px]">
           {/* Icon Section */}
           <div className="mb-8 flex items-center justify-center h-24 w-24 rounded-full bg-gradient-to-br from-blue-100 to-cyan-100">

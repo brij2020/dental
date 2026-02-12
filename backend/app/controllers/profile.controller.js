@@ -67,6 +67,26 @@ exports.findAll = async (req, res) => {
 };
 
 /**
+ * Public: Get all doctor/admin profiles (optional filters)
+ */
+exports.findAllPublic = async (req, res) => {
+  try {
+    const { clinic_id, status, full_name } = req.query || {};
+    const doctors = await profileService.getAllProfiles({
+      role: { $in: ['doctor', 'admin'] }
+    });
+    res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.set('Pragma', 'no-cache');
+    res.set('Expires', '0');
+    res.send(doctors);
+  } catch (err) {
+    res.status(500).send({
+      message: err.message || "Error retrieving doctors"
+    });
+  }
+};
+
+/**
  * Get doctor by ID
  */
 exports.findOne = async (req, res) => {
@@ -177,7 +197,8 @@ exports.findByClinic = async (req, res) => {
 exports.getSlots = async (req, res) => {
   try {
     const id = req.params.id;
-    const slots = await profileService.getProfileSlots(id);
+    const availabilityType = req.query.consultation_type || 'in_person';
+    const slots = await profileService.getProfileSlots(id, availabilityType);
     
     res.send({
       message: "Doctor slots retrieved successfully",

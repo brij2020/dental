@@ -11,6 +11,7 @@ import {
   IconHeartbeat,
   IconPill,
   IconVideo,
+  IconAlertCircle,
 } from '@tabler/icons-react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../../state/useAuth';
@@ -113,6 +114,12 @@ export const SettingsMenu = () => {
         description="Manage a list of common conditions."
         icon={IconHeartbeat}
         to="/settings/conditions"
+      />
+      <MenuItem
+        title="Chief Complaints"
+        description="Manage common chief complaints."
+        icon={IconAlertCircle}
+        to="/settings/chief-complaint"
       />
       <MenuItem
         title="Remedies"

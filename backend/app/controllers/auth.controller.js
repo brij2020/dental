@@ -104,7 +104,7 @@ exports.patientLogin = async (req, res) => {
         }
 
         const patient = await Patient.findOne({ email: email.toLowerCase().trim() }).select("+password");
-      
+        console.log("=======PATIENT====", patient)
         if (!patient) {
             logger.warn({ email }, 'Patient login failed: patient not found');
             return res.status(401).json({
@@ -113,7 +113,7 @@ exports.patientLogin = async (req, res) => {
                 code: "INVALID_CREDENTIALS"
             });
         }
-
+        
         if (!patient.password) {
             logger.warn({ patientId: patient._id, email }, 'Patient login failed: no password set');
             return res.status(401).json({
@@ -125,6 +125,7 @@ exports.patientLogin = async (req, res) => {
 
 
         const isMatch = await patient.comparePassword(password);
+    
         if (!isMatch) {
             logger.warn({ patientId: patient._id, email }, 'Patient login failed: invalid password');
             return res.status(401).json({

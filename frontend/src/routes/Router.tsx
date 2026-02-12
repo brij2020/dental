@@ -28,6 +28,7 @@ const LeaveSettingsPanel = lazy(() => import("../pages/settings/components/Leave
 const ProcedurePanel = lazy(() => import("../pages/settings/components/ProcedurePanel"));
 const MedicalConditionsPanel = lazy(() => import("../pages/settings/components/MedicalConditionsPanel"));
 const RemediesPanel = lazy(() => import("../pages/settings/components/RemediesPanel"));
+const ChiefComplaintsPanel = lazy(() => import("../pages/settings/components/ChiefComplaintsPanel"));
 const ProcedureProblemsPanel = lazy(() => import("../pages/settings/components/ProcedureProblemsPanel"));
 const ProblemsPanel = lazy(() => import("../pages/settings/components/ProblemsPanel"));
 const FeesPanel = lazy(() => import("../pages/settings/components/FeesPanel"));
@@ -74,6 +75,7 @@ const router = createBrowserRouter([
               { path: "leaves", element: withSuspense(<LeaveSettingsPanel />) },
               { path: "procedures", element: withSuspense(<ProcedurePanel />) },
               { path: "conditions", element: withSuspense(<MedicalConditionsPanel />) },
+              { path: "chief-complaint", element: withSuspense(<ChiefComplaintsPanel />) },
               { path: "remedies", element: withSuspense(<RemediesPanel />) },
               { path: "problems", element: withSuspense(<ProblemsPanel />) },
               { path: "procedure-problems", element: withSuspense(<ProcedureProblemsPanel />) },

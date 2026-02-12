@@ -45,6 +45,12 @@ const appointmentSchema = new mongoose.Schema(
       type: String, // HH:MM format
       required: true,
     },
+    appointment_type: {
+      type: String,
+      enum: ['in_person', 'video'],
+      default: 'in_person',
+      index: true,
+    },
     doctor_id: {
       type: String,
       required: true,

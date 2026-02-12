@@ -46,6 +46,10 @@ const doctorSchema = new mongoose.Schema(
       type: Object, // flexible schedule (jsonb style)
       default: () => JSON.parse(JSON.stringify(DEFAULT_AVAILABILITY))
     },
+    v_availability: {
+      type: Object, // flexible schedule (jsonb style)
+      default: () => JSON.parse(JSON.stringify(DEFAULT_AVAILABILITY))
+    },
      leave: [
       {
         day: {

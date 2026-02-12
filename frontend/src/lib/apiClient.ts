@@ -159,8 +159,11 @@ export const adminResetPassword = async (profileId: string, adminCurrentPassword
 /**
  * Get doctor slots (availability and slot_duration_minutes)
  */
-export const getProfileSlots = async (doctorId: string): Promise<AxiosResponse<any>> => {
-  return get(`/api/profile/${doctorId}/slots`);
+export const getProfileSlots = async (
+  doctorId: string,
+  params?: { consultation_type?: 'in_person' | 'video' }
+): Promise<AxiosResponse<any>> => {
+  return get(`/api/profile/${doctorId}/slots`, { params });
 };
 
 
@@ -742,6 +745,46 @@ export const updateProblem = async (id: string, problemData: any): Promise<Axios
  */
 export const deleteProblem = async (id: string): Promise<AxiosResponse<any>> => {
   return del(`/api/problems/${id}`);
+};
+
+
+/**
+ * ==================== CHIEF COMPLAINTS ====================
+ */
+
+/**
+ * Get all chief complaints for a clinic
+ */
+export const getChiefComplaints = async (): Promise<AxiosResponse<any>> => {
+  return get('/api/chief-complaints');
+};
+
+/**
+ * Get chief complaint by ID
+ */
+export const getChiefComplaintById = async (id: string): Promise<AxiosResponse<any>> => {
+  return get(`/api/chief-complaints/${id}`);
+};
+
+/**
+ * Create a new chief complaint
+ */
+export const createChiefComplaint = async (data: any): Promise<AxiosResponse<any>> => {
+  return post('/api/chief-complaints', data);
+};
+
+/**
+ * Update chief complaint
+ */
+export const updateChiefComplaint = async (id: string, data: any): Promise<AxiosResponse<any>> => {
+  return put(`/api/chief-complaints/${id}`);
+};
+
+/**
+ * Delete chief complaint
+ */
+export const deleteChiefComplaint = async (id: string): Promise<AxiosResponse<any>> => {
+  return del(`/api/chief-complaints/${id}`);
 };
 
 /**

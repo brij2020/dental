@@ -18,6 +18,7 @@ db.fees = require("./fee.model.js")
 db.remedies = require("./remedy.model.js")
 db.procedures = require("./procedure.model.js")
 db.problems = require("./problem.model.js")
+db.chiefComplaints = require("./chiefComplaint.model.js")
 db.consultations = require("./consultation.model.js")
 db.treatmentProcedures = require("./treatmentProcedure.model.js")
 

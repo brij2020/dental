@@ -205,13 +205,15 @@ const getActiveProfiles = async () => {
 /**
  * Get doctor slots (availability and slot_duration_minutes)
  */
-const getProfileSlots = async (id) => {
+const getProfileSlots = async (id, availabilityType = 'in_person') => {
   try {
     if (!id) {
       throw new Error("Profile ID is required");
     }
 
-    const profile = await Profile.findById(id).select('availability slot_duration_minutes full_name capacity');
+    const profile = await Profile.findById(id).select(
+      'availability v_availability slot_duration_minutes full_name capacity'
+    );
 
     if (!profile) {
       throw new Error("Doctor profile not found");
@@ -221,10 +223,11 @@ const getProfileSlots = async (id) => {
       doctorId: id,
     });
 
+    const availabilityField = availabilityType === 'video' ? 'v_availability' : 'availability';
     return {
       doctor_id: profile._id,
       full_name: profile.full_name,
-      availability: profile.availability,
+      availability: profile[availabilityField],
       slot_duration_minutes: profile.slot_duration_minutes,
       capacity: profile.capacity
     };

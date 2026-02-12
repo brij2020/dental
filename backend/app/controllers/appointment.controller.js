@@ -16,6 +16,7 @@ exports.book = async (req, res) => {
       doctor_id,
       medical_conditions,
       clinics,
+      appointment_type='in_person'
     } = req.body;
 
     // Validate required fields with detailed error messages
@@ -26,6 +27,7 @@ exports.book = async (req, res) => {
     if (!appointment_date) missingFields.push('appointment_date');
     if (!appointment_time) missingFields.push('appointment_time');
     if (!doctor_id) missingFields.push('doctor_id');
+
 
     if (missingFields.length > 0) {
       console.warn('Missing fields in appointment booking:', { missingFields });
@@ -114,6 +116,7 @@ exports.book = async (req, res) => {
       medical_conditions: medical_conditions || [],
       status: 'scheduled',
       clinics: clinics || null,
+      appointment_type
     };
 
     // Mark as provisional if explicitly set by caller or when booking as a patient (patient portal)

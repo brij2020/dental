@@ -10,6 +10,9 @@ module.exports = app => {
   // Retrieve all active profile (public)
   router.get("/active", profile.findAllActive);
 
+  // Retrieve all doctor/admin profiles (public)
+  router.get("/public", profile.findAllPublic);
+
   // Retrieve all profile (clinic-filtered, requires auth)
   router.get("/", verifyToken, profile.findAll);
 
