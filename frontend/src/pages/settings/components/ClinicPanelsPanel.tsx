@@ -22,7 +22,6 @@ import {
   createClinicPanel,
   updateClinicPanel,
   deleteClinicPanel,
-  createProcedure,
 } from '../../../lib/apiClient';
 
 type ModalMode = 'add' | 'edit';
@@ -40,35 +39,11 @@ interface Panel {
   closing_time?: string;
 }
 
-type ProcedureFormData = {
-  panel_id: string;
-  name: string;
-  procedure_type: string;
-  cost: number;
-  description: string;
-  note: string;
-};
-
-const PROCEDURE_TYPES = [
-  'General',
-  'Cosmetic',
-  'Surgical',
-  'Diagnostic',
-  'Preventive',
-  'Restorative',
-  'Orthodontic',
-  'Prosthodontic',
-  'Periodontal',
-  'Endodontic',
-  'Other',
-];
-
 export default function ClinicPanelsPanel() {
   const { user } = useAuth();
   const [panels, setPanels] = useState<Panel[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [isProcedureSaving, setIsProcedureSaving] = useState(false);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<ModalMode>('add');
@@ -77,16 +52,6 @@ export default function ClinicPanelsPanel() {
   const [panelCode, setPanelCode] = useState('');
   const [panelSpecialization, setPanelSpecialization] = useState('');
   const [panelDescription, setPanelDescription] = useState('');
-  const [selectedPanelForProcedure, setSelectedPanelForProcedure] = useState('');
-  const [isProcedureModalOpen, setIsProcedureModalOpen] = useState(false);
-  const [procedureForm, setProcedureForm] = useState<ProcedureFormData>({
-    panel_id: '',
-    name: '',
-    procedure_type: 'General',
-    cost: 0,
-    description: '',
-    note: '',
-  });
 
   const clinicId = user?.clinic_id;
 
@@ -136,23 +101,6 @@ export default function ClinicPanelsPanel() {
     setPanelSpecialization('');
     setPanelDescription('');
     setEditingPanelId(null);
-  };
-
-  const openProcedureModal = () => {
-    if (!clinicId) return;
-    setProcedureForm({
-      panel_id: selectedPanelForProcedure,
-      name: '',
-      procedure_type: 'General',
-      cost: 0,
-      description: '',
-      note: '',
-    });
-    setIsProcedureModalOpen(true);
-  };
-
-  const closeProcedureModal = () => {
-    setIsProcedureModalOpen(false);
   };
 
   const savePanelToApi = async (panelData: Partial<Panel>) => {
@@ -253,36 +201,6 @@ export default function ClinicPanelsPanel() {
     }
   };
 
-  const handleProcedureSubmit = async (e: FormEvent) => {
-    e.preventDefault();
-    if (!clinicId) return;
-    if (!procedureForm.name.trim()) {
-      toast.error('Procedure name is required');
-      return;
-    }
-
-    setIsProcedureSaving(true);
-    try {
-      await createProcedure({
-        clinic_id: clinicId,
-        panel_id: procedureForm.panel_id || null,
-        name: procedureForm.name.trim(),
-        procedure_type: procedureForm.procedure_type,
-        cost: Number(procedureForm.cost) || 0,
-        description: procedureForm.description.trim() || null,
-        note: procedureForm.note.trim() || null,
-      });
-      toast.success('Procedure created successfully.');
-      closeProcedureModal();
-    } catch (error: any) {
-      console.error(error);
-      const errorMsg = error?.response?.data?.message || error.message || 'Failed to create procedure';
-      toast.error(errorMsg);
-    } finally {
-      setIsProcedureSaving(false);
-    }
-  };
-
   return (
     <div>
       <Link
@@ -309,33 +227,6 @@ export default function ClinicPanelsPanel() {
           >
             <IconPlus className="h-5 w-5" />
             Add Panel
-          </button>
-        </div>
-
-        <div className="mt-4 flex flex-col gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 sm:flex-row sm:items-end">
-          <div className="w-full sm:max-w-sm">
-            <label className="mb-1 block text-sm font-medium text-slate-700">
-              Select Panel for Procedure
-            </label>
-            <select
-              value={selectedPanelForProcedure}
-              onChange={(e) => setSelectedPanelForProcedure(e.target.value)}
-              className="w-full rounded-xl border border-slate-300 bg-white py-2.5 px-3 text-slate-900 outline-none transition focus:border-sky-400 focus:ring-4 focus:ring-sky-300/40"
-            >
-              <option value="">No panel</option>
-              {panels.map((panel) => (
-                <option key={panel._id || panel.id} value={panel._id || panel.id}>
-                  {panel.name} ({panel.code})
-                </option>
-              ))}
-            </select>
-          </div>
-          <button
-            type="button"
-            onClick={openProcedureModal}
-            className="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2.5 font-medium text-slate-700 transition hover:bg-slate-100"
-          >
-            Create Procedure
           </button>
         </div>
 
@@ -565,108 +456,6 @@ export default function ClinicPanelsPanel() {
                 >
                   <IconDeviceFloppy className="h-5 w-5" />
                   <span>{isSaving ? 'Saving...' : 'Save'}</span>
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Create Procedure Modal */}
-      {isProcedureModalOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
-          aria-labelledby="procedure-modal-title"
-          role="dialog"
-          aria-modal="true"
-        >
-          <div className="w-full max-w-lg rounded-2xl border bg-white p-6 shadow-xl">
-            <form onSubmit={handleProcedureSubmit}>
-              <div className="flex items-start justify-between">
-                <h3 id="procedure-modal-title" className="text-lg font-semibold text-slate-800">
-                  Create Procedure
-                </h3>
-                <button
-                  type="button"
-                  onClick={closeProcedureModal}
-                  className="rounded-full p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
-                >
-                  <IconX className="h-5 w-5" />
-                </button>
-              </div>
-
-              <div className="mt-6 space-y-4">
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-slate-700">Panel</label>
-                  <select
-                    value={procedureForm.panel_id}
-                    onChange={(e) => setProcedureForm(prev => ({ ...prev, panel_id: e.target.value }))}
-                    className="w-full rounded-xl border border-slate-300 bg-white py-2.5 px-3 text-slate-900 outline-none transition focus:border-sky-400 focus:ring-4 focus:ring-sky-300/40"
-                  >
-                    <option value="">No panel</option>
-                    {panels.map((panel) => (
-                      <option key={panel._id || panel.id} value={panel._id || panel.id}>
-                        {panel.name} ({panel.code})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-slate-700">Procedure Name</label>
-                  <input
-                    type="text"
-                    required
-                    value={procedureForm.name}
-                    onChange={(e) => setProcedureForm(prev => ({ ...prev, name: e.target.value }))}
-                    className="w-full rounded-xl border border-slate-300 bg-white py-2.5 px-3 text-slate-900 outline-none transition focus:border-sky-400 focus:ring-4 focus:ring-sky-300/40"
-                    placeholder="e.g., Root Canal Therapy"
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-slate-700">Type</label>
-                  <select
-                    value={procedureForm.procedure_type}
-                    onChange={(e) => setProcedureForm(prev => ({ ...prev, procedure_type: e.target.value }))}
-                    className="w-full rounded-xl border border-slate-300 bg-white py-2.5 px-3 text-slate-900 outline-none transition focus:border-sky-400 focus:ring-4 focus:ring-sky-300/40"
-                  >
-                    {PROCEDURE_TYPES.map(type => (
-                      <option key={type} value={type}>
-                        {type}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-slate-700">Cost</label>
-                  <input
-                    type="number"
-                    min={0}
-                    step="0.01"
-                    value={procedureForm.cost}
-                    onChange={(e) => setProcedureForm(prev => ({ ...prev, cost: Number(e.target.value) }))}
-                    className="w-full rounded-xl border border-slate-300 bg-white py-2.5 px-3 text-slate-900 outline-none transition focus:border-sky-400 focus:ring-4 focus:ring-sky-300/40"
-                  />
-                </div>
-              </div>
-
-              <div className="mt-8 flex justify-end gap-3 border-t pt-4">
-                <button
-                  type="button"
-                  onClick={closeProcedureModal}
-                  className="rounded-xl border border-slate-300 bg-white px-4 py-2 font-medium text-slate-700 transition hover:bg-slate-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={isProcedureSaving}
-                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-sky-500 px-5 py-2 font-medium text-white shadow-sm transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  <IconDeviceFloppy className="h-5 w-5" />
-                  <span>{isProcedureSaving ? 'Saving...' : 'Create'}</span>
                 </button>
               </div>
             </form>
