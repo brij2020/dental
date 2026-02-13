@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { getAllClinics, deactivateClinic } from "./api";
 import type { ClinicResponse } from "./api";
@@ -11,20 +11,28 @@ import {
   IconArrowDown,
 } from "@tabler/icons-react";
 import { toast } from "react-toastify";
+import TablePagination from "../../components/TablePagination";
+import TableOverlayLoader from "../../components/TableOverlayLoader";
 
 type SortField = "name" | "phone" | "city" | "status";
 type SortOrder = "asc" | "desc";
 
 export default function Clinics() {
+  const PAGE_SIZE = 10;
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [clinics, setClinics] = useState<ClinicResponse[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isPageLoading, setIsPageLoading] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(searchParams.get("success") === "true");
   const [sortField, setSortField] = useState<SortField>("name");
   const [sortOrder, setSortOrder] = useState<SortOrder>("asc");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const hasFetchedOnceRef = useRef(false);
 
   useEffect(() => {
     if (success) {
@@ -36,18 +44,35 @@ export default function Clinics() {
   useEffect(() => {
     const fetchClinics = async () => {
       try {
-        setLoading(true);
-        const data = await getAllClinics();
-        setClinics(data);
+        const useFullPageLoader = !hasFetchedOnceRef.current;
+        if (useFullPageLoader) {
+          setLoading(true);
+        } else {
+          setIsPageLoading(true);
+        }
+        const response = await getAllClinics({ page: currentPage, limit: PAGE_SIZE });
+        const pageData = response?.data || [];
+        const pagination = response?.pagination;
+        setClinics(pageData);
+        setTotalItems(pagination?.total ?? pageData.length);
+        setTotalPages(Math.max(1, pagination?.pages ?? 1));
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to load clinics");
+        setClinics([]);
+        setTotalItems(0);
+        setTotalPages(1);
       } finally {
-        setLoading(false);
+        if (!hasFetchedOnceRef.current) {
+          setLoading(false);
+        } else {
+          setIsPageLoading(false);
+        }
+        hasFetchedOnceRef.current = true;
       }
     };
 
     fetchClinics();
-  }, []);
+  }, [PAGE_SIZE, currentPage]);
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -105,7 +130,12 @@ export default function Clinics() {
       const clinicId = getClinicId(clinic);
       setDeleting(clinicId);
       await deactivateClinic(clinicId);
-      setClinics(clinics.filter(c => getClinicId(c) !== clinicId));
+      if (clinics.length === 1 && currentPage > 1) {
+        setCurrentPage(prev => prev - 1);
+      } else {
+        setClinics(clinics.filter(c => getClinicId(c) !== clinicId));
+        setTotalItems(prev => Math.max(0, prev - 1));
+      }
       toast.success(`${clinic.name} deactivated successfully`);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Failed to deactivate clinic";
@@ -123,7 +153,7 @@ export default function Clinics() {
         <div className="flex justify-between items-center mb-8">
           <div>
             <h1 className="text-4xl font-bold text-slate-900">Manage Clinics</h1>
-            <p className="text-slate-600 mt-2">{clinics.length} clinic{clinics.length !== 1 ? "s" : ""} registered</p>
+            <p className="text-slate-600 mt-2">{totalItems} clinic{totalItems !== 1 ? "s" : ""} registered</p>
           </div>
           <button
             onClick={() => navigate("/clinics/create")}
@@ -161,7 +191,7 @@ export default function Clinics() {
         {/* Table View */}
         {!loading && clinics.length > 0 && (
           <div className="bg-white rounded-lg shadow-md border border-slate-200 overflow-hidden">
-            <div className="overflow-x-auto">
+            <div className="relative overflow-x-auto">
               <table className="w-full">
                 <thead className="bg-slate-50 border-b border-slate-200">
                   <tr>
@@ -211,7 +241,7 @@ export default function Clinics() {
                 </thead>
                 <tbody>
                   {getSortedClinics().map((clinic) => (
-                    <tr key={clinic.id} className="border-b border-slate-200 hover:bg-slate-50 transition-colors">
+                    <tr key={getClinicId(clinic)} className="border-b border-slate-200 hover:bg-slate-50 transition-colors">
                       <td className="px-6 py-4">
                         <span className="font-medium text-slate-900">{clinic.name}</span>
                       </td>
@@ -249,7 +279,7 @@ export default function Clinics() {
                             disabled={deleting === getClinicId(clinic)}
                             className="inline-flex items-center gap-1 px-3 py-2 text-sm border border-red-300 text-red-600 rounded hover:bg-red-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                           >
-                            {deleting === clinic.id ? (
+                            {deleting === getClinicId(clinic) ? (
                               <>
                                 <IconLoader size={16} className="animate-spin" />
                                 Deactivating...
@@ -267,8 +297,19 @@ export default function Clinics() {
                   ))}
                 </tbody>
               </table>
+              {isPageLoading && <TableOverlayLoader />}
             </div>
           </div>
+        )}
+        {!loading && clinics.length > 0 && (
+          <TablePagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalItems={totalItems}
+            pageSize={PAGE_SIZE}
+            isLoading={isPageLoading}
+            onPageChange={setCurrentPage}
+          />
         )}
 
         {/* Empty State */}

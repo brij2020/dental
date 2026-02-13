@@ -61,6 +61,16 @@ export interface ClinicResponse {
   updated_at?: string;
 }
 
+export interface ClinicsListResponse {
+  data: ClinicResponse[];
+  pagination?: {
+    total: number;
+    page: number;
+    limit: number;
+    pages: number;
+  };
+}
+
 /**
  * Create a new clinic with admin profile
  */
@@ -72,9 +82,18 @@ export const createClinic = async (data: ClinicFormData): Promise<ClinicResponse
 /**
  * Get all clinics for super admin
  */
-export const getAllClinics = async (): Promise<ClinicResponse[]> => {
-  const response = await apiClient.get("/api/clinics");
-  return response.data;
+export const getAllClinics = async (
+  options?: { page?: number; limit?: number }
+): Promise<ClinicsListResponse> => {
+  const response = await apiClient.get("/api/clinics", { params: options });
+  const payload = response.data;
+  if (Array.isArray(payload)) {
+    return { data: payload };
+  }
+  return {
+    data: payload?.data || [],
+    pagination: payload?.pagination,
+  };
 };
 
 /**

@@ -18,6 +18,7 @@ import {
 } from '@tabler/icons-react';
 import {
   getProcedures,
+  getAllClinicPanels,
   createProcedure,
   updateProcedure,
   deleteProcedure,
@@ -31,6 +32,7 @@ import TableOverlayLoader from '../../../components/TableOverlayLoader';
 type Procedure = {
   _id: string;
   clinic_id: string;
+  panel_id?: string | null;
   name: string;
   procedure_type: string;
   description: string | null;
@@ -43,11 +45,17 @@ type Procedure = {
 
 type ProcedureFormData = {
   _id: string | null;
+  panel_id: string;
   name: string;
   procedure_type: string;
   description: string;
   cost: number;
   note: string;
+};
+type ClinicPanelOption = {
+  _id: string;
+  name: string;
+  code: string;
 };
 
 const PROCEDURE_TYPES = [
@@ -66,6 +74,7 @@ const PROCEDURE_TYPES = [
 
 const newFormState = (): ProcedureFormData => ({
   _id: null,
+  panel_id: '',
   name: '',
   procedure_type: 'General',
   description: '',
@@ -84,6 +93,7 @@ export default function ProcedurePanel() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<'add' | 'edit'>('add');
   const [formData, setFormData] = useState<ProcedureFormData | null>(null);
+  const [clinicPanels, setClinicPanels] = useState<ClinicPanelOption[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
@@ -134,6 +144,20 @@ export default function ProcedurePanel() {
     fetchProcedures();
   }, [fetchProcedures]);
 
+  useEffect(() => {
+    const fetchClinicPanels = async () => {
+      if (!user?.clinic_id) return;
+      try {
+        const response = await getAllClinicPanels(user.clinic_id, { limit: 200 });
+        setClinicPanels(response.data?.data || []);
+      } catch (error) {
+        console.error('Error fetching clinic panels for procedures:', error);
+      }
+    };
+
+    fetchClinicPanels();
+  }, [user?.clinic_id]);
+
   // --- Sorting Handler ---
   const handleSort = (column: 'name' | 'procedure_type' | 'cost' | 'description' | 'note') => {
     if (sortColumn === column) {
@@ -183,6 +207,7 @@ export default function ProcedurePanel() {
   const handleOpenEditModal = (proc: Procedure) => {
     setFormData({
       _id: proc._id,
+      panel_id: typeof proc.panel_id === 'string' ? proc.panel_id : '',
       name: proc.name,
       procedure_type: proc.procedure_type,
       description: proc.description || '',
@@ -219,6 +244,7 @@ export default function ProcedurePanel() {
     try {
       const payload = {
         clinic_id: user.clinic_id,
+        panel_id: formData.panel_id || null,
         name: formData.name.trim(),
         procedure_type: formData.procedure_type,
         description: formData.description.trim() || null,
@@ -302,6 +328,12 @@ export default function ProcedurePanel() {
                 <tr>
                   <th
                     scope="col"
+                    className="px-6 py-3 text-xs font-medium tracking-wider text-left uppercase text-slate-500"
+                  >
+                    Panel
+                  </th>
+                  <th
+                    scope="col"
                     onClick={() => handleSort('name')}
                     className="px-6 py-3 text-xs font-medium tracking-wider text-left uppercase text-slate-500 cursor-pointer hover:bg-slate-100 transition"
                   >
@@ -343,14 +375,14 @@ export default function ProcedurePanel() {
               <tbody className="bg-white divide-y divide-slate-200">
                 {isLoading && (
                   <tr>
-                    <td colSpan={6} className="p-8 text-center text-slate-500">
+                    <td colSpan={7} className="p-8 text-center text-slate-500">
                       Loading procedures...
                     </td>
                   </tr>
                 )}
                 {!isLoading && procedures.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="p-8 text-center text-slate-500">
+                    <td colSpan={7} className="p-8 text-center text-slate-500">
                       <IconAlertCircle className="w-12 h-12 mx-auto text-slate-400" />
                       <p className="mt-2 font-medium">No procedures found.</p>
                       <p className="text-sm">Click &quot;Add Procedure&quot; to get started.</p>
@@ -360,6 +392,9 @@ export default function ProcedurePanel() {
                 {!isLoading &&
                   sortedProcedures.map(proc => (
                     <tr key={proc._id}>
+                      <td className="px-6 py-4 text-sm whitespace-nowrap text-slate-600">
+                        {clinicPanels.find(p => p._id === proc.panel_id)?.name || <span className="italic text-slate-400">—</span>}
+                      </td>
                       <td className="px-6 py-4 text-sm font-medium whitespace-nowrap text-slate-900">
                         {proc.name}
                       </td>
@@ -438,6 +473,35 @@ export default function ProcedurePanel() {
 
               {/* Modal Body */}
               <div className="mt-6 space-y-4">
+                {/* Panel */}
+                <div>
+                  <label
+                    htmlFor="panel_id"
+                    className="block mb-1 text-sm font-medium text-slate-700"
+                  >
+                    Panel
+                  </label>
+                  <div className="relative">
+                    <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                      <IconTag className="w-5 h-5 text-slate-400" />
+                    </span>
+                    <select
+                      id="panel_id"
+                      name="panel_id"
+                      value={formData.panel_id}
+                      onChange={handleFormChange}
+                      className="w-full py-2.5 pl-10 pr-3 text-slate-900 bg-white border border-slate-300 rounded-xl outline-none focus:ring-4 focus:ring-sky-300/40 focus:border-sky-400 transition"
+                    >
+                      <option value="">No panel</option>
+                      {clinicPanels.map(panel => (
+                        <option key={panel._id} value={panel._id}>
+                          {panel.name} ({panel.code})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
                 {/* Procedure Name */}
                 <div>
                   <label

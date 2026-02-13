@@ -1,5 +1,6 @@
 const db = require("../models");
 const Procedure = db.procedures;
+const ClinicPanel = db.clinicPanels;
 const { logger } = require("../config/logger");
 
 /**
@@ -85,7 +86,7 @@ exports.getProcedureById = async (req, res) => {
  */
 exports.createProcedure = async (req, res) => {
   try {
-    const { clinic_id, name, procedure_type, description, cost, note } = req.body;
+    const { clinic_id, panel_id, name, procedure_type, description, cost, note } = req.body;
 
     if (!clinic_id || !name) {
       return res.status(400).send({ message: "clinic_id and name are required" });
@@ -96,8 +97,16 @@ exports.createProcedure = async (req, res) => {
       return res.status(400).send({ message: "Cost must be a non-negative number" });
     }
 
+    if (panel_id) {
+      const panel = await ClinicPanel.findById(panel_id);
+      if (!panel || panel.clinic_id !== clinic_id) {
+        return res.status(400).send({ message: "Invalid panel_id for this clinic" });
+      }
+    }
+
     const procedure = new Procedure({
       clinic_id,
+      panel_id: panel_id || null,
       name: name.trim(),
       procedure_type: procedure_type || "General",
       description: description?.trim(),
@@ -120,7 +129,7 @@ exports.createProcedure = async (req, res) => {
 exports.updateProcedure = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, procedure_type, description, cost, note, is_active } = req.body;
+    const { name, procedure_type, description, cost, note, is_active, panel_id } = req.body;
 
     // Validate cost
     if (cost !== undefined && (typeof cost !== 'number' || cost < 0)) {
@@ -134,6 +143,21 @@ exports.updateProcedure = async (req, res) => {
     if (cost !== undefined) updateData.cost = cost;
     if (note !== undefined) updateData.note = note?.trim();
     if (is_active !== undefined) updateData.is_active = is_active;
+    if (panel_id !== undefined) {
+      if (panel_id === null || panel_id === '') {
+        updateData.panel_id = null;
+      } else {
+        const existingProcedure = await Procedure.findById(id).select("clinic_id");
+        if (!existingProcedure) {
+          return res.status(404).send({ message: "Procedure not found" });
+        }
+        const panel = await ClinicPanel.findById(panel_id);
+        if (!panel || panel.clinic_id !== existingProcedure.clinic_id) {
+          return res.status(400).send({ message: "Invalid panel_id for this clinic" });
+        }
+        updateData.panel_id = panel_id;
+      }
+    }
 
     const procedure = await Procedure.findByIdAndUpdate(id, updateData, { new: true });
 

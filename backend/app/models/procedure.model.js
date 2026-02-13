@@ -7,6 +7,11 @@ const procedureSchema = new mongoose.Schema(
       required: true,
       ref: "Clinic"
     },
+    panel_id: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "ClinicPanel",
+      default: null
+    },
     name: {
       type: String,
       required: true,
@@ -45,5 +50,6 @@ const procedureSchema = new mongoose.Schema(
 
 // Index for clinic_id for faster queries
 procedureSchema.index({ clinic_id: 1 });
+procedureSchema.index({ panel_id: 1 });
 
 module.exports = mongoose.model("Procedure", procedureSchema);

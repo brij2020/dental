@@ -131,10 +131,36 @@ const createClinic = async (clinicData) => {
 /**
  * Get all clinics
  */
-const getAllClinics = async () => {
+const getAllClinics = async (filters = {}) => {
   try {
-    const clinics = await Clinic.find({});
-    // Transform _id to id for API response
+    const hasPagination = filters.page !== undefined || filters.limit !== undefined;
+    const query = {};
+
+    if (hasPagination) {
+      const page = Math.max(1, parseInt(filters.page, 10) || 1);
+      const limit = Math.max(1, parseInt(filters.limit, 10) || 10);
+      const skip = (page - 1) * limit;
+
+      const [clinics, total] = await Promise.all([
+        Clinic.find(query).sort({ createdAt: -1 }).skip(skip).limit(limit),
+        Clinic.countDocuments(query),
+      ]);
+
+      return {
+        data: clinics.map(clinic => ({
+          id: clinic._id.toString(),
+          ...clinic.toObject()
+        })),
+        pagination: {
+          total,
+          page,
+          limit,
+          pages: Math.ceil(total / limit),
+        },
+      };
+    }
+
+    const clinics = await Clinic.find(query);
     return clinics.map(clinic => ({
       id: clinic._id.toString(),
       ...clinic.toObject()

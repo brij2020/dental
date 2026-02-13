@@ -40,8 +40,32 @@ exports.create = async (req, res) => {
  */
 exports.findAll = async (req, res) => {
   try {
-    const clinics = await clinicService.getAllClinics();
-    res.status(200).send(clinics);
+    const { page, limit } = req.query;
+
+    if (page !== undefined && (!Number.isInteger(Number(page)) || Number(page) < 1)) {
+      return res.status(400).send({
+        message: "Invalid page. Expected a positive integer",
+        code: "INVALID_PAGE",
+      });
+    }
+
+    if (limit !== undefined && (!Number.isInteger(Number(limit)) || Number(limit) < 1)) {
+      return res.status(400).send({
+        message: "Invalid limit. Expected a positive integer",
+        code: "INVALID_LIMIT",
+      });
+    }
+
+    const result = await clinicService.getAllClinics({
+      page: page || undefined,
+      limit: limit || undefined,
+    });
+    const clinics = Array.isArray(result) ? result : (result?.data || []);
+    const pagination = Array.isArray(result) ? undefined : result?.pagination;
+
+    const payload = { data: clinics };
+    if (pagination) payload.pagination = pagination;
+    res.status(200).send(payload);
   } catch (err) {
     res.status(500).send({
       message: err.message || "Error retrieving clinics"
