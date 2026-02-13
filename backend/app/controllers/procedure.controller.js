@@ -7,13 +7,52 @@ const { logger } = require("../config/logger");
  */
 exports.getAllProcedures = async (req, res) => {
   try {
-    const { clinic_id } = req.query;
+    const { clinic_id, page, limit } = req.query;
 
     if (!clinic_id) {
       return res.status(400).send({ message: "clinic_id is required" });
     }
 
-    const procedures = await Procedure.find({ clinic_id }).sort({ created_at: -1 });
+    if (page !== undefined && (!Number.isInteger(Number(page)) || Number(page) < 1)) {
+      return res.status(400).send({
+        message: "Invalid page. Expected a positive integer",
+        code: "INVALID_PAGE",
+      });
+    }
+
+    if (limit !== undefined && (!Number.isInteger(Number(limit)) || Number(limit) < 1)) {
+      return res.status(400).send({
+        message: "Invalid limit. Expected a positive integer",
+        code: "INVALID_LIMIT",
+      });
+    }
+
+    const query = { clinic_id };
+    const hasPagination = page !== undefined || limit !== undefined;
+
+    if (hasPagination) {
+      const pageNum = Math.max(1, parseInt(page, 10) || 1);
+      const limitNum = Math.max(1, parseInt(limit, 10) || 10);
+      const skip = (pageNum - 1) * limitNum;
+
+      const [procedures, total] = await Promise.all([
+        Procedure.find(query).sort({ created_at: -1 }).skip(skip).limit(limitNum),
+        Procedure.countDocuments(query),
+      ]);
+
+      logger.info({ clinic_id, count: procedures.length, total, page: pageNum, limit: limitNum }, 'Fetched paginated procedures');
+      return res.status(200).send({
+        data: procedures,
+        pagination: {
+          total,
+          page: pageNum,
+          limit: limitNum,
+          pages: Math.ceil(total / limitNum),
+        },
+      });
+    }
+
+    const procedures = await Procedure.find(query).sort({ created_at: -1 });
     logger.info({ clinic_id, count: procedures.length }, 'Fetched procedures');
     res.status(200).send({ data: procedures });
   } catch (err) {

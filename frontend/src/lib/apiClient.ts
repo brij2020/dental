@@ -568,9 +568,16 @@ export const changePassword = async (currentPassword: string, newPassword: strin
 /**
  * Get all procedures for a clinic
  */
-export const getProcedures = async (clinicId: string): Promise<AxiosResponse<any>> => {
+export const getProcedures = async (
+  clinicId: string,
+  options?: { page?: number; limit?: number }
+): Promise<AxiosResponse<any>> => {
   return get('/api/procedures', {
-    params: { clinic_id: clinicId }
+    params: {
+      clinic_id: clinicId,
+      page: options?.page,
+      limit: options?.limit,
+    }
   });
 };
 

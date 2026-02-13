@@ -139,7 +139,7 @@ export const SettingsMenu = () => {
         icon={IconVideo}
         to="/settings/video-consultation-timings"
       />}
-      {!isSuperAdmin && (
+      {isSuperAdmin && (
         <MenuItem
           title="Clinic Panels"
           description="Manage clinic panel associations."
