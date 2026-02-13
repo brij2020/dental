@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import {
   IconChevronLeft,
+  IconChevronRight,
   IconPlus,
   IconPencil,
   IconTrash,
@@ -41,46 +42,49 @@ type ConditionFormData = {
 // --- Main Panel Component ---
 export default function MedicalConditionsPanel() {
   const { user } = useAuth();
+  const PAGE_SIZE = 10;
   const [conditions, setConditions] = useState<MedicalCondition[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<'add' | 'edit'>('add');
   const [formData, setFormData] = useState<ConditionFormData | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
 
   // Fetch conditions FOR THE USER'S CLINIC
 
   const fetchConditions = useCallback(async () => {
+    if (!user) return;
+
     setIsLoading(true);
     try {
-      let allConditions = [];
-      if (user?.role === 'super_admin') {
-        // Super admin: only global
-        const response = await getMedicalConditions('system');
-        allConditions = response.data?.data || [];
-      } else {
-        // Clinic: fetch both global and clinic-specific
-        const [globalRes, clinicRes] = await Promise.all([
-          getMedicalConditions('system'),
-          user?.clinic_id ? getMedicalConditions(user.clinic_id) : Promise.resolve({ data: { data: [] } })
-        ]);
-        const global = globalRes.data?.data || [];
-        const clinic = clinicRes.data?.data || [];
-        // Merge, clinic-specific can override global if needed (by name)
-        // Deduplicate by name: if a clinic-specific condition has the same name as a global one, use the clinic-specific
-        const clinicNames = new Set(clinic.map((c: MedicalCondition) => c.name.trim().toLowerCase()));
-        const dedupedGlobal = global.filter((g: MedicalCondition) => !clinicNames.has(g.name.trim().toLowerCase()));
-        const merged = [...dedupedGlobal, ...clinic];
-        allConditions = merged;
+      const clinicId = user.role === 'super_admin' ? 'system' : user.clinic_id;
+      if (!clinicId) {
+        setConditions([]);
+        setTotalItems(0);
+        setTotalPages(1);
+        return;
       }
-      setConditions(allConditions);
+
+      const response = await getMedicalConditions(clinicId, {
+        page: currentPage,
+        limit: PAGE_SIZE,
+      });
+      const pageData = response.data?.data || [];
+      const pagination = response.data?.pagination;
+
+      setConditions(pageData);
+      setTotalItems(pagination?.total ?? pageData.length);
+      setTotalPages(Math.max(1, pagination?.pages ?? 1));
     } catch (error) {
       toast.error('Failed to fetch medical conditions.');
       console.error(error);
     } finally {
       setIsLoading(false);
     }
-  }, [user?.clinic_id, user?.role]);
+  }, [PAGE_SIZE, currentPage, user]);
 
   useEffect(() => {
     fetchConditions();
@@ -112,7 +116,7 @@ export default function MedicalConditionsPanel() {
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!formData || !formData.name || !user?.clinic_id) return;
+    if (!formData || !formData.name || (!user?.clinic_id && user?.role !== 'super_admin')) return;
     setIsSaving(true);
 
     try {
@@ -124,8 +128,8 @@ export default function MedicalConditionsPanel() {
       };
 
       if (modalMode === 'add') {
-        const response = await createMedicalCondition(conditionData);
-        setConditions([...conditions, response.data?.data]);
+        await createMedicalCondition(conditionData);
+        await fetchConditions();
         toast.success('Condition successfully added!');
       } else {
         const response = await updateMedicalCondition(formData.id!, conditionData);
@@ -152,7 +156,11 @@ export default function MedicalConditionsPanel() {
 
     try {
       await deleteMedicalCondition(condition._id);
-      setConditions(conditions.filter(c => c._id !== condition._id));
+      if (conditions.length === 1 && currentPage > 1) {
+        setCurrentPage(prev => prev - 1);
+      } else {
+        await fetchConditions();
+      }
       toast.success('Condition deleted successfully.');
     } catch (error: any) {
       console.error(error);
@@ -160,6 +168,9 @@ export default function MedicalConditionsPanel() {
       toast.error(errorMsg);
     }
   };
+
+  const startItem = totalItems === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1;
+  const endItem = totalItems === 0 ? 0 : Math.min(currentPage * PAGE_SIZE, totalItems);
   
   return (
     <div>
@@ -239,6 +250,34 @@ export default function MedicalConditionsPanel() {
             </table>
           </div>
         </div>
+        {!isLoading && totalItems > 0 && (
+          <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm text-slate-600">
+              Showing {startItem}-{endItem} of {totalItems}
+            </p>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                disabled={currentPage === 1}
+                className="inline-flex items-center gap-1 rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <IconChevronLeft className="h-4 w-4" />
+                Prev
+              </button>
+              <span className="text-sm text-slate-600">
+                Page {currentPage} of {totalPages}
+              </span>
+              <button
+                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                disabled={currentPage >= totalPages}
+                className="inline-flex items-center gap-1 rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Next
+                <IconChevronRight className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* --- Add/Edit Modal --- */}

@@ -366,8 +366,17 @@ export const bulkDeletePatients = async (ids: string[]): Promise<AxiosResponse<a
 /**
  * Get all medical conditions for a clinic
  */
-export const getMedicalConditions = async (clinicId: string): Promise<AxiosResponse<any>> => {
-  return get('/api/medical-condition', { params: { clinic_id: clinicId } });
+export const getMedicalConditions = async (
+  clinicId: string,
+  options?: { page?: number; limit?: number }
+): Promise<AxiosResponse<any>> => {
+  return get('/api/medical-condition', {
+    params: {
+      clinic_id: clinicId,
+      page: options?.page,
+      limit: options?.limit,
+    },
+  });
 };
 
 /**

@@ -4,7 +4,7 @@ const logger = require("../config/logger");
 // Get all medical conditions for a clinic
 exports.findAll = async (req, res) => {
   try {
-    const { clinic_id } = req.query;
+    const { clinic_id, page, limit } = req.query;
 
     if (!clinic_id) {
       return res.status(400).json({
@@ -13,13 +13,37 @@ exports.findAll = async (req, res) => {
       });
     }
 
-    const conditions = await medicalConditionService.getAllConditions(clinic_id);
+    if (page !== undefined && (!Number.isInteger(Number(page)) || Number(page) < 1)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid page. Expected a positive integer",
+        code: "INVALID_PAGE",
+      });
+    }
 
-    res.status(200).json({
+    if (limit !== undefined && (!Number.isInteger(Number(limit)) || Number(limit) < 1)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid limit. Expected a positive integer",
+        code: "INVALID_LIMIT",
+      });
+    }
+
+    const result = await medicalConditionService.getAllConditions(clinic_id, {
+      page: page || undefined,
+      limit: limit || undefined,
+    });
+    const conditions = Array.isArray(result) ? result : (result?.data || []);
+    const pagination = Array.isArray(result) ? undefined : result?.pagination;
+
+    const payload = {
       success: true,
       message: "Medical conditions retrieved successfully",
       data: conditions,
-    });
+    };
+    if (pagination) payload.pagination = pagination;
+
+    res.status(200).json(payload);
   } catch (error) {
     logger.error("Error fetching medical conditions:", error);
     res.status(500).json({

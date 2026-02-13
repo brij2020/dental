@@ -13,7 +13,49 @@ exports.getAllConditions = async (clinicId, filters = {}) => {
       .sort({ name: 1 })
       .lean();
 
-    return conditions;
+    let normalizedConditions = conditions;
+    if (clinicId && clinicId !== 'system') {
+      const conditionMap = new Map();
+
+      for (const condition of conditions) {
+        const key = (condition.name || '').trim().toLowerCase();
+        const existing = conditionMap.get(key);
+        const isClinicSpecific = condition.clinic_id === clinicId;
+
+        if (!existing) {
+          conditionMap.set(key, condition);
+          continue;
+        }
+
+        if (existing.clinic_id !== clinicId && isClinicSpecific) {
+          conditionMap.set(key, condition);
+        }
+      }
+
+      normalizedConditions = Array.from(conditionMap.values()).sort((a, b) =>
+        (a.name || '').localeCompare(b.name || '')
+      );
+    }
+
+    const hasPagination = filters.page !== undefined || filters.limit !== undefined;
+    if (hasPagination) {
+      const page = Math.max(1, parseInt(filters.page, 10) || 1);
+      const limit = Math.max(1, parseInt(filters.limit, 10) || 10);
+      const total = normalizedConditions.length;
+      const skip = (page - 1) * limit;
+
+      return {
+        data: normalizedConditions.slice(skip, skip + limit),
+        pagination: {
+          total,
+          page,
+          limit,
+          pages: Math.ceil(total / limit),
+        },
+      };
+    }
+
+    return normalizedConditions;
   } catch (error) {
     throw error;
   }
