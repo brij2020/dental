@@ -1,9 +1,11 @@
 // features/appointments/Appointments.tsx
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { toast } from 'react-toastify';
 import { useAuth } from '../../state/useAuth';
 import type { AppointmentDetails, MedicalCondition } from './types';
 import AppointmentTable from './components/AppointmentTable';
+import TablePagination from '../../components/TablePagination';
+import TableOverlayLoader from '../../components/TableOverlayLoader';
 import {
   getAppointments,
   updateAppointmentStatus,
@@ -52,15 +54,22 @@ function SearchBar({ value, onChange, disabled, placeholder }: SearchBarProps) {
 
 
 export default function Appointments() {
+  const PAGE_SIZE = 10;
   const { user } = useAuth();
   const clinicId = user?.clinic_id ?? null;
   const [appointmentType, setAppointmentType] = useState<'in_person' | 'video'>('in_person');
 
   const [appointments, setAppointments] = useState<AppointmentDetails[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isPageLoading, setIsPageLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-const [clinicConditions, setClinicConditions] = useState<MedicalCondition[]>([]);
- const [, setConditionsLoading] = useState(false);
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
+  const [clinicConditions, setClinicConditions] = useState<MedicalCondition[]>([]);
+  const [, setConditionsLoading] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const hasFetchedOnceRef = useRef(false);
 
   useEffect(() => {
     if (!clinicId) return;
@@ -82,19 +91,38 @@ const [clinicConditions, setClinicConditions] = useState<MedicalCondition[]>([])
       setLoading(false);
       return;
     }
-    setLoading(true);
+    const useFullPageLoader = !hasFetchedOnceRef.current;
+    if (useFullPageLoader) {
+      setLoading(true);
+    } else {
+      setIsPageLoading(true);
+    }
     try {
-      const data = await getAppointments(clinicId, {
-        searchTerm,
+      const result = await getAppointments(clinicId, {
+        searchTerm: debouncedSearchTerm,
         appointmentType,
+        page: currentPage,
+        limit: PAGE_SIZE,
       });
-      setAppointments(data);
+      const pageData = result.data || [];
+      const pagination = result.pagination;
+      setAppointments(pageData);
+      setTotalItems(pagination?.total ?? pageData.length);
+      setTotalPages(Math.max(1, pagination?.pages ?? 1));
     } catch (error) {
       toast.error('Failed to fetch appointments.');
+      setAppointments([]);
+      setTotalItems(0);
+      setTotalPages(1);
     } finally {
-      setLoading(false);
+      if (useFullPageLoader) {
+        setLoading(false);
+      } else {
+        setIsPageLoading(false);
+      }
+      hasFetchedOnceRef.current = true;
     }
-  }, [clinicId, searchTerm, appointmentType]);
+  }, [PAGE_SIZE, appointmentType, clinicId, currentPage, debouncedSearchTerm]);
 
   const handleUpdateConditions = async (appointmentId: string, names: string[]) => {
     // optimistic UI
@@ -112,15 +140,15 @@ const [clinicConditions, setClinicConditions] = useState<MedicalCondition[]>([])
   };
 
   useEffect(() => {
-    // Using a timeout to debounce the search
     const handler = setTimeout(() => {
-        fetchAppointments();
-    }, 300); // 300ms delay
+      setDebouncedSearchTerm(searchTerm);
+    }, 300);
+    return () => clearTimeout(handler);
+  }, [searchTerm]);
 
-    return () => {
-        clearTimeout(handler);
-    };
-  }, [searchTerm, fetchAppointments]);
+  useEffect(() => {
+    fetchAppointments();
+  }, [fetchAppointments]);
 
   const handleStatusChange = async (appointmentId: string, newStatus: 'in-progress') => {
     try {
@@ -147,7 +175,10 @@ const [clinicConditions, setClinicConditions] = useState<MedicalCondition[]>([])
         <div className="mb-4 inline-flex rounded-xl border border-slate-200 bg-slate-50 p-1">
           <button
             type="button"
-            onClick={() => setAppointmentType('in_person')}
+            onClick={() => {
+              setAppointmentType('in_person');
+              setCurrentPage(1);
+            }}
             className={`px-4 py-2 text-sm font-medium rounded-lg transition ${
               appointmentType === 'in_person'
                 ? 'bg-white text-slate-900 shadow-sm'
@@ -158,7 +189,10 @@ const [clinicConditions, setClinicConditions] = useState<MedicalCondition[]>([])
           </button>
           <button
             type="button"
-            onClick={() => setAppointmentType('video')}
+            onClick={() => {
+              setAppointmentType('video');
+              setCurrentPage(1);
+            }}
             className={`px-4 py-2 text-sm font-medium rounded-lg transition ${
               appointmentType === 'video'
                 ? 'bg-white text-slate-900 shadow-sm'
@@ -170,17 +204,33 @@ const [clinicConditions, setClinicConditions] = useState<MedicalCondition[]>([])
         </div>
         <SearchBar
           value={searchTerm}
-          onChange={setSearchTerm}
+          onChange={(value) => {
+            setSearchTerm(value);
+            setCurrentPage(1);
+          }}
           disabled={!clinicId}
           placeholder="Search by Appointment ID..."
         />
-        <AppointmentTable
-          appointments={appointments}
-          loading={loading}
-          onStatusChange={handleStatusChange}
-          clinicConditions={clinicConditions}
-          onUpdateConditions={handleUpdateConditions}
-        />
+        <div className="relative">
+          <AppointmentTable
+            appointments={appointments}
+            loading={loading}
+            onStatusChange={handleStatusChange}
+            clinicConditions={clinicConditions}
+            onUpdateConditions={handleUpdateConditions}
+          />
+          {isPageLoading && <TableOverlayLoader />}
+        </div>
+        {!loading && appointments.length > 0 && (
+          <TablePagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalItems={totalItems}
+            pageSize={PAGE_SIZE}
+            isLoading={isPageLoading}
+            onPageChange={setCurrentPage}
+          />
+        )}
       </div>
     </div>
   );

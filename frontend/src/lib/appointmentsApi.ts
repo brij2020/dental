@@ -16,14 +16,26 @@ type GetAppointmentsOptions = {
   date?: string;
   searchTerm?: string;
   appointmentType?: 'in_person' | 'video';
+  page?: number;
+  limit?: number;
+};
+
+type AppointmentsListResult = {
+  data: AppointmentDetails[];
+  pagination?: {
+    total: number;
+    page: number;
+    limit: number;
+    pages: number;
+  };
 };
 
 export async function getAppointments(
   clinicId: string,
   options: GetAppointmentsOptions = {}
-): Promise<AppointmentDetails[]> {
+): Promise<AppointmentsListResult> {
   try {
-    const { date, searchTerm = '', appointmentType } = options;
+    const { date, searchTerm = '', appointmentType, page, limit } = options;
     const params = new URLSearchParams();
     params.append('clinic_id', clinicId);
 
@@ -35,12 +47,21 @@ export async function getAppointments(
     if (appointmentType) {
       params.append('appointment_type', appointmentType);
     }
+    if (page !== undefined) {
+      params.append('page', String(page));
+    }
+    if (limit !== undefined) {
+      params.append('limit', String(limit));
+    }
 
     const response = await get(
       `${APPOINTMENTS_API.getByClinic(clinicId)}?${params.toString()}`
     );
     const data = response.data?.data || [];
-    return data.map((appointment: any) => mapAppointmentData(appointment)) as AppointmentDetails[];
+    return {
+      data: data.map((appointment: any) => mapAppointmentData(appointment)) as AppointmentDetails[],
+      pagination: response.data?.pagination,
+    };
   } catch (error) {
     console.error('Error fetching appointments:', error);
     throw error;
