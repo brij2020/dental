@@ -453,8 +453,8 @@ export default function ProcedurePanel() {
           role="dialog"
           aria-modal="true"
         >
-          <div className="w-full max-w-lg p-6 bg-white border shadow-xl rounded-2xl">
-            <form onSubmit={handleSubmit}>
+          <div className="w-full max-w-lg max-h-[90vh] p-6 bg-white border shadow-xl rounded-2xl overflow-hidden">
+            <form onSubmit={handleSubmit} className="flex h-full flex-col">
               {/* Modal Header */}
               <div className="flex items-start justify-between">
                 <div>
@@ -472,7 +472,7 @@ export default function ProcedurePanel() {
               </div>
 
               {/* Modal Body */}
-              <div className="mt-6 space-y-4">
+              <div className="mt-6 space-y-4 overflow-y-auto pr-1">
                 {/* Panel */}
                 <div>
                   <label
