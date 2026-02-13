@@ -8,7 +8,6 @@ import AddPatientModal from './components/AddPatientModal';
 import NewPatientModal from './components/NewPatientModal';
 import BookAppointmentModal from './components/BookAppointmentModal';
 
-import { searchClinicPatients } from './api';
 import { getAllPatients, getAllClinicPanels, getClinicAppointments, deleteAppointment } from '../../lib/apiClient';
 import type { ClinicPatientRow } from './types';
 
@@ -18,10 +17,18 @@ export default function Patients() {
 
   const [searchTerm, setSearchTerm] = useState('');
   const [patients, setPatients] = useState<ClinicPatientRow[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize] = useState(10);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalPatients, setTotalPatients] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'patients' | 'provisional'>('patients');
   const [provisionalAppointments, setProvisionalAppointments] = useState<any[]>([]);
+  const [provisionalCurrentPage, setProvisionalCurrentPage] = useState(1);
+  const [provisionalPageSize] = useState(10);
+  const [provisionalTotalPages, setProvisionalTotalPages] = useState(1);
+  const [provisionalTotalCount, setProvisionalTotalCount] = useState(0);
   const [provisionalLoading, setProvisionalLoading] = useState(false);
   const [provisionalQuery, setProvisionalQuery] = useState<string>('');
   const [actionLoading, setActionLoading] = useState<Record<string, boolean>>({});
@@ -53,6 +60,16 @@ export default function Patients() {
     fetchPanels();
   }, [clinicId]);
 
+  useEffect(() => {
+    if (activeTab !== 'patients') return;
+    setCurrentPage(1);
+  }, [searchTerm, activeTab]);
+
+  useEffect(() => {
+    if (activeTab !== 'provisional') return;
+    setProvisionalCurrentPage(1);
+  }, [provisionalQuery, activeTab]);
+
   // Debounced main search (patients_clinic) OR fetch all patients
   useEffect(() => {
     if (activeTab === 'provisional') return; // patients fetch handled below
@@ -67,16 +84,22 @@ export default function Patients() {
         setLoading(true);
         setError(null);
         try {
-          if (searchTerm.trim()) {
-            // Search mode
-            const rows = await searchClinicPatients(clinicId, searchTerm);
-            setPatients(rows);
-          } else {
-            // Fetch all patients for the clinic
-            const response = await getAllPatients({ clinic_id: clinicId });
-            const allPatients = response.data?.data || [];
-            setPatients(allPatients);
+          const response = await getAllPatients({
+            clinic_id: clinicId,
+            search: searchTerm.trim() || undefined,
+            page: currentPage,
+            limit: pageSize,
+          });
+          const rows = response.data?.data || [];
+          const pagination = response.data?.pagination || {};
+          const pages = pagination.pages || 1;
+          if (currentPage > pages) {
+            setCurrentPage(pages);
+            return;
           }
+          setPatients(rows);
+          setTotalPages(pages);
+          setTotalPatients(pagination.total || 0);
         } catch (e) {
           console.error(e);
           setError('Failed to fetch patients.');
@@ -88,7 +111,7 @@ export default function Patients() {
     }, 300); // Debounce time
 
     return () => clearTimeout(t);
-  }, [searchTerm, clinicId, refreshTrigger.current]);
+  }, [activeTab, searchTerm, clinicId, currentPage, pageSize, refreshTrigger.current]);
 
   // Fetch provisional appointments for clinic when provisional tab active
   useEffect(() => {
@@ -97,8 +120,16 @@ export default function Patients() {
     (async () => {
       try {
         setProvisionalLoading(true);
-        const resp = await getClinicAppointments(clinicId, { provisional: true });
+        const resp = await getClinicAppointments(clinicId, {
+          provisional: true,
+          page: provisionalCurrentPage,
+          limit: provisionalPageSize,
+          search: provisionalQuery.trim() || undefined,
+        });
         const appts = resp.data?.data || [];
+        const pagination = resp.data?.pagination || {};
+        const pages = pagination.pages || 1;
+        const total = pagination.total || 0;
 
         // Use backend-provided `doctor_name` when present; otherwise derive from populated `doctor_id` or fallback to placeholder
         const resolved = appts.map((a: any) => {
@@ -110,7 +141,15 @@ export default function Patients() {
           return { ...a, doctor_name };
         });
 
-        if (mounted) setProvisionalAppointments(resolved);
+        if (mounted) {
+          if (provisionalCurrentPage > pages) {
+            setProvisionalCurrentPage(pages);
+            return;
+          }
+          setProvisionalAppointments(resolved);
+          setProvisionalTotalPages(pages);
+          setProvisionalTotalCount(total);
+        }
       } catch (e) {
         console.error('Failed to fetch provisional appointments', e);
       } finally {
@@ -118,7 +157,7 @@ export default function Patients() {
       }
     })();
     return () => { mounted = false; };
-  }, [activeTab, clinicId, refreshTrigger.current]);
+  }, [activeTab, clinicId, provisionalCurrentPage, provisionalPageSize, provisionalQuery, refreshTrigger.current]);
 
   const handleSuccess = () => {
     setAddOpen(false);
@@ -195,13 +234,41 @@ export default function Patients() {
             </div>
 
             {activeTab === 'patients' && (
-              <PatientList 
-                onBookAppointment={handleOpenBookAppointmentModal} 
-                searchTerm={searchTerm} 
-                loading={loading} 
-                error={error} 
-                patients={patients}
-              />
+              <>
+                <PatientList 
+                  onBookAppointment={handleOpenBookAppointmentModal} 
+                  searchTerm={searchTerm} 
+                  loading={loading} 
+                  error={error} 
+                  patients={patients}
+                  totalCount={totalPatients}
+                />
+                {!loading && !error && (
+                  <div className="mt-4 flex flex-col gap-3 border-t border-slate-200 pt-4 sm:flex-row sm:items-center sm:justify-between">
+                    <p className="text-sm text-slate-600">
+                      Showing page {currentPage} of {totalPages} ({totalPatients} patients)
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                        disabled={currentPage <= 1}
+                        className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        Previous
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                        disabled={currentPage >= totalPages}
+                        className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        Next
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </>
             )}
 
             {activeTab === 'provisional' && (
@@ -235,18 +302,7 @@ export default function Patients() {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-200">
-                        {provisionalAppointments
-                          .filter((a: any) => {
-                            if (!provisionalQuery.trim()) return true;
-                            const q = provisionalQuery.toLowerCase();
-                            return (
-                              (a.full_name || '').toLowerCase().includes(q) ||
-                              (a.appointment_date || '').toLowerCase().includes(q) ||
-                              (a.appointment_time || '').toLowerCase().includes(q) ||
-                              (a.contact_number || '').toLowerCase().includes(q)
-                            );
-                          })
-                          .map((a: any) => (
+                        {provisionalAppointments.map((a: any) => (
                           <tr key={a._id} className="hover:bg-sky-50">
                             <td className="px-4 py-3">{a.appointment_date}</td>
                             <td className="px-4 py-3">{a.appointment_time}</td>
@@ -320,8 +376,7 @@ export default function Patients() {
                                           setActionLoading(prev => ({ ...prev, [a._id]: true }));
                                           await deleteAppointment(a._id);
                                           toast.success('Appointment deleted');
-                                          const resp = await getClinicAppointments(clinicId!, { provisional: true });
-                                          setProvisionalAppointments(resp.data?.data || []);
+                                          refreshTrigger.current += 1;
                                         } catch (err) {
                                           console.error(err);
                                           toast.error('Failed to delete appointment');
@@ -344,6 +399,31 @@ export default function Patients() {
                         ))}
                       </tbody>
                     </table>
+                    {!provisionalLoading && (
+                      <div className="flex flex-col gap-3 border-t border-slate-200 bg-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                        <p className="text-sm text-slate-600">
+                          Showing page {provisionalCurrentPage} of {provisionalTotalPages} ({provisionalTotalCount} provisional appointments)
+                        </p>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setProvisionalCurrentPage((p) => Math.max(1, p - 1))}
+                            disabled={provisionalCurrentPage <= 1}
+                            className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            Previous
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setProvisionalCurrentPage((p) => Math.min(provisionalTotalPages, p + 1))}
+                            disabled={provisionalCurrentPage >= provisionalTotalPages}
+                            className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            Next
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

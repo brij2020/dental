@@ -210,7 +210,7 @@ exports.getBookedSlots = async (req, res) => {
 exports.getByClinic = async (req, res) => {
   try {
     const { clinic_id } = req.params;
-    const { status, doctorId, patientId, startDate, endDate, date, search, provisional, appointment_type } = req.query;
+    const { status, doctorId, patientId, startDate, endDate, date, search, provisional, appointment_type, page, limit } = req.query;
 
     if (!clinic_id) {
       return res.status(400).json({
@@ -265,6 +265,22 @@ exports.getByClinic = async (req, res) => {
       });
     }
 
+    if (page !== undefined && (!Number.isInteger(Number(page)) || Number(page) < 1)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid page. Expected a positive integer',
+        code: 'INVALID_PAGE',
+      });
+    }
+
+    if (limit !== undefined && (!Number.isInteger(Number(limit)) || Number(limit) < 1)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid limit. Expected a positive integer',
+        code: 'INVALID_LIMIT',
+      });
+    }
+
     const filters = {
       status: status || undefined,
       doctorId: doctorId || undefined,
@@ -275,18 +291,24 @@ exports.getByClinic = async (req, res) => {
       search: search || undefined,
       provisional: provisional || undefined,
       appointment_type: appointment_type || undefined,
+      page: page || undefined,
+      limit: limit || undefined,
     };
 
     // Remove undefined filters
     Object.keys(filters).forEach(key => filters[key] === undefined && delete filters[key]);
 
-    const appointments = await AppointmentService.getAppointmentsByClinic(clinic_id, filters);
+    const result = await AppointmentService.getAppointmentsByClinic(clinic_id, filters);
+    const appointments = Array.isArray(result) ? result : (result?.data || []);
+    const pagination = Array.isArray(result) ? undefined : result?.pagination;
 
-    return res.status(200).json({
+    const payload = {
       success: true,
       data: appointments,
       message: `Retrieved ${appointments.length} appointment(s)`,
-    });
+    };
+    if (pagination) payload.pagination = pagination;
+    return res.status(200).json(payload);
   } catch (error) {
     console.error('Error fetching appointments:', error);
     return res.status(500).json({

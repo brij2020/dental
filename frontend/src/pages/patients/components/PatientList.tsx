@@ -11,10 +11,11 @@ type Props = {
   loading: boolean;
   error: string | null;
   patients: ClinicPatientRow[];
+  totalCount?: number;
   onBookAppointment: (patient: ClinicPatientRow) => void;
 };
 
-export default function PatientList({ searchTerm, loading, error, patients, onBookAppointment }: Props) {
+export default function PatientList({ searchTerm, loading, error, patients, totalCount, onBookAppointment }: Props) {
   const [sortBy, setSortBy] = useState<SortBy>('name');
   const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
   const [sortedPatients, setSortedPatients] = useState<ClinicPatientRow[]>([]);
@@ -144,7 +145,7 @@ export default function PatientList({ searchTerm, loading, error, patients, onBo
                 </div>
 
                 <span className="text-xs text-slate-500">
-                  ({sortedPatients.length} patient{sortedPatients.length !== 1 ? 's' : ''})
+                  ({totalCount ?? sortedPatients.length} patient{(totalCount ?? sortedPatients.length) !== 1 ? 's' : ''} total)
                 </span>
               </div>
 

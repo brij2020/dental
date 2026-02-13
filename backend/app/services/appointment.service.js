@@ -29,9 +29,16 @@ class AppointmentService {
   static async getAppointmentsByClinic(clinicId, filters = {}) {
     const query = { clinic_id: clinicId };
     
-    // Search by appointment_uid if provided
+    // Search by appointment fields if provided
     if (filters.search) {
-      query.appointment_uid = { $regex: filters.search.trim(), $options: 'i' }; // Case-insensitive search
+      const rx = { $regex: filters.search.trim(), $options: 'i' };
+      query.$or = [
+        { appointment_uid: rx },
+        { full_name: rx },
+        { contact_number: rx },
+        { appointment_date: rx },
+        { appointment_time: rx },
+      ];
     } else if (filters.date) {
       // Filter by specific date if provided (and no search term)
       query.appointment_date = filters.date;
@@ -48,6 +55,33 @@ class AppointmentService {
       query.appointment_date = {};
       if (filters.startDate) query.appointment_date.$gte = filters.startDate;
       if (filters.endDate) query.appointment_date.$lte = filters.endDate;
+    }
+
+    const hasPagination = filters.page !== undefined || filters.limit !== undefined;
+
+    if (hasPagination) {
+      const page = Math.max(1, parseInt(filters.page, 10) || 1);
+      const limit = Math.max(1, parseInt(filters.limit, 10) || 10);
+      const skip = (page - 1) * limit;
+
+      const [appointments, total] = await Promise.all([
+        Appointment.find(query)
+          .sort({ appointment_date: -1, appointment_time: 1 })
+          .skip(skip)
+          .limit(limit)
+          .populate('doctor_id', 'full_name'),
+        Appointment.countDocuments(query),
+      ]);
+
+      return {
+        data: appointments,
+        pagination: {
+          total,
+          page,
+          limit,
+          pages: Math.ceil(total / limit),
+        },
+      };
     }
 
     return await Appointment.find(query).sort({ appointment_time: 1 }).populate('doctor_id', 'full_name');
