@@ -1,4 +1,4 @@
-import React, { useState, useEffect, type FormEvent, useCallback } from 'react';
+import React, { useState, useEffect, type FormEvent, useCallback, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import {
@@ -17,6 +17,8 @@ import {
 } from '@tabler/icons-react';
 import { remedyAPI } from '../../../lib/remedyAPI';
 import { useAuth } from '../../../state/useAuth';
+import TablePagination from '../../../components/TablePagination';
+import TableOverlayLoader from '../../../components/TableOverlayLoader';
 
 // --- Types ---
 type Remedy = {
@@ -50,28 +52,54 @@ const newFormState = (): RemedyFormData => ({
 // --- Main Panel Component ---
 export default function RemediesPanel() {
   const { user } = useAuth();
+  const PAGE_SIZE = 10;
   const [remedies, setRemedies] = useState<Remedy[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isPageLoading, setIsPageLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<'add' | 'edit'>('add');
   const [formData, setFormData] = useState<RemedyFormData | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const hasFetchedOnceRef = useRef(false);
 
   // Fetch remedies for the user's clinic
   const fetchRemedies = useCallback(async () => {
     if (!user?.clinic_id) return;
 
-    setIsLoading(true);
+    const useFullPageLoader = !hasFetchedOnceRef.current;
+    if (useFullPageLoader) {
+      setIsLoading(true);
+    } else {
+      setIsPageLoading(true);
+    }
     try {
-      const data = await remedyAPI.getByClinic(user.clinic_id);
-      setRemedies(data || []);
+      const response = await remedyAPI.getByClinic(user.clinic_id, {
+        page: currentPage,
+        limit: PAGE_SIZE,
+      });
+      const pageData = response?.data || [];
+      const pagination = response?.pagination;
+      setRemedies(pageData);
+      setTotalItems(pagination?.total ?? pageData.length);
+      setTotalPages(Math.max(1, pagination?.pages ?? 1));
     } catch (error) {
       toast.error('Failed to fetch remedies.');
       console.error(error);
       setRemedies([]);
+      setTotalItems(0);
+      setTotalPages(1);
+    } finally {
+      if (useFullPageLoader) {
+        setIsLoading(false);
+      } else {
+        setIsPageLoading(false);
+      }
+      hasFetchedOnceRef.current = true;
     }
-    setIsLoading(false);
-  }, [user?.clinic_id]);
+  }, [PAGE_SIZE, currentPage, user?.clinic_id]);
 
   // Initial data fetch
   useEffect(() => {
@@ -132,7 +160,7 @@ export default function RemediesPanel() {
       }
 
       toast.success(`Remedy successfully ${modalMode === 'add' ? 'added' : 'updated'}!`);
-      fetchRemedies();
+      await fetchRemedies();
       handleCloseModal();
     } catch (error: any) {
       if (error.response?.status === 409) {
@@ -152,7 +180,11 @@ export default function RemediesPanel() {
     try {
       await remedyAPI.delete(remedy._id);
       toast.success('Remedy deleted.');
-      fetchRemedies();
+      if (remedies.length === 1 && currentPage > 1) {
+        setCurrentPage(prev => prev - 1);
+      } else {
+        await fetchRemedies();
+      }
     } catch (error: any) {
       toast.error(`Failed to delete remedy. ${error.response?.data?.message || error.message}`);
     }
@@ -188,7 +220,7 @@ export default function RemediesPanel() {
 
         {/* --- Table --- */}
         <div className="mt-6 border border-slate-200 rounded-lg overflow-hidden">
-          <div className="overflow-x-auto">
+          <div className="relative overflow-x-auto">
             <table className="min-w-full divide-y divide-slate-200">
               <thead className="bg-slate-50">
                 <tr>
@@ -236,8 +268,21 @@ export default function RemediesPanel() {
                 ))}
               </tbody>
             </table>
+            {isPageLoading && (
+              <TableOverlayLoader />
+            )}
           </div>
         </div>
+        {!isLoading && (
+          <TablePagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalItems={totalItems}
+            pageSize={PAGE_SIZE}
+            isLoading={isPageLoading}
+            onPageChange={setCurrentPage}
+          />
+        )}
       </div>
 
       {/* --- Add/Edit Modal --- */}

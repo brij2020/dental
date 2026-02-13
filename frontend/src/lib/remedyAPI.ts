@@ -4,9 +4,14 @@ const REMEDIES_ENDPOINT = '/api/remedies';
 
 export const remedyAPI = {
   // Get all remedies for a clinic
-  getByClinic: async (clinicId: string) => {
-    const response = await apiClient.get(`${REMEDIES_ENDPOINT}/clinic/${clinicId}`);
-    return response.data.data;
+  getByClinic: async (clinicId: string, options?: { page?: number; limit?: number }) => {
+    const response = await apiClient.get(`${REMEDIES_ENDPOINT}/clinic/${clinicId}`, {
+      params: {
+        page: options?.page,
+        limit: options?.limit,
+      },
+    });
+    return response.data;
   },
 
   // Get all remedies (optionally filtered)

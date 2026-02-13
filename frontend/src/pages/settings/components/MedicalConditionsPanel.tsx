@@ -1,9 +1,8 @@
-import  { useState, useEffect, type FormEvent, useCallback } from 'react';
+import  { useState, useEffect, type FormEvent, useCallback, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import {
   IconChevronLeft,
-  IconChevronRight,
   IconPlus,
   IconPencil,
   IconTrash,
@@ -20,6 +19,8 @@ import {
   updateMedicalCondition,
   deleteMedicalCondition,
 } from '../../../lib/apiClient';
+import TablePagination from '../../../components/TablePagination';
+import TableOverlayLoader from '../../../components/TableOverlayLoader';
 
 // --- Types ---
 type MedicalCondition = {
@@ -45,6 +46,7 @@ export default function MedicalConditionsPanel() {
   const PAGE_SIZE = 10;
   const [conditions, setConditions] = useState<MedicalCondition[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isPageLoading, setIsPageLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<'add' | 'edit'>('add');
@@ -52,13 +54,19 @@ export default function MedicalConditionsPanel() {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
+  const hasFetchedOnceRef = useRef(false);
 
   // Fetch conditions FOR THE USER'S CLINIC
 
   const fetchConditions = useCallback(async () => {
     if (!user) return;
 
-    setIsLoading(true);
+    const useFullPageLoader = !hasFetchedOnceRef.current;
+    if (useFullPageLoader) {
+      setIsLoading(true);
+    } else {
+      setIsPageLoading(true);
+    }
     try {
       const clinicId = user.role === 'super_admin' ? 'system' : user.clinic_id;
       if (!clinicId) {
@@ -82,7 +90,12 @@ export default function MedicalConditionsPanel() {
       toast.error('Failed to fetch medical conditions.');
       console.error(error);
     } finally {
-      setIsLoading(false);
+      if (useFullPageLoader) {
+        setIsLoading(false);
+      } else {
+        setIsPageLoading(false);
+      }
+      hasFetchedOnceRef.current = true;
     }
   }, [PAGE_SIZE, currentPage, user]);
 
@@ -169,9 +182,6 @@ export default function MedicalConditionsPanel() {
     }
   };
 
-  const startItem = totalItems === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1;
-  const endItem = totalItems === 0 ? 0 : Math.min(currentPage * PAGE_SIZE, totalItems);
-  
   return (
     <div>
       <Link to="/settings" className="flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-slate-900 mb-4">
@@ -198,7 +208,7 @@ export default function MedicalConditionsPanel() {
 
         {/* --- Table --- */}
         <div className="mt-6 border border-slate-200 rounded-lg overflow-hidden">
-          <div className="overflow-x-auto">
+          <div className="relative overflow-x-auto">
             <table className="min-w-full divide-y divide-slate-200">
               <thead className="bg-slate-50">
                 <tr>
@@ -248,35 +258,20 @@ export default function MedicalConditionsPanel() {
                 ))}
               </tbody>
             </table>
+            {isPageLoading && (
+              <TableOverlayLoader />
+            )}
           </div>
         </div>
-        {!isLoading && totalItems > 0 && (
-          <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-sm text-slate-600">
-              Showing {startItem}-{endItem} of {totalItems}
-            </p>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                disabled={currentPage === 1}
-                className="inline-flex items-center gap-1 rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                <IconChevronLeft className="h-4 w-4" />
-                Prev
-              </button>
-              <span className="text-sm text-slate-600">
-                Page {currentPage} of {totalPages}
-              </span>
-              <button
-                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                disabled={currentPage >= totalPages}
-                className="inline-flex items-center gap-1 rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                Next
-                <IconChevronRight className="h-4 w-4" />
-              </button>
-            </div>
-          </div>
+        {!isLoading && (
+          <TablePagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalItems={totalItems}
+            pageSize={PAGE_SIZE}
+            isLoading={isPageLoading}
+            onPageChange={setCurrentPage}
+          />
         )}
       </div>
 

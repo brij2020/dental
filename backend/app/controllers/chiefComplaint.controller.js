@@ -4,9 +4,50 @@ const logger = require("../config/logger");
 exports.getAllChiefComplaints = async (req, res) => {
   try {
     const { clinic_id } = req.user;
+    const { page, limit } = req.query;
 
-    const complaints = await ChiefComplaint.find({ clinic_id })
-      .sort({ created_at: -1 });
+    if (page !== undefined && (!Number.isInteger(Number(page)) || Number(page) < 1)) {
+      return res.status(400).json({
+        status: "error",
+        message: "Invalid page. Expected a positive integer",
+        code: "INVALID_PAGE",
+      });
+    }
+
+    if (limit !== undefined && (!Number.isInteger(Number(limit)) || Number(limit) < 1)) {
+      return res.status(400).json({
+        status: "error",
+        message: "Invalid limit. Expected a positive integer",
+        code: "INVALID_LIMIT",
+      });
+    }
+
+    const query = { clinic_id };
+    const hasPagination = page !== undefined || limit !== undefined;
+    if (hasPagination) {
+      const pageNum = Math.max(1, parseInt(page, 10) || 1);
+      const limitNum = Math.max(1, parseInt(limit, 10) || 10);
+      const skip = (pageNum - 1) * limitNum;
+
+      const [complaints, total] = await Promise.all([
+        ChiefComplaint.find(query).sort({ created_at: -1 }).skip(skip).limit(limitNum),
+        ChiefComplaint.countDocuments(query),
+      ]);
+
+      return res.status(200).json({
+        status: "success",
+        message: "Chief complaints retrieved successfully",
+        data: complaints,
+        pagination: {
+          total,
+          page: pageNum,
+          limit: limitNum,
+          pages: Math.ceil(total / limitNum),
+        },
+      });
+    }
+
+    const complaints = await ChiefComplaint.find(query).sort({ created_at: -1 });
 
     return res.status(200).json({
       status: "success",
@@ -25,10 +66,7 @@ exports.getAllChiefComplaints = async (req, res) => {
 
 exports.getAllChiefComplaintsPublic = async (req, res) => {
   try {
-    const { clinic_id } = req.user;
-
-    const complaints = await ChiefComplaint.find({  })
-      .sort({ created_at: -1 });
+    const complaints = await ChiefComplaint.find({}).sort({ created_at: -1 });
 
     return res.status(200).json({
       status: "success",

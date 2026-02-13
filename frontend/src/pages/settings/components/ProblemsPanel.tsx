@@ -1,4 +1,4 @@
-import React, { useState, useEffect, type FormEvent, useCallback } from 'react';
+import React, { useState, useEffect, type FormEvent, useCallback, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import {
@@ -19,6 +19,8 @@ import {
   deleteProblem,
 } from '../../../lib/apiClient';
 import { useAuth } from '../../../state/useAuth';
+import TablePagination from '../../../components/TablePagination';
+import TableOverlayLoader from '../../../components/TableOverlayLoader';
 
 // --- Types ---
 type Problem = {
@@ -58,12 +60,18 @@ const newFormState = (): ProblemFormData => ({
 // --- Main Panel Component ---
 export default function ProblemsPanel() {
   const { user } = useAuth();
+  const PAGE_SIZE = 10;
   const [problems, setProblems] = useState<Problem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isPageLoading, setIsPageLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<'add' | 'edit'>('add');
   const [formData, setFormData] = useState<ProblemFormData | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const hasFetchedOnceRef = useRef(false);
 
   // Sorting state
   const [sortColumn, setSortColumn] = useState<'clinical_findings' | 'severity' | 'icd10_code'>('clinical_findings');
@@ -73,20 +81,38 @@ export default function ProblemsPanel() {
   const fetchProblems = useCallback(async () => {
     if (!user?.clinic_id) return;
 
-    setIsLoading(true);
+    const useFullPageLoader = !hasFetchedOnceRef.current;
+    if (useFullPageLoader) {
+      setIsLoading(true);
+    } else {
+      setIsPageLoading(true);
+    }
     try {
-      const response = await getProblems();
+      const response = await getProblems({ page: currentPage, limit: PAGE_SIZE });
       if (response.data.status === 'success') {
-        setProblems(response.data.data);
+        const pageData = response.data.data || [];
+        const pagination = response.data.pagination;
+        setProblems(pageData);
+        setTotalItems(pagination?.total ?? pageData.length);
+        setTotalPages(Math.max(1, pagination?.pages ?? 1));
       } else {
         toast.error('Failed to fetch problems.');
       }
     } catch (error) {
       toast.error('Failed to fetch problems.');
       console.error(error);
+      setProblems([]);
+      setTotalItems(0);
+      setTotalPages(1);
+    } finally {
+      if (useFullPageLoader) {
+        setIsLoading(false);
+      } else {
+        setIsPageLoading(false);
+      }
+      hasFetchedOnceRef.current = true;
     }
-    setIsLoading(false);
-  }, [user?.clinic_id]);
+  }, [PAGE_SIZE, currentPage, user?.clinic_id]);
 
   // Initial data fetch
   useEffect(() => {
@@ -200,7 +226,7 @@ export default function ProblemsPanel() {
         toast.success(
           `Problem successfully ${modalMode === 'add' ? 'added' : 'updated'}!`
         );
-        fetchProblems();
+        await fetchProblems();
         handleCloseModal();
       } else {
         toast.error(`Failed to save problem. ${response.data.message}`);
@@ -224,7 +250,11 @@ export default function ProblemsPanel() {
       const response = await deleteProblem(problem._id);
       if (response.data.status === 'success') {
         toast.success('Problem deleted successfully.');
-        fetchProblems();
+        if (problems.length === 1 && currentPage > 1) {
+          setCurrentPage(prev => prev - 1);
+        } else {
+          await fetchProblems();
+        }
       } else {
         toast.error(`Failed to delete problem. ${response.data.message}`);
       }
@@ -266,7 +296,7 @@ export default function ProblemsPanel() {
 
         {/* --- Table --- */}
         <div className="mt-6 border border-slate-200 rounded-lg overflow-hidden">
-          <div className="overflow-x-auto">
+          <div className="relative overflow-x-auto">
             <table className="min-w-full divide-y divide-slate-200">
               <thead className="bg-slate-50">
                 <tr>
@@ -370,8 +400,19 @@ export default function ProblemsPanel() {
                   ))}
               </tbody>
             </table>
+            {isPageLoading && <TableOverlayLoader />}
           </div>
         </div>
+        {!isLoading && (
+          <TablePagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalItems={totalItems}
+            pageSize={PAGE_SIZE}
+            isLoading={isPageLoading}
+            onPageChange={setCurrentPage}
+          />
+        )}
       </div>
 
       {/* --- Add/Edit Modal --- */}

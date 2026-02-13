@@ -752,8 +752,15 @@ export const deleteConsultation = async (id: string): Promise<AxiosResponse<any>
 /**
  * Get all problems for a clinic
  */
-export const getProblems = async (): Promise<AxiosResponse<any>> => {
-  return get('/api/problems');
+export const getProblems = async (
+  options?: { page?: number; limit?: number }
+): Promise<AxiosResponse<any>> => {
+  return get('/api/problems', {
+    params: {
+      page: options?.page,
+      limit: options?.limit,
+    },
+  });
 };
 
 /**
@@ -792,8 +799,15 @@ export const deleteProblem = async (id: string): Promise<AxiosResponse<any>> => 
 /**
  * Get all chief complaints for a clinic
  */
-export const getChiefComplaints = async (): Promise<AxiosResponse<any>> => {
-  return get('/api/chief-complaints');
+export const getChiefComplaints = async (
+  options?: { page?: number; limit?: number }
+): Promise<AxiosResponse<any>> => {
+  return get('/api/chief-complaints', {
+    params: {
+      page: options?.page,
+      limit: options?.limit,
+    },
+  });
 };
 
 /**
@@ -814,7 +828,7 @@ export const createChiefComplaint = async (data: any): Promise<AxiosResponse<any
  * Update chief complaint
  */
 export const updateChiefComplaint = async (id: string, data: any): Promise<AxiosResponse<any>> => {
-  return put(`/api/chief-complaints/${id}`);
+  return put(`/api/chief-complaints/${id}`, data);
 };
 
 /**

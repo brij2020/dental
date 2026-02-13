@@ -59,13 +59,36 @@ exports.findByClinicAndName = async (clinic_id, name) => {
 };
 
 // Get all remedies for a clinic, including global remedies
-exports.findByClinicId = async (clinic_id) => {
+exports.findByClinicId = async (clinic_id, filters = {}) => {
   try {
     // Return both global and clinic-specific remedies
-    if(clinic_id!='system'){
-      return await Remedy.find({ clinic_id: { $in: [clinic_id, 'system'] } }).sort({ name: 1 });
+    const query = clinic_id !== 'system'
+      ? { clinic_id: { $in: [clinic_id, 'system'] } }
+      : { clinic_id };
+
+    const hasPagination = filters.page !== undefined || filters.limit !== undefined;
+    if (hasPagination) {
+      const page = Math.max(1, parseInt(filters.page, 10) || 1);
+      const limit = Math.max(1, parseInt(filters.limit, 10) || 10);
+      const skip = (page - 1) * limit;
+
+      const [data, total] = await Promise.all([
+        Remedy.find(query).sort({ name: 1 }).skip(skip).limit(limit),
+        Remedy.countDocuments(query),
+      ]);
+
+      return {
+        data,
+        pagination: {
+          total,
+          page,
+          limit,
+          pages: Math.ceil(total / limit),
+        },
+      };
     }
-    return await Remedy.find({ clinic_id}).sort({ name: 1 });
+
+    return await Remedy.find(query).sort({ name: 1 });
   } catch (error) {
     logger.error("Error finding remedies by clinic ID:", error);
     throw error;

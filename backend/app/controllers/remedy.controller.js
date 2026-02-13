@@ -72,9 +72,35 @@ exports.findOne = async (req, res) => {
 // GET /api/remedies/clinic/:clinic_id - Get all remedies for a clinic
 exports.findByClinicId = async (req, res) => {
   try {
-    const remedies = await remedyService.findByClinicId(req.params.clinic_id);
+    const { page, limit } = req.query;
 
-    res.status(200).send({ success: true, data: remedies });
+    if (page !== undefined && (!Number.isInteger(Number(page)) || Number(page) < 1)) {
+      return res.status(400).send({
+        success: false,
+        message: "Invalid page. Expected a positive integer",
+        code: "INVALID_PAGE",
+      });
+    }
+
+    if (limit !== undefined && (!Number.isInteger(Number(limit)) || Number(limit) < 1)) {
+      return res.status(400).send({
+        success: false,
+        message: "Invalid limit. Expected a positive integer",
+        code: "INVALID_LIMIT",
+      });
+    }
+
+    const result = await remedyService.findByClinicId(req.params.clinic_id, {
+      page: page || undefined,
+      limit: limit || undefined,
+    });
+    const remedies = Array.isArray(result) ? result : (result?.data || []);
+    const pagination = Array.isArray(result) ? undefined : result?.pagination;
+
+    const payload = { success: true, data: remedies };
+    if (pagination) payload.pagination = pagination;
+
+    res.status(200).send(payload);
   } catch (err) {
     logger.error("Error fetching remedies by clinic:", err);
     res.status(500).send({ message: err.message });

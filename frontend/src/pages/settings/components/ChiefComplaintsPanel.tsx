@@ -1,4 +1,4 @@
-import React, { useState, useEffect, type FormEvent, useCallback } from 'react';
+import React, { useState, useEffect, type FormEvent, useCallback, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import {
@@ -17,6 +17,8 @@ import {
   deleteChiefComplaint,
 } from '../../../lib/apiClient';
 import { useAuth } from '../../../state/useAuth';
+import TablePagination from '../../../components/TablePagination';
+import TableOverlayLoader from '../../../components/TableOverlayLoader';
 
 type ChiefComplaint = {
   _id: string;
@@ -42,31 +44,55 @@ const newFormState = (): ChiefComplaintFormData => ({
 
 export default function ChiefComplaintsPanel() {
   const { user } = useAuth();
+  const PAGE_SIZE = 10;
   const [complaints, setComplaints] = useState<ChiefComplaint[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isPageLoading, setIsPageLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<'add' | 'edit'>('add');
   const [formData, setFormData] = useState<ChiefComplaintFormData | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const hasFetchedOnceRef = useRef(false);
 
   const fetchComplaints = useCallback(async () => {
     if (!user?.clinic_id) return;
 
-    setIsLoading(true);
+    const useFullPageLoader = !hasFetchedOnceRef.current;
+    if (useFullPageLoader) {
+      setIsLoading(true);
+    } else {
+      setIsPageLoading(true);
+    }
+
     try {
-      const response = await getChiefComplaints();
+      const response = await getChiefComplaints({ page: currentPage, limit: PAGE_SIZE });
       if (response.data.status === 'success') {
-        setComplaints(response.data.data || []);
+        const pageData = response.data.data || [];
+        const pagination = response.data.pagination;
+        setComplaints(pageData);
+        setTotalItems(pagination?.total ?? pageData.length);
+        setTotalPages(Math.max(1, pagination?.pages ?? 1));
       } else {
         toast.error('Failed to fetch chief complaints.');
       }
     } catch (error) {
       toast.error('Failed to fetch chief complaints.');
       console.error(error);
+      setComplaints([]);
+      setTotalItems(0);
+      setTotalPages(1);
     } finally {
-      setIsLoading(false);
+      if (useFullPageLoader) {
+        setIsLoading(false);
+      } else {
+        setIsPageLoading(false);
+      }
+      hasFetchedOnceRef.current = true;
     }
-  }, [user?.clinic_id]);
+  }, [PAGE_SIZE, currentPage, user?.clinic_id]);
 
   useEffect(() => {
     fetchComplaints();
@@ -148,7 +174,11 @@ export default function ChiefComplaintsPanel() {
     try {
       const response = await deleteChiefComplaint(complaint._id);
       if (response.data.status === 'success') {
-        setComplaints(complaints.filter(c => c._id !== complaint._id));
+        if (complaints.length === 1 && currentPage > 1) {
+          setCurrentPage(prev => prev - 1);
+        } else {
+          await fetchComplaints();
+        }
         toast.success('Chief complaint deleted successfully.');
       } else {
         toast.error(response.data.message || 'Failed to delete chief complaint.');
@@ -183,7 +213,7 @@ export default function ChiefComplaintsPanel() {
         </div>
 
         <div className="mt-6 border border-slate-200 rounded-lg overflow-hidden">
-          <div className="overflow-x-auto">
+          <div className="relative overflow-x-auto">
             <table className="min-w-full divide-y divide-slate-200">
               <thead className="bg-slate-50">
                 <tr>
@@ -233,8 +263,19 @@ export default function ChiefComplaintsPanel() {
                 ))}
               </tbody>
             </table>
+            {isPageLoading && <TableOverlayLoader />}
           </div>
         </div>
+        {!isLoading && (
+          <TablePagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalItems={totalItems}
+            pageSize={PAGE_SIZE}
+            isLoading={isPageLoading}
+            onPageChange={setCurrentPage}
+          />
+        )}
       </div>
 
       {isModalOpen && (
