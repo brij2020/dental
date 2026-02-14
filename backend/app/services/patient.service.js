@@ -19,22 +19,107 @@ exports.createPatient = async (patientData) => {
 /**
  * Get all patients with filters (supports both clinic and global)
  */
+const parseDateOnly = (value) => {
+  if (!value) return null;
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return new Date(parsed.getFullYear(), parsed.getMonth(), parsed.getDate());
+};
+
+const escapeRegex = (value) => {
+  return value.replace(/[-/\\^$*+?.()|[\]{}]/g, "\\$&");
+};
+
 exports.getAllPatients = async (filters = {}) => {
   try {
     const query = {};
 
     // Add optional filters
     if (filters.search) {
-      query.$or = [
-        { full_name: { $regex: filters.search, $options: "i" } },
-        { email: { $regex: filters.search, $options: "i" } },
-        { contact_number: { $regex: filters.search, $options: "i" } },
-        { uhid: { $regex: filters.search, $options: "i" } }
-      ];
+      const searchValue = String(filters.search).trim();
+      if (searchValue.length > 0) {
+        const regex = new RegExp(escapeRegex(searchValue), "i");
+        const orClauses = [
+          { full_name: { $regex: regex } },
+          { email: { $regex: regex } },
+          { contact_number: { $regex: regex } },
+          { uhid: { $regex: regex } },
+        ];
+
+        const parsedDate = parseDateOnly(searchValue);
+        if (parsedDate) {
+          const upperBound = new Date(parsedDate);
+          upperBound.setHours(23, 59, 59, 999);
+          orClauses.push({
+            date_of_birth: { $gte: parsedDate, $lte: upperBound },
+          });
+        }
+
+        const numericAge = Number(searchValue);
+        if (!Number.isNaN(numericAge) && numericAge >= 0 && numericAge <= 120) {
+          const today = new Date();
+          const start = new Date(today);
+          start.setFullYear(start.getFullYear() - numericAge - 1);
+          start.setHours(0, 0, 0, 0);
+          const end = new Date(today);
+          end.setFullYear(end.getFullYear() - numericAge);
+          end.setHours(23, 59, 59, 999);
+          orClauses.push({
+            date_of_birth: { $gte: start, $lte: end },
+          });
+        }
+
+        query.$or = orClauses;
+      }
     }
 
     if (filters.gender) {
       query.gender = filters.gender;
+    }
+
+    if (filters.name) {
+      query.full_name = { $regex: filters.name, $options: "i" };
+    }
+
+    if (filters.dob) {
+      const dobDate = parseDateOnly(filters.dob);
+      if (dobDate) {
+        const start = new Date(dobDate);
+        const end = new Date(dobDate);
+        end.setHours(23, 59, 59, 999);
+        query.date_of_birth = { $gte: start, $lte: end };
+      } else {
+        query.date_of_birth = { $regex: filters.dob, $options: "i" };
+      }
+    }
+
+    if (filters.uhid) {
+      query.uhid = { $regex: filters.uhid, $options: "i" };
+    }
+
+    if (filters.contact_number) {
+      query.contact_number = { $regex: filters.contact_number, $options: "i" };
+    }
+
+    if (filters.registered_from || filters.registered_to) {
+      const createdAtFilter = {};
+      if (filters.registered_from) {
+        const fromDate = parseDateOnly(filters.registered_from);
+        if (fromDate) {
+          createdAtFilter.$gte = fromDate;
+        }
+      }
+      if (filters.registered_to) {
+        const toDate = parseDateOnly(filters.registered_to);
+        if (toDate) {
+          const endDate = new Date(toDate);
+          endDate.setHours(23, 59, 59, 999);
+          createdAtFilter.$lte = endDate;
+        }
+      }
+      if (Object.keys(createdAtFilter).length > 0) {
+        query.createdAt = createdAtFilter;
+      }
     }
 
     if (filters.state) {

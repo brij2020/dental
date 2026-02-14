@@ -66,8 +66,14 @@ exports.findAll = async (req, res) => {
       gender: req.query.gender,
       state: req.query.state,
       city: req.query.city,
+      name: req.query.name,
+      dob: req.query.dob,
+      uhid: req.query.uhid,
+      contact_number: req.query.contact_number,
+      registered_from: req.query.registered_from,
+      registered_to: req.query.registered_to,
       page: parseInt(req.query.page) || 1,
-      limit: parseInt(req.query.limit) || 10,
+      limit: parseInt(req.query.limit) || 25,
       registration_type: registrationType
     };
 

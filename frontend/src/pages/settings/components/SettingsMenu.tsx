@@ -142,6 +142,14 @@ export const SettingsMenu = () => {
       />}
       {isSuperAdmin && (
         <MenuItem
+          title="Patients"
+          description="View and manage registered patients."
+          icon={IconUsersGroup}
+          to="/settings/patients"
+        />
+      )}
+      {isSuperAdmin && (
+        <MenuItem
           title="Clinic Panels"
           description="Manage clinic panel associations."
           icon={IconBuildingHospital}
