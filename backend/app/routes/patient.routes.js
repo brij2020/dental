@@ -26,6 +26,9 @@ module.exports = app => {
   // Get current authenticated patient
   router.get("/me", verifyToken, patient.me);
 
+  // Get clinic-related patients (clinic registrations + visited patients)
+  router.get("/clinic-related", verifyToken, patient.findClinicRelated);
+
   // Get patient by ID
   router.get("/:id", verifyToken, patient.findOne);
 

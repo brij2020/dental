@@ -1,6 +1,6 @@
 const { logger } = require("../config/logger");
 const Patient = require("../models/patient.model");
-const generateUhid  = require("../util/generateUhid");
+const Appointment = require("../models/appointment.model");
 /**
  * Create a new patient
  */
@@ -162,6 +162,134 @@ exports.getAllPatients = async (filters = {}) => {
     };
   } catch (error) {
     logger.error(`Error retrieving patients: ${error.message}`);
+    throw error;
+  }
+};
+
+exports.getClinicRelatedPatients = async (filters = {}) => {
+  try {
+    const clinicId = filters.clinic_id;
+    if (!clinicId) {
+      throw new Error("clinic_id is required");
+    }
+
+    const page = Number(filters.page) || 1;
+    const limit = Number(filters.limit) || 25;
+    const skip = (page - 1) * limit;
+
+    const appointmentPipeline = [
+      {
+        $match: {
+          clinic_id: clinicId,
+          file_number: { $exists: true, $ne: null }
+        }
+      },
+      { $sort: { createdAt: -1 } },
+      {
+        $group: {
+          _id: "$patient_id",
+          file_number: { $first: "$file_number" },
+          visitedAt: { $first: "$createdAt" }
+        }
+      }
+    ];
+
+    const appointmentRecords = await Appointment.aggregate(appointmentPipeline);
+    const appointmentPatientIds = appointmentRecords
+      .map((record) => (record._id ? String(record._id) : null))
+      .filter(Boolean);
+
+    const fileNumberByPatientId = new Map(
+      appointmentRecords.map((record) => [String(record._id), record.file_number || null])
+    );
+
+    const baseConditions = [
+      { clinic_id: clinicId, registration_type: "clinic" }
+    ];
+
+    if (appointmentPatientIds.length > 0) {
+      baseConditions.push({ _id: { $in: appointmentPatientIds } });
+    }
+
+    if (baseConditions.length === 0) {
+      return {
+        data: [],
+        pagination: {
+          total: 0,
+          page,
+          limit,
+          pages: 0
+        }
+      };
+    }
+
+    const searchTerm = filters.search ? String(filters.search).trim() : "";
+    const searchClauses = [];
+
+    if (searchTerm) {
+      const regex = new RegExp(escapeRegex(searchTerm), "i");
+      searchClauses.push({ full_name: { $regex: regex } });
+      searchClauses.push({ uhid: { $regex: regex } });
+      searchClauses.push({ contact_number: { $regex: regex } });
+
+      const lowerSearchTerm = searchTerm.toLowerCase();
+      const matchingFilePatients = appointmentRecords
+        .filter((record) => record.file_number && record.file_number.toLowerCase().includes(lowerSearchTerm))
+        .map((record) => String(record._id));
+
+      if (matchingFilePatients.length > 0) {
+        searchClauses.push({ _id: { $in: matchingFilePatients } });
+      }
+    }
+
+    const baseFilter = { $or: baseConditions };
+    let query;
+
+    if (searchClauses.length > 0) {
+      query = {
+        $and: [
+          baseFilter,
+          { $or: searchClauses }
+        ]
+      };
+    } else {
+      query = baseFilter;
+    }
+
+    const [total, patients] = await Promise.all([
+      Patient.countDocuments(query),
+      Patient.find(query)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+    ]);
+
+    const mappedPatients = patients.map((patient) => {
+      const idString = patient._id.toString();
+      return {
+        id: idString,
+        patient_id: idString,
+        full_name: patient.full_name,
+        uhid: patient.uhid || null,
+        contact_number: patient.contact_number || null,
+        date_of_birth: patient.date_of_birth?.toISOString() || null,
+        file_number: fileNumberByPatientId.get(idString) || null,
+        clinic_id: patient.clinic_id || null,
+        registration_type: patient.registration_type || null
+      };
+    });
+
+    return {
+      data: mappedPatients,
+      pagination: {
+        total,
+        page,
+        limit,
+        pages: Math.ceil(total / limit)
+      }
+    };
+  } catch (error) {
+    logger.error(`Error retrieving clinic-related patients: ${error.message}`);
     throw error;
   }
 };

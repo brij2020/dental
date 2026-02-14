@@ -8,7 +8,7 @@ import AddPatientModal from './components/AddPatientModal';
 import NewPatientModal from './components/NewPatientModal';
 import BookAppointmentModal from './components/BookAppointmentModal';
 
-import { getAllPatients, getAllClinicPanels, getClinicAppointments, deleteAppointment } from '../../lib/apiClient';
+import { getClinicRelatedPatients, getAllClinicPanels, getClinicAppointments, deleteAppointment } from '../../lib/apiClient';
 import type { ClinicPatientRow } from './types';
 
 export default function Patients() {
@@ -84,12 +84,12 @@ export default function Patients() {
         setLoading(true);
         setError(null);
         try {
-          const response = await getAllPatients({
-            clinic_id: clinicId,
-            search: searchTerm.trim() || undefined,
-            page: currentPage,
-            limit: pageSize,
-          });
+        const response = await getClinicRelatedPatients({
+          clinic_id: clinicId,
+          search: searchTerm.trim() || undefined,
+          page: currentPage,
+          limit: pageSize,
+        });
           const rows = response.data?.data || [];
           const pagination = response.data?.pagination || {};
           const pages = pagination.pages || 1;

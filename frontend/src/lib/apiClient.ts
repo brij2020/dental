@@ -298,6 +298,13 @@ export const getAllPatients = async (params?: any): Promise<AxiosResponse<any>> 
 };
 
 /**
+ * Get patients who are clinic-registered or have visited the clinic before
+ */
+export const getClinicRelatedPatients = async (params?: any): Promise<AxiosResponse<any>> => {
+  return get('/api/patients/clinic-related', { params });
+};
+
+/**
  * Search clinic patients by term (name, UHID, phone, email)
  */
 export const searchClinicPatients = async (clinicId: string, term: string): Promise<AxiosResponse<any>> => {

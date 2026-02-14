@@ -156,6 +156,7 @@ export default function PatientList({ searchTerm, loading, error, patients, tota
                   <thead>
                     <tr className="bg-gradient-to-r from-sky-50 to-cyan-50 border-b border-slate-200">
                       <th className="px-6 py-4 text-left font-semibold text-slate-700">Patient Name</th>
+                      <th className="px-6 py-4 text-left font-semibold text-slate-700">Patient ID</th>
                       <th className="px-6 py-4 text-left font-semibold text-slate-700">UHID</th>
                       <th className="px-6 py-4 text-left font-semibold text-slate-700">File #</th>
                       <th className="px-6 py-4 text-left font-semibold text-slate-700">DOB</th>
@@ -172,6 +173,7 @@ export default function PatientList({ searchTerm, loading, error, patients, tota
                         className="hover:bg-sky-50 transition duration-150"
                       >
                         <td className="px-6 py-4 font-medium text-slate-800">{p.full_name}</td>
+                        <td className="px-6 py-4 text-slate-600 font-mono text-xs uppercase tracking-wide">{p.patient_id || '—'}</td>
                         <td className="px-6 py-4 text-slate-600">{p.uhid || '—'}</td>
                         <td className="px-6 py-4 text-slate-600">{p.file_number || '—'}</td>
                         <td className="px-6 py-4 text-slate-600">

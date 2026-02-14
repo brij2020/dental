@@ -97,6 +97,36 @@ exports.findAll = async (req, res) => {
   }
 };
 
+exports.findClinicRelated = async (req, res) => {
+  try {
+    const clinicId = req.query.clinic_id || req.user?.clinic_id;
+    if (!clinicId) {
+      return res.status(400).send({
+        message: "clinic_id is required"
+      });
+    }
+
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 25;
+    const search = req.query.search;
+
+    const filters = {
+      clinic_id: clinicId,
+      page,
+      limit,
+      search
+    };
+
+    const result = await patientService.getClinicRelatedPatients(filters);
+    res.send(result);
+  } catch (err) {
+    logger.error(`Error retrieving clinic-related patients: ${err.message}`);
+    res.status(500).send({
+      message: err.message || "Error retrieving clinic-related patients"
+    });
+  }
+};
+
 /**
  * Get patient by ID
  */
