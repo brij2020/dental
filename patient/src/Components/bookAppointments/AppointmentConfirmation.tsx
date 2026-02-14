@@ -6,6 +6,7 @@ import { useProfile } from '@/hooks/useProfile';
 import useGetAppointments from '@/hooks/useGetAppointments';
 import formatTime from '@/services/formatTime';
 import { getISTDate } from '@/lib/istDateUtils';
+import { api } from '@/lib/apiClient';
 
 interface AppointmentSummaryProps {
     selectedClinic: Clinic;
@@ -31,10 +32,64 @@ const AppointmentConfirmation: React.FC<AppointmentSummaryProps> = ({ selectedCl
         return selectedClinic?.doctor_id || selectedClinic?.admin_staff;
     };
 
+    const [quotaLimit, setQuotaLimit] = React.useState<number>(0);
+    const [usedAppointments, setUsedAppointments] = React.useState<number>(0);
+    const [quotaLoading, setQuotaLoading] = React.useState<boolean>(false);
+
+    const clinicIdentifier = selectedClinic?.clinic_id || selectedClinic?.id || selectedClinic?._id;
+
+    const fetchQuota = React.useCallback(async () => {
+        if (!clinicIdentifier) return;
+        setQuotaLoading(true);
+        const now = new Date();
+        const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+        const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
+
+        try {
+            const [subResp, appointmentsResp] = await Promise.all([
+                api.get(`/api/clinic-subscriptions/active`, { params: { clinic_id: clinicIdentifier } }),
+                api.get(`/api/appointments/clinic/${clinicIdentifier}`, {
+                    params: { startDate: monthStart, endDate: monthEnd }
+                }),
+            ]);
+
+            let limit = 0;
+            if (subResp.success && subResp.data) {
+                limit = subResp.data?.data?.limits_snapshot?.max_appointments || 0;
+            }
+
+            let appointments: any[] = [];
+            if (appointmentsResp.success && appointmentsResp.data) {
+                appointments = appointmentsResp.data?.data || [];
+            }
+            const filtered = appointments.filter((apt: any) =>
+              ['scheduled', 'confirmed', 'completed'].includes(apt?.status)
+            );
+
+            setQuotaLimit(limit);
+            setUsedAppointments(filtered.length);
+        } catch (err) {
+            console.error("Failed to load subscription quota", err);
+        } finally {
+            setQuotaLoading(false);
+        }
+    }, [clinicIdentifier]);
+
+    React.useEffect(() => {
+        void fetchQuota();
+    }, [fetchQuota]);
+
+    const quotaReached = quotaLimit > 0 && usedAppointments >= quotaLimit;
+
     const handleBookAppointment = async () => {
         if (isBooking) return;
         if (!profile) {
             toast.error("Profile is not loaded properly. Please refresh the page.");
+            return;
+        }
+
+        if (quotaReached) {
+            toast.error("Clinic has reached its appointment quota for this month. Please try later or contact the clinic.");
             return;
         }
 
@@ -66,7 +121,6 @@ const AppointmentConfirmation: React.FC<AppointmentSummaryProps> = ({ selectedCl
 
         // Validate clinic and doctor data
         // Ensure we have a clinic identifier (accept clinic_id, id or _id)
-        const clinicIdentifier = selectedClinic?.clinic_id || selectedClinic?.id || selectedClinic?._id;
         if (!clinicIdentifier) {
             toast.error("Clinic ID is missing. Please select a clinic again.");
             console.error('Missing clinic identifier in selectedClinic:', selectedClinic);
@@ -223,8 +277,21 @@ const AppointmentConfirmation: React.FC<AppointmentSummaryProps> = ({ selectedCl
                     </div>
                 </div>
 
-                <div className='flex justify-center mt-4'>
-                    <button onClick={handleBookAppointment} disabled={isBooking} className={`${isBooking ? "bg-zinc-400 cursor-not-allowed" : "bg-sky-600 hover:bg-sky-800"} text-white w-full py-2 rounded-sm`}>{isBooking ? "Please wait..." : "Confirm"}</button>
+                <div className='flex flex-col gap-2 mt-4'>
+                    <div className='text-xs text-slate-500'>
+                        {quotaLoading
+                            ? "Checking subscription quota..."
+                            : quotaLimit > 0
+                                ? `Appointments this month: ${usedAppointments}/${quotaLimit}`
+                                : "No monthly quota for this clinic."}
+                    </div>
+                    <button
+                        onClick={handleBookAppointment}
+                        disabled={isBooking || quotaReached}
+                        className={`${isBooking || quotaReached ? "bg-zinc-400 cursor-not-allowed" : "bg-sky-600 hover:bg-sky-800"} text-white w-full py-2 rounded-sm`}
+                    >
+                        {isBooking ? "Please wait..." : quotaReached ? "Monthly limit reached" : "Confirm"}
+                    </button>
                 </div>
             </div>
 

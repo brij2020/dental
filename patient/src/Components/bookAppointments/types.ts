@@ -66,6 +66,7 @@ export interface Clinic {
     admin_staff?: string;
     admin_staff_name?: string;
     doctors?: string[];
+    doctor_name?: string;
 }
 
 export interface Filters {
