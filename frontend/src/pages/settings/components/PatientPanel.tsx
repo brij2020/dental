@@ -29,6 +29,9 @@ interface Patient {
   uhid?: string;
   clinic_id?: string;
   registration_type?: string;
+  subscription?: string;
+  subscription_plan?: string;
+  plan_name?: string;
   createdAt?: string;
 }
 
@@ -96,7 +99,7 @@ export default function PatientPanel() {
 
   // Filter and sort patients
   useEffect(() => {
-    let filtered = patients.filter((patient) => {
+    const filtered = patients.filter((patient) => {
       const searchLower = searchTerm.toLowerCase();
       return (
         patient.full_name?.toLowerCase().includes(searchLower) ||
@@ -217,7 +220,7 @@ export default function PatientPanel() {
 
   // Export to CSV
   const handleExportCSV = () => {
-    const headers = ['Name', 'Email', 'Phone', 'UHID', 'Gender', 'DOB'];
+    const headers = ['Name', 'Email', 'Phone', 'UHID', 'Gender', 'DOB', 'Subscription'];
     const rows = filteredPatients.map((p) => [
       p.full_name,
       p.email,
@@ -225,6 +228,7 @@ export default function PatientPanel() {
       p.uhid || '',
       p.gender || '',
       p.dob || '',
+      p.subscription_plan || p.subscription || p.plan_name || 'Free Plan',
     ]);
 
     const csv = [
@@ -306,11 +310,11 @@ export default function PatientPanel() {
         </div>
       ) : (
         <>
-          <div className="overflow-x-auto rounded-lg border border-gray-200">
-            <table className="w-full text-sm text-left">
-              <thead className="bg-gray-50 border-b border-gray-200">
+          <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
+            <table className="min-w-full table-fixed text-sm text-left">
+              <thead className="bg-slate-50 border-b border-slate-200">
                 <tr>
-                  <th className="px-6 py-3">
+                  <th className="px-4 py-3 w-12">
                     <input
                       type="checkbox"
                       checked={
@@ -321,8 +325,8 @@ export default function PatientPanel() {
                       className="w-4 h-4 rounded border-gray-300 cursor-pointer"
                     />
                   </th>
-                  <th 
-                    className="px-6 py-3 font-semibold text-gray-900 cursor-pointer hover:bg-gray-100 select-none"
+                  <th
+                    className="px-4 py-3 font-semibold uppercase tracking-wide text-xs text-slate-600 cursor-pointer hover:bg-slate-100 select-none"
                     onClick={() => handleSort('name')}
                   >
                     <div className="flex items-center gap-2">
@@ -332,12 +336,12 @@ export default function PatientPanel() {
                       )}
                     </div>
                   </th>
-                  <th className="px-6 py-3 font-semibold text-gray-900">Email</th>
-                  <th className="px-6 py-3 font-semibold text-gray-900">Phone</th>
-                  <th className="px-6 py-3 font-semibold text-gray-900">UHID</th>
-                  <th className="px-6 py-3 font-semibold text-gray-900">Gender</th>
-                  <th 
-                    className="px-6 py-3 font-semibold text-gray-900 cursor-pointer hover:bg-gray-100 select-none"
+                  <th className="px-4 py-3 font-semibold uppercase tracking-wide text-xs text-slate-600">Email</th>
+                  <th className="px-4 py-3 font-semibold uppercase tracking-wide text-xs text-slate-600">Phone</th>
+                  <th className="px-4 py-3 font-semibold uppercase tracking-wide text-xs text-slate-600">UHID</th>
+                  <th className="px-4 py-3 font-semibold uppercase tracking-wide text-xs text-slate-600">Gender</th>
+                  <th
+                    className="px-4 py-3 font-semibold uppercase tracking-wide text-xs text-slate-600 cursor-pointer hover:bg-slate-100 select-none"
                     onClick={() => handleSort('age')}
                   >
                     <div className="flex items-center gap-2">
@@ -347,16 +351,25 @@ export default function PatientPanel() {
                       )}
                     </div>
                   </th>
-                  <th className="px-6 py-3 font-semibold text-gray-900">Actions</th>
+                  <th className="px-4 py-3 font-semibold uppercase tracking-wide text-xs text-slate-600">Subscription</th>
+                  <th className="px-4 py-3 font-semibold uppercase tracking-wide text-xs text-slate-600">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-200">
-                {paginatedPatients.map((patient) => (
+              <tbody className="divide-y divide-slate-100">
+                {paginatedPatients.map((patient, index) => {
+                  const subscriptionLabel =
+                    patient.subscription_plan?.trim() ||
+                    patient.subscription?.trim() ||
+                    patient.plan_name?.trim() ||
+                    'Free Plan';
+                  const age = calculateAge(patient.dob);
+
+                  return (
                   <tr
                     key={patient._id}
-                    className="hover:bg-gray-50 transition-colors"
+                    className={`${index % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'} hover:bg-slate-100/60 transition-colors`}
                   >
-                    <td className="px-6 py-4">
+                    <td className="px-4 py-3">
                       <input
                         type="checkbox"
                         checked={selectedPatients.has(patient._id)}
@@ -364,15 +377,26 @@ export default function PatientPanel() {
                         className="w-4 h-4 rounded border-gray-300 cursor-pointer"
                       />
                     </td>
-                    <td className="px-6 py-4 font-medium text-gray-900">
+                    <td className="px-4 py-3 font-medium text-slate-900">
                       {patient.full_name}
                     </td>
-                    <td className="px-6 py-4 text-gray-600">{patient.email}</td>
-                    <td className="px-6 py-4 text-gray-600">{patient.phone}</td>
-                    <td className="px-6 py-4 text-gray-600">{patient.uhid || '-'}</td>
-                    <td className="px-6 py-4 text-gray-600">{patient.gender || '-'}</td>
-                    <td className="px-6 py-4 text-gray-600">{calculateAge(patient.dob) !== null ? `${calculateAge(patient.dob)} years` : '-'}</td>
-                    <td className="px-6 py-4">
+                    <td className="px-4 py-3 text-slate-600">{patient.email}</td>
+                    <td className="px-4 py-3 text-slate-600">{patient.phone}</td>
+                    <td className="px-4 py-3 text-slate-600">{patient.uhid || '-'}</td>
+                    <td className="px-4 py-3 text-slate-600">{patient.gender || '-'}</td>
+                    <td className="px-4 py-3 text-slate-600">{age !== null ? `${age} years` : '-'}</td>
+                    <td className="px-4 py-3">
+                      <span
+                        className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${
+                          subscriptionLabel === 'Free Plan'
+                            ? 'bg-slate-100 text-slate-700'
+                            : 'bg-emerald-50 text-emerald-700'
+                        }`}
+                      >
+                        {subscriptionLabel}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
                       <div className="flex gap-2">
                         <button
                           onClick={() => handleEdit(patient)}
@@ -391,7 +415,8 @@ export default function PatientPanel() {
                       </div>
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>
