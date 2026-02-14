@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { getAllClinics, deactivateClinic } from "./api";
+import { getAllClinics, deactivateClinic, getClinicActiveSubscription } from "./api";
 import type { ClinicResponse } from "./api";
 import {
   IconPlus,
@@ -32,6 +32,7 @@ export default function Clinics() {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
+  const [subscriptionMap, setSubscriptionMap] = useState<Record<string, string>>({});
   const hasFetchedOnceRef = useRef(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterCity, setFilterCity] = useState("");
@@ -59,6 +60,26 @@ export default function Clinics() {
         setClinics(pageData);
         setTotalItems(pagination?.total ?? pageData.length);
         setTotalPages(Math.max(1, pagination?.pages ?? 1));
+        if (pageData.length > 0) {
+          const activeSubs: Record<string, string> = {};
+          await Promise.all(
+            pageData.map(async (clinic) => {
+              try {
+                const resp = await getClinicActiveSubscription(getClinicId(clinic));
+                if (resp?.data?.data?.name_snapshot) {
+                  activeSubs[getClinicId(clinic)] = resp.data.data.name_snapshot;
+                } else {
+                  activeSubs[getClinicId(clinic)] = "Free plan";
+                }
+              } catch (err) {
+                activeSubs[getClinicId(clinic)] = "Free plan";
+              }
+            })
+          );
+          setSubscriptionMap(activeSubs);
+        } else {
+          setSubscriptionMap({});
+        }
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to load clinics");
         setClinics([]);
@@ -338,6 +359,9 @@ export default function Clinics() {
                     <th className="px-6 py-4 text-left">
                       <span className="font-semibold text-slate-900">Motto</span>
                     </th>
+                    <th className="px-6 py-4 text-left">
+                      <span className="font-semibold text-slate-900">Subscription</span>
+                    </th>
                     <th className="px-6 py-4 text-center">
                       <span className="font-semibold text-slate-900">Actions</span>
                     </th>
@@ -371,6 +395,9 @@ export default function Clinics() {
                       </td>
                       <td className="px-6 py-4 text-slate-600 truncate max-w-xs">
                         {clinic.branding_moto || "-"}
+                      </td>
+                      <td className="px-6 py-4 text-slate-600">
+                        {subscriptionMap[getClinicId(clinic)] || "Free plan"}
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex justify-center gap-2">
