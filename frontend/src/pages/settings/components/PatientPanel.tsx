@@ -6,8 +6,6 @@ import {
   IconTrash,
   IconEdit,
   IconDownload,
-  IconChevronLeft,
-  IconChevronRight,
 } from '@tabler/icons-react';
 import {
   getAllPatients,
@@ -15,6 +13,7 @@ import {
   deletePatient,
   bulkDeletePatients,
 } from '../../../lib/apiClient';
+import TablePagination from '../../../components/TablePagination';
 
 interface Patient {
   _id: string;
@@ -61,6 +60,11 @@ export default function PatientPanel() {
     from: '',
     to: '',
   });
+  // const [activeFilters, setActiveFilters] = useState({
+  //   search: '',
+  //   from: '',
+  //   to: '',
+  // });
   const [paginationMeta, setPaginationMeta] = useState({
     page: 1,
     total: 0,
@@ -242,15 +246,6 @@ export default function PatientPanel() {
       console.error('Error updating patient:', error);
       toast.error('Failed to update patient');
     }
-  };
-
-  const goToPage = (direction: 'prev' | 'next') => {
-    const targetPage =
-      direction === 'prev'
-        ? Math.max(1, paginationMeta.page - 1)
-        : Math.min(paginationMeta.pages, paginationMeta.page + 1);
-    if (targetPage === paginationMeta.page) return;
-    fetchPatients(targetPage, activeFilters.search, activeFilters.from, activeFilters.to);
   };
 
   return (
@@ -445,25 +440,15 @@ export default function PatientPanel() {
         )}
       </div>
 
-      {paginationMeta.pages > 1 && (
-        <div className="flex items-center justify-center gap-3">
-          <button
-            onClick={() => goToPage('prev')}
-            disabled={paginationMeta.page === 1}
-            className="p-2 rounded-lg border border-gray-300 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <IconChevronLeft size={18} />
-          </button>
-          <span className="text-sm text-gray-600">Page {paginationMeta.page} of {paginationMeta.pages}</span>
-          <button
-            onClick={() => goToPage('next')}
-            disabled={paginationMeta.page === paginationMeta.pages}
-            className="p-2 rounded-lg border border-gray-300 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <IconChevronRight size={18} />
-          </button>
-        </div>
-      )}
+      <TablePagination
+        currentPage={paginationMeta.page}
+        totalPages={paginationMeta.pages}
+        totalItems={paginationMeta.total}
+        pageSize={ITEMS_PER_PAGE}
+        isLoading={loading}
+        onPageChange={(page) => fetchPatients(page, activeFilters.search, activeFilters.from, activeFilters.to)}
+        className="justify-end"
+      />
 
       {showEditModal && editingPatient && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
