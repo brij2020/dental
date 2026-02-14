@@ -1,7 +1,7 @@
-import { useState, useEffect, type FormEvent } from 'react';
+import { useState, useEffect, useCallback, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../../state/useAuth';
-import { createProfile, getAllProfiles, deleteProfile, adminResetPassword, updateProfile, uploadProfilePic } from '../../../lib/apiClient';
+import { createProfile, getAllProfiles, deleteProfile, adminResetPassword, updateProfile, uploadProfilePic, getActiveClinicSubscription } from '../../../lib/apiClient';
 import { Modal } from '../../../components/Modal';
 import { environment } from '../../../config/environment';
 import {
@@ -27,8 +27,12 @@ const Input = ({ id, label, type, icon: Icon, ...props }: any) => (
   </div>
 );
 
-const Button = ({ children, loading, ...props }: any) => (
-  <button className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-sky-500 px-4 py-2.5 text-white font-medium shadow-sm hover:brightness-105 active:brightness-95 disabled:opacity-60 disabled:cursor-not-allowed transition" disabled={loading} {...props}>
+const Button = ({ children, loading, disabled, ...props }: any) => (
+  <button
+    className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-sky-500 px-4 py-2.5 text-white font-medium shadow-sm hover:brightness-105 active:brightness-95 disabled:opacity-60 disabled:cursor-not-allowed transition"
+    disabled={loading || disabled}
+    {...props}
+  >
     {loading ? 'Submitting...' : children}
   </button>
 );
@@ -52,6 +56,7 @@ export default function UserManagementPanel() {
   const [loading, setLoading] = useState(true);
   const [formLoading, setFormLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [activePlan, setActivePlan] = useState<any>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedRole, setSelectedRole] = useState('doctor');
   const [fieldErrors, setFieldErrors] = useState<{ [k: string]: string }>({});
@@ -78,9 +83,20 @@ export default function UserManagementPanel() {
   });
 
 
+  const fetchActivePlan = useCallback(async () => {
+    if (!adminUser?.clinic_id) return;
+    try {
+      const response = await getActiveClinicSubscription(adminUser.clinic_id);
+      setActivePlan(response.data?.data || null);
+    } catch (err) {
+      console.error("Error fetching subscription info:", err);
+    }
+  }, [adminUser?.clinic_id]);
+
   useEffect(() => {
     fetchStaff();
-  }, [adminUser]);
+    fetchActivePlan();
+  }, [adminUser, fetchActivePlan]);
 
   const fetchStaff = async () => {
     if (!adminUser?.clinic_id) return;
@@ -149,6 +165,13 @@ export default function UserManagementPanel() {
 
       // clear errors
       setFieldErrors({});
+
+      const staffLimit = activePlan?.limits_snapshot?.max_staff ?? 0;
+      if (staffLimit > 0 && staff.length >= staffLimit) {
+        toast.error('Staff limit reached for your current subscription. Upgrade to add more users.');
+        setFormLoading(false);
+        return;
+      }
 
       // Add qualification and specialization if doctor role
       // assign qualification & specialization
@@ -383,6 +406,10 @@ export default function UserManagementPanel() {
   };
 
 
+  const staffLimit = activePlan?.limits_snapshot?.max_staff ?? 0;
+  const staffRemaining = staffLimit > 0 ? Math.max(0, staffLimit - staff.length) : null;
+  const isStaffLimitReached = staffLimit > 0 && staff.length >= staffLimit;
+
   return (
     <>
       <div>
@@ -391,9 +418,29 @@ export default function UserManagementPanel() {
           Back to Settings
         </Link>
         <div className="p-6 bg-white border rounded-2xl">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-slate-800">Staff Management</h2>
-            <Button onClick={() => setIsModalOpen(true)}>
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div>
+              <h2 className="text-lg font-semibold text-slate-800">Staff Management</h2>
+              <p className="text-sm text-slate-500">Create doctors and receptionists for your clinic.</p>
+              <div className="mt-2 flex flex-wrap gap-3 text-xs text-slate-600">
+                <span>
+                  Active plan: <span className="font-semibold text-slate-800">{activePlan?.name_snapshot ?? 'Free Plan'}</span>
+                </span>
+                {staffLimit > 0 && (
+                  <span>
+                    Staff: <span className="font-semibold text-slate-800">{staff.length}/{staffLimit}</span>
+                    {staffRemaining !== null && staffRemaining >= 0 && ` (${staffRemaining} slots left)`}
+                  </span>
+                )}
+                {isStaffLimitReached && (
+                  <span className="text-rose-500">Staff limit reached. Upgrade to add more users.</span>
+                )}
+              </div>
+            </div>
+            <Button
+              onClick={() => setIsModalOpen(true)}
+              disabled={formLoading || isStaffLimitReached}
+            >
               <IconUserPlus className="h-5 w-5" />
               <span>Add New Staff</span>
             </Button>

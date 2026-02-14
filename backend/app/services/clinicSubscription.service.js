@@ -3,17 +3,35 @@ const ClinicSubscription = db.clinicSubscriptions;
 const Subscription = db.subscriptions;
 const { logger } = require("../config/logger");
 
+const DEFAULT_FREE_LIMITS = {
+  max_doctors: Number(process.env.FREE_PLAN_MAX_DOCTORS) || 2,
+  max_staff: Number(process.env.FREE_PLAN_MAX_STAFF) || 4,
+  max_branches: Number(process.env.FREE_PLAN_MAX_BRANCHES) || 1,
+  max_appointments: Number(process.env.FREE_PLAN_MAX_APPOINTMENTS) || 400,
+};
+
+const getFreePlanSnapshot = () => ({
+  name_snapshot: "Free Plan",
+  price_snapshot: 0,
+  currency_snapshot: process.env.FREE_PLAN_CURRENCY || "INR",
+  features_snapshot: ["Clinic listing", "Basic staff access"],
+  limits_snapshot: DEFAULT_FREE_LIMITS,
+  start_date: null,
+  end_date: null,
+});
+
 const getActiveSubscriptionByClinicId = async (clinicId) => {
   if (!clinicId) return null;
 
   const now = new Date();
   const active = await ClinicSubscription.findOne({
-    clinic_id: clinicId,
     status: "active",
     end_date: { $gte: now },
   }).sort({ end_date: -1 });
 
-  if (!active) return null;
+  if (!active) {
+    return getFreePlanSnapshot();
+  }
   return active;
 };
 
