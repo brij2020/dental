@@ -103,12 +103,15 @@ export default function PatientPanel() {
 
         const response = await getAllPatients(params);
         const payload = response.data;
+        const total = payload?.pagination?.total ?? payload?.data?.length ?? 0;
+        const limit = payload?.pagination?.limit || ITEMS_PER_PAGE;
+        const computedPages = Math.max(1, Math.ceil(total / Math.max(1, limit)));
 
         setPatients(payload?.data || []);
         setPaginationMeta({
           page: payload?.pagination?.page || page,
-          total: payload?.pagination?.total || 0,
-          pages: payload?.pagination?.pages || 1,
+          total,
+          pages: payload?.pagination?.pages || computedPages,
         });
         setSelectedPatients(new Set());
       } catch (error) {
