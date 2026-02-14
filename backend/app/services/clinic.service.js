@@ -132,6 +132,8 @@ const createClinic = async (clinicData) => {
  * Get all clinics
  */
 const isValidString = (value) => typeof value === "string" && value.trim().length > 0;
+const escapeForRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const toCaseInsensitiveRegex = (value) => new RegExp(escapeForRegex(value.trim()), "i");
 
 const getAllClinics = async (filters = {}) => {
   try {
@@ -247,7 +249,7 @@ const searchClinics = async (filters) => {
       query['address.city'] = { $regex: filters.city, $options: 'i' };
     }
     if (filters.pin) {
-      query['address.postal_code'] = filters.pin;
+      query['address.postal_code'] = toCaseInsensitiveRegex(filters.pin);
     }
     if (filters.location) {
       // Search in location fields: floor, room_number, wing
