@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { getAllClinics, deactivateClinic } from "./api";
 import type { ClinicResponse } from "./api";
@@ -33,6 +33,9 @@ export default function Clinics() {
   const [totalItems, setTotalItems] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
   const hasFetchedOnceRef = useRef(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [filterCity, setFilterCity] = useState("");
+  const [filterStatus, setFilterStatus] = useState("");
 
   useEffect(() => {
     if (success) {
@@ -83,8 +86,26 @@ export default function Clinics() {
     }
   };
 
-  const getSortedClinics = () => {
-    const sorted = [...clinics].sort((a, b) => {
+  const processedClinics = useMemo(() => {
+    const filtered = clinics.filter((clinic) => {
+      const matchesSearch =
+        searchTerm.trim() === "" ||
+        clinic.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (clinic.phone || "").includes(searchTerm) ||
+        (clinic.address?.city || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (clinic.branding_moto || "").toLowerCase().includes(searchTerm.toLowerCase());
+
+      const matchesCity =
+        filterCity === "" ||
+        (clinic.address?.city || "").toLowerCase() === filterCity.toLowerCase();
+
+      const matchesStatus =
+        filterStatus === "" || (clinic.status || "").toLowerCase() === filterStatus.toLowerCase();
+
+      return matchesSearch && matchesCity && matchesStatus;
+    });
+
+    const sorted = [...filtered].sort((a, b) => {
       let aVal: any;
       let bVal: any;
 
@@ -107,8 +128,13 @@ export default function Clinics() {
       return 0;
     });
 
+      if (aVal < bVal) return sortOrder === "asc" ? -1 : 1;
+      if (aVal > bVal) return sortOrder === "asc" ? 1 : -1;
+      return 0;
+    });
+
     return sorted;
-  };
+  }, [clinics, searchTerm, filterCity, filterStatus, sortField, sortOrder]);
 
   const SortIcon = ({ field }: { field: SortField }) => {
     if (sortField !== field) return null;
@@ -145,6 +171,14 @@ export default function Clinics() {
       setDeleting(null);
     }
   };
+
+  const uniqueCities = useMemo(() => {
+    const cities = clinics
+      .map((c) => c.address?.city?.trim() || "")
+      .filter((city) => city.length > 0);
+
+    return Array.from(new Set(cities)).sort();
+  }, [clinics]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-6">
@@ -188,7 +222,79 @@ export default function Clinics() {
           </div>
         )}
 
-        {/* Table View */}
+        {/* Filter + Table View */}
+        <div className="mb-6 grid gap-3 md:grid-cols-4">
+          <div className="md:col-span-2">
+            <label className="text-xs uppercase tracking-wider text-slate-500">Search clinics</label>
+            <input
+              value={searchTerm}
+              onChange={(e) => {
+                setSearchTerm(e.target.value);
+                setCurrentPage(1);
+              }}
+              placeholder="Search by name, city, phone..."
+              className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-200"
+            />
+          </div>
+          <div>
+            <label className="text-xs uppercase tracking-wider text-slate-500">Filter city</label>
+            <select
+              value={filterCity}
+              onChange={(e) => setFilterCity(e.target.value)}
+              className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-200"
+            >
+              <option value="">All cities</option>
+              {uniqueCities.map((city) => (
+                <option key={city} value={city}>
+                  {city}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="text-xs uppercase tracking-wider text-slate-500">Status</label>
+            <select
+              value={filterStatus}
+              onChange={(e) => setFilterStatus(e.target.value)}
+              className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-200"
+            >
+              <option value="">All statuses</option>
+              <option value="Active">Active</option>
+              <option value="Inactive">Inactive</option>
+              <option value="Pending">Pending</option>
+            </select>
+          </div>
+          <div className="flex items-end">
+            <button
+              onClick={() => {
+                setSearchTerm("");
+                setFilterCity("");
+                setFilterStatus("");
+              }}
+              className="w-full rounded-xl border border-slate-300 px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 transition"
+            >
+              Clear filters
+            </button>
+          </div>
+        </div>
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-2 text-sm text-slate-600">
+          <span className="text-slate-600">
+            Showing {processedClinics.length} of {totalItems} clinic{totalItems !== 1 ? "s" : ""}
+          </span>
+          {(filterCity || filterStatus || searchTerm) && (
+            <button
+              onClick={() => {
+                setSearchTerm("");
+                setFilterCity("");
+                setFilterStatus("");
+              }}
+              className="text-sky-600 underline text-xs"
+            >
+              Reset filters
+            </button>
+          )}
+        </div>
+
         {!loading && clinics.length > 0 && (
           <div className="bg-white rounded-lg shadow-md border border-slate-200 overflow-hidden">
             <div className="relative overflow-x-auto">
@@ -232,6 +338,9 @@ export default function Clinics() {
                       </button>
                     </th>
                     <th className="px-6 py-4 text-left">
+                      <span className="font-semibold text-slate-900">Admin / Doctor</span>
+                    </th>
+                    <th className="px-6 py-4 text-left">
                       <span className="font-semibold text-slate-900">Motto</span>
                     </th>
                     <th className="px-6 py-4 text-center">
@@ -240,7 +349,7 @@ export default function Clinics() {
                   </tr>
                 </thead>
                 <tbody>
-                  {getSortedClinics().map((clinic) => (
+                  {processedClinics.map((clinic) => (
                     <tr key={getClinicId(clinic)} className="border-b border-slate-200 hover:bg-slate-50 transition-colors">
                       <td className="px-6 py-4">
                         <span className="font-medium text-slate-900">{clinic.name}</span>
@@ -261,6 +370,9 @@ export default function Clinics() {
                         >
                           {clinic.status}
                         </span>
+                      </td>
+                      <td className="px-6 py-4 text-slate-600">
+                        {clinic.admin_staff_name || clinic.contact_name || "-"}
                       </td>
                       <td className="px-6 py-4 text-slate-600 truncate max-w-xs">
                         {clinic.branding_moto || "-"}
