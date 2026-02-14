@@ -1,5 +1,5 @@
-import React, { useState, useEffect, type FormEvent, type ElementType } from 'react';
-import { getClinicById as getClinicInfo, updateAppointment as updateAppointmentAPI } from '../../../lib/apiClient';
+import React, { useState, useEffect, useCallback, type FormEvent, type ElementType } from 'react';
+import { getClinicById as getClinicInfo, updateAppointment as updateAppointmentAPI, api } from '../../../lib/apiClient';
 import { toast } from 'react-toastify';
 import { Modal } from '../../../components/Modal';
 import {
@@ -122,6 +122,22 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(({ id, label, icon:
 
 export default function BookAppointmentModal({ open, onClose, onSuccess, patient, clinicId, appointment = null, isEditing = false }: Props) {
   const { user } = useAuth(); 
+  type ApiSuccessResponse<T> = {
+    success: true;
+    data: T;
+    status: number;
+  };
+
+  type ApiErrorResponse = {
+    success: false;
+    error: string;
+    code: string;
+    status: any;
+  };
+
+  type ApiResponse<T> = ApiSuccessResponse<T> | ApiErrorResponse;
+
+  const isApiSuccess = <T,>(res: ApiResponse<T>): res is ApiSuccessResponse<T> => res.success;
   const [date, setDate] = useState('');
   const [time, setTime] = useState('');
   const [saving, setSaving] = useState(false);
@@ -143,6 +159,10 @@ export default function BookAppointmentModal({ open, onClose, onSuccess, patient
   const [isDoctorOnLeave, setIsDoctorOnLeave] = useState(false);
   const [leaveReason, setLeaveReason] = useState<string | undefined>(undefined);
   const [checkingLeave, setCheckingLeave] = useState(false);
+
+  const [quotaLimit, setQuotaLimit] = useState<number>(0);
+  const [usedAppointments, setUsedAppointments] = useState<number>(0);
+  const [quotaLoading, setQuotaLoading] = useState(false);
 
   // Clinic info state
   const [clinicInfo, setClinicInfo] = useState<any>(null);
@@ -173,6 +193,52 @@ export default function BookAppointmentModal({ open, onClose, onSuccess, patient
       setClinicInfo(null);
     }
   }, [open, clinicId]);
+
+  const clinicIdentifier = clinicInfo?.clinic_id || clinicId;
+
+  const fetchQuota = useCallback(async () => {
+    if (!clinicIdentifier) return;
+    setQuotaLoading(true);
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+    const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
+
+    try {
+      const [subResp, appointmentsResp] = await Promise.all([
+        api.get(`/api/clinic-subscriptions/active`, { params: { clinic_id: clinicIdentifier } }),
+        api.get(`/api/appointments/clinic/${clinicIdentifier}`, {
+          params: { startDate: monthStart, endDate: monthEnd },
+        }),
+      ]);
+
+      let limit = 0;
+      if (isApiSuccess(subResp) && subResp.data) {
+        limit = subResp.data?.data?.limits_snapshot?.max_appointments || 0;
+      }
+
+      let appointments: any[] = [];
+      if (isApiSuccess(appointmentsResp) && appointmentsResp.data) {
+        appointments = appointmentsResp.data?.data || [];
+      }
+
+      const filtered = appointments.filter((apt: any) =>
+        ['scheduled', 'confirmed', 'completed'].includes(apt?.status)
+      );
+
+      setQuotaLimit(limit);
+      setUsedAppointments(filtered.length);
+    } catch (err) {
+      console.error('Failed to load subscription quota', err);
+    } finally {
+      setQuotaLoading(false);
+    }
+  }, [clinicIdentifier]);
+
+  useEffect(() => {
+    if (open) {
+      void fetchQuota();
+    }
+  }, [open, fetchQuota]);
 
   // ... (Keep existing useEffects for slots, booked slots, patient data, and doctors) ...
 
@@ -406,6 +472,12 @@ export default function BookAppointmentModal({ open, onClose, onSuccess, patient
         return;
       }
 
+      if (quotaLimit > 0 && usedAppointments >= quotaLimit && !isEditing) {
+        toast.error('Clinic has reached its monthly appointment quota. Please try again later.');
+        setSaving(false);
+        return;
+      }
+    
       
       if (isEditing && appointment) {
         // Update only doctor/time/date and clear provisional flag. Do not touch status.
@@ -603,7 +675,7 @@ setBookedSlots(normalized);
           )}
         </div>
 
-        <div className="flex justify-end gap-3 pt-4 border-t border-slate-200">
+        <div className="flex flex-col gap-2 pt-4 border-t border-slate-200">
           <button
             type="button"
             className="px-4 py-2 text-sm font-medium text-slate-700 bg-slate-100 rounded-xl hover:bg-slate-200 transition"
@@ -614,10 +686,16 @@ setBookedSlots(normalized);
           <button
             type="submit"
             className="inline-flex items-center justify-center gap-2 px-5 py-2.5 font-medium text-white transition bg-gradient-to-r from-sky-600 to-cyan-500 rounded-xl shadow-sm hover:brightness-105 active:brightness-95 disabled:opacity-60 disabled:cursor-not-allowed"
-            disabled={saving}
+            disabled={saving || (quotaLimit > 0 && usedAppointments >= quotaLimit)}
           >
             {saving ? (isEditing ? 'Updating...' : 'Booking...') : (isEditing ? 'Update Appointment' : 'Book Appointment')}
           </button>
+          {quotaLimit > 0 && (
+            <p className="text-xs text-slate-500">
+              Appointments this month: {usedAppointments}/{quotaLimit}
+              {usedAppointments >= quotaLimit && ' — quota reached'}
+            </p>
+          )}
         </div>
       </form>
     </Modal>

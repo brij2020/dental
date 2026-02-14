@@ -36,6 +36,14 @@ const AppointmentConfirmation: React.FC<AppointmentSummaryProps> = ({ selectedCl
     const [usedAppointments, setUsedAppointments] = React.useState<number>(0);
     const [quotaLoading, setQuotaLoading] = React.useState<boolean>(false);
 
+    type ApiResponse<T> =
+        | { success: true; data: T; status: number }
+        | { success: false; error: string; code: string; status: any };
+
+    const isSuccessResponse = <T,>(res: ApiResponse<T>): res is { success: true; data: T; status: number } => {
+        return res.success;
+    };
+
     const clinicIdentifier = selectedClinic?.clinic_id || selectedClinic?.id || selectedClinic?._id;
 
     const fetchQuota = React.useCallback(async () => {
@@ -54,12 +62,12 @@ const AppointmentConfirmation: React.FC<AppointmentSummaryProps> = ({ selectedCl
             ]);
 
             let limit = 0;
-            if (subResp.success && subResp.data) {
+            if (isSuccessResponse(subResp) && subResp.data) {
                 limit = subResp.data?.data?.limits_snapshot?.max_appointments || 0;
             }
 
             let appointments: any[] = [];
-            if (appointmentsResp.success && appointmentsResp.data) {
+            if (isSuccessResponse(appointmentsResp) && appointmentsResp.data) {
                 appointments = appointmentsResp.data?.data || [];
             }
             const filtered = appointments.filter((apt: any) =>
