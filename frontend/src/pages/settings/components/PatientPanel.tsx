@@ -8,10 +8,10 @@ import {
   IconDownload,
 } from '@tabler/icons-react';
 import {
-  getAllPatients,
   updatePatient,
   deletePatient,
   bulkDeletePatients,
+  getAllPatients
 } from '../../../lib/apiClient';
 import TablePagination from '../../../components/TablePagination';
 
@@ -156,26 +156,38 @@ export default function PatientPanel() {
       return;
     }
 
-    const downloadLimit = Math.max(paginationMeta.total || ITEMS_PER_PAGE, ITEMS_PER_PAGE);
     const params: Record<string, any> = {
       clinic_id: clinicId,
+      search: activeFilters.search || undefined,
+      registered_from: activeFilters.from || undefined,
+      registered_to: activeFilters.to || undefined,
+      limit: 100,
       page: 1,
-      limit: downloadLimit,
     };
-    if (activeFilters.search) params.search = activeFilters.search;
-    if (activeFilters.from) params.registered_from = activeFilters.from;
-    if (activeFilters.to) params.registered_to = activeFilters.to;
 
     try {
-      const response = await getClinicRelatedPatients(params);
-      const exportPatients = response.data?.data || [];
-      if (exportPatients.length === 0) {
+      const patientsToExport: any[] = [];
+      let currentPage = 1;
+      let totalPages = 1;
+
+      do {
+        params.page = currentPage;
+        const response = await getAllPatients(params);
+        const batch = response.data?.data || [];
+        const pagination = response.data?.pagination;
+        totalPages = pagination?.pages || 1;
+        patientsToExport.push(...batch);
+        if (currentPage >= totalPages) break;
+        currentPage += 1;
+      } while (currentPage <= totalPages);
+
+      if (patientsToExport.length === 0) {
         toast.info('No patients to download');
         return;
       }
 
       const headers = ['Name', 'Gender', 'DOB', 'UHID', 'File Number', 'Contact', 'Registered On', 'Subscription', 'Email'];
-      const rows = exportPatients.map((patient) => [
+      const rows = patientsToExport.map((patient) => [
         escapeCsvValue(patient.full_name),
         escapeCsvValue(patient.gender || '-'),
         escapeCsvValue(patient.date_of_birth || patient.dob || '-'),
