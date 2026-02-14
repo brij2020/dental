@@ -441,7 +441,7 @@ export default function PatientPanel() {
                   <td className="px-4 py-3 text-slate-600 capitalize">{patient.gender || '-'}</td>
                   <td className="px-4 py-3 text-slate-600">{formatDate(patient.date_of_birth || patient.dob)}</td>
                   <td className="px-4 py-3 text-slate-600">{patient.uhid || '-'}</td>
-                  <td className="px-4 py-3 text-slate-600">{patient.phone || '-'}</td>
+                  <td className="px-4 py-3 text-slate-600">{patient.contact_number || '-'}</td>
                   <td className="px-4 py-3 text-slate-600">{formatDate(patient.createdAt || patient.created_at)}</td>
                   <td className="px-4 py-3 text-slate-600">
                     {(patient.subscription_plan?.trim() ||
