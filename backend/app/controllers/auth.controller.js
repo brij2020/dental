@@ -131,7 +131,7 @@ exports.sendMobileOtp = async (req, res) => {
         }
 
         const otp = await otpService.createOtp(tenDigitMobile);
-        const smsText = `Your OTP for SPAI LABS login is ${otp}. Valid for 5 minutes.`;
+        const smsText = smsService.buildOtpMessage(otp);
         const smsResult = await smsService.sendSms({ mobileNumber: tenDigitMobile, message: smsText });
 
         logger.info({

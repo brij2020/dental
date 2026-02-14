@@ -1,6 +1,13 @@
 const { logger } = require("../config/logger");
 
-const SMS_API_BASE = process.env.SMS_API_BASE || "http://cloud.smsindiahub.in/api/mt/SendSMS";
+const SMS_API_BASE = process.env.SMS_API_BASE || "https://cloud.smsindiahub.in/vendorsms/pushsms.aspx";
+const SMS_API_KEY = process.env.SMS_API_KEY || "iLryzAoPAUin48T8419f1g";
+const SMS_SID = process.env.SMS_SID || "SPAIDG";
+const SMS_FL = process.env.SMS_FL || "0";
+const SMS_DC = process.env.SMS_DC || "0";
+const SMS_GWID = process.env.SMS_GWID || "2";
+const OTP_SMS_MESSAGE_TEMPLATE =
+  "Dear User, Your One-Time Password {otp} for login to SPAI Labs Pvt Ltd This OTP is valid for 10 minutes. Do not share it with anyone for security reasons.";
 
 function maskMobileNumber(mobileNumber) {
   const value = String(mobileNumber || "");
@@ -22,11 +29,11 @@ function normalizeMobileNumber(mobileNumber) {
 }
 
 async function sendSms({ mobileNumber, message }) {
-  const apiKey = process.env.SMS_API_KEY;
-  const senderId = process.env.SMS_SENDER_ID || "WEBSMS";
-  const channel = process.env.SMS_CHANNEL || "Promo";
-  const route = process.env.SMS_ROUTE || "##";
-  const peId = process.env.SMS_PE_ID || "##";
+  const apiKey = SMS_API_KEY;
+  const sid = SMS_SID;
+  const fl = SMS_FL;
+  const dc = SMS_DC;
+  const gwid = SMS_GWID;
 
   if (!apiKey) {
     throw new Error("SMS_API_KEY is not configured");
@@ -39,27 +46,26 @@ async function sendSms({ mobileNumber, message }) {
 
   logger.info("Preparing SMS request", {
     smsApiBase: SMS_API_BASE,
-    senderId,
-    channel,
-    route,
-    peId,
+    sid,
+    fl,
+    dc,
+    gwid,
     mobile: maskMobileNumber(normalizedMobile),
     apiKey: maskApiKey(apiKey),
   });
 
-  const params = new URLSearchParams({
-    APIKey: apiKey,
-    senderid: senderId,
-    channel,
-    DCS: "0",
-    flashsms: "0",
-    number: normalizedMobile,
-    text: message,
-    route,
-    PEId: peId,
-  });
+  const encodedMessage = encodeURIComponent(message);
+  const params = [
+    `APIKey=${encodeURIComponent(apiKey)}`,
+    `msisdn=${normalizedMobile}`,
+    `sid=${encodeURIComponent(sid)}`,
+    `msg=${encodedMessage}`,
+    `fl=${encodeURIComponent(fl)}`,
+    `dc=${encodeURIComponent(dc)}`,
+    `gwid=${encodeURIComponent(gwid)}`,
+  ];
 
-  const requestUrl = `${SMS_API_BASE}?${params.toString()}`;
+  const requestUrl = `${SMS_API_BASE}?${params.join("&")}`;
   console.log("requestUrl",requestUrl)
   const response = await fetch(requestUrl, { method: "GET" });
   const text = await response.text();
@@ -87,7 +93,12 @@ async function sendSms({ mobileNumber, message }) {
   return { success: true, raw: text };
 }
 
+function buildOtpMessage(otp) {
+  return OTP_SMS_MESSAGE_TEMPLATE.replace("{otp}", otp);
+}
+
 module.exports = {
   sendSms,
   normalizeMobileNumber,
+  buildOtpMessage,
 };
