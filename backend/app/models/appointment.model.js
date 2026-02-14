@@ -114,7 +114,11 @@ appointmentSchema.index({ clinic_id: 1, appointment_date: 1 });
  */
 appointmentSchema.pre('save', async function (next) {
   try {
-    // Generate File Number if not provided and clinic_id exists
+    // Generate File Number if not provided, clinic_id exists, and appointment is provisional
+    if (this.provisional === false || !this.clinic_id) {
+      return next();
+    }
+
     if (!this.file_number && this.clinic_id) {
       try {
         const currentYear = new Date().getFullYear().toString().slice(-2);
