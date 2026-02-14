@@ -6,10 +6,10 @@ module.exports = app => {
   const router = require("express").Router();
 
   // Create clinic with admin profile
-  router.post("/create", clinic.create);
+  router.post("/create", verifyToken, allowRoles("super_admin"), clinic.create);
 
   // Create clinic (legacy endpoint)
-  router.post("/", clinic.create);
+  router.post("/", verifyToken, allowRoles("super_admin"), clinic.create);
 
   // Retrieve all clinics (public - clinic listing is public data)
   router.get("/", clinic.findAll);
@@ -39,19 +39,20 @@ module.exports = app => {
   router.get("/:id/doctors/:doctorId", clinic.getDoctorScheduleById);
 
   // Update clinic by id
-  router.put("/:id", verifyToken, clinic.update);
+  router.put("/:id", verifyToken, allowRoles("super_admin", "admin"), clinic.update);
 
   // Upload clinic logo/profile image
   router.post(
     "/:id/upload-logo",
     verifyToken,
+    allowRoles("super_admin", "admin"),
     uploadClinicLogo.single("logo"),
     handleUploadError,
     clinic.uploadLogo
   );
 
   // Delete clinic by id
-  router.delete("/:id", verifyToken, clinic.delete);
+  router.delete("/:id", verifyToken, allowRoles("super_admin"), clinic.delete);
 
   app.use("/api/clinics", router);
   app.use("/api/clinic", router);

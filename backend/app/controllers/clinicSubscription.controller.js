@@ -4,6 +4,10 @@ const { logger } = require("../config/logger");
 exports.purchase = async (req, res) => {
   try {
     const isSuperAdmin = req.user?.role === "super_admin";
+    if (!isSuperAdmin && (req.body?.clinic_id || req.query?.clinic_id)) {
+      return res.status(403).send({ message: "Admins cannot specify clinic_id explicitly" });
+    }
+
     const clinicId = isSuperAdmin ? (req.body?.clinic_id || req.query?.clinic_id) : req.user?.clinic_id;
     const subscriptionId = req.body?.subscription_id;
 

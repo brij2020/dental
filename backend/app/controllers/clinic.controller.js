@@ -173,7 +173,10 @@ exports.findOne = async (req, res) => {
  */
 exports.update = async (req, res) => {
   try {
-    const clinicId = req.params.id || req.user.clinic_id;
+    let clinicId = req.params.id || req.user.clinic_id;
+    if (req.user?.role === "admin") {
+      clinicId = req.user.clinic_id;
+    }
     if (!clinicId) {
       return res.status(400).send({
         message: "Clinic ID is required"

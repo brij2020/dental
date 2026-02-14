@@ -1,17 +1,22 @@
 const express = require('express');
+const appointmentController = require('../controllers/appointment.controller');
+const { verifyToken } = require('../middleware/auth.middleware');
+const { throttle } = require('../middleware/throttle.middleware');
+
 module.exports = (app) => {
 	const router = express.Router();
-	const appointmentController = require('../controllers/appointment.controller');
-	const { verifyToken } = require('../middleware/auth.middleware');
+
+	const publicBookLimiter = throttle({ windowMs: 60 * 1000, max: 8, scope: 'appointments-book' });
+	const publicSlotLimiter = throttle({ windowMs: 60 * 1000, max: 12, scope: 'appointments-slots' });
 
 	// Book an appointment (public endpoint - patients can book without auth)
-	router.post('/', appointmentController.book);
+	router.post('/', publicBookLimiter, appointmentController.book);
 
 	// Get all appointments for authenticated patient (requires auth)
 	router.get('/', verifyToken, appointmentController.getByPatient);
 
 	// Get booked slots for a doctor on a specific date (public - needed for slot selection)
-	router.get('/booked-slots', appointmentController.getBookedSlots);
+	router.get('/booked-slots', publicSlotLimiter, appointmentController.getBookedSlots);
 
 	// Get patient appointment history with a specific doctor (requires auth)
 	router.get('/patient-history/:patientId', verifyToken, appointmentController.getDoctorHistory);
