@@ -131,10 +131,51 @@ const createClinic = async (clinicData) => {
 /**
  * Get all clinics
  */
+const isValidString = (value) => typeof value === "string" && value.trim().length > 0;
+
 const getAllClinics = async (filters = {}) => {
   try {
     const hasPagination = filters.page !== undefined || filters.limit !== undefined;
     const query = {};
+
+    if (isValidString(filters.search)) {
+      const term = filters.search.trim();
+      const regex = new RegExp(term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
+      query.$or = [
+        { name: regex },
+        { "address.city": regex },
+        { phone: regex },
+        { branding_moto: regex },
+      ];
+    }
+
+    if (isValidString(filters.city)) {
+      query["address.city"] = new RegExp(`^${filters.city.trim()}$`, "i");
+    }
+
+    if (isValidString(filters.status)) {
+      query.status = filters.status.trim();
+    }
+
+    if (isValidString(filters.created_from) || isValidString(filters.created_to)) {
+      query.createdAt = {};
+      if (isValidString(filters.created_from)) {
+        const from = new Date(filters.created_from);
+        if (!Number.isNaN(from.getTime())) {
+          query.createdAt.$gte = from;
+        }
+      }
+      if (isValidString(filters.created_to)) {
+        const to = new Date(filters.created_to);
+        if (!Number.isNaN(to.getTime())) {
+          to.setHours(23, 59, 59, 999);
+          query.createdAt.$lte = to;
+        }
+      }
+      if (Object.keys(query.createdAt).length === 0) {
+        delete query.createdAt;
+      }
+    }
 
     if (hasPagination) {
       const page = Math.max(1, parseInt(filters.page, 10) || 1);

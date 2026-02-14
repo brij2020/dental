@@ -36,6 +36,8 @@ export default function Clinics() {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterCity, setFilterCity] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
+  const [createdFrom, setCreatedFrom] = useState("");
+  const [createdTo, setCreatedTo] = useState("");
 
   useEffect(() => {
     if (success) {
@@ -53,7 +55,15 @@ export default function Clinics() {
         } else {
           setIsPageLoading(true);
         }
-        const response = await getAllClinics({ page: currentPage, limit: PAGE_SIZE });
+        const response = await getAllClinics({
+          page: currentPage,
+          limit: PAGE_SIZE,
+          search: searchTerm,
+          city: filterCity,
+          status: filterStatus,
+          created_from: createdFrom || undefined,
+          created_to: createdTo || undefined,
+        });
         const pageData = response?.data || [];
         const pagination = response?.pagination;
         setClinics(pageData);
@@ -75,7 +85,7 @@ export default function Clinics() {
     };
 
     fetchClinics();
-  }, [PAGE_SIZE, currentPage]);
+    }, [PAGE_SIZE, currentPage, searchTerm, filterCity, filterStatus, createdFrom, createdTo]);
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -85,51 +95,6 @@ export default function Clinics() {
       setSortOrder("asc");
     }
   };
-
-  const processedClinics = useMemo(() => {
-    const filtered = clinics.filter((clinic) => {
-      const matchesSearch =
-        searchTerm.trim() === "" ||
-        clinic.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (clinic.phone || "").includes(searchTerm) ||
-        (clinic.address?.city || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (clinic.branding_moto || "").toLowerCase().includes(searchTerm.toLowerCase());
-
-      const matchesCity =
-        filterCity === "" ||
-        (clinic.address?.city || "").toLowerCase() === filterCity.toLowerCase();
-
-      const matchesStatus =
-        filterStatus === "" || (clinic.status || "").toLowerCase() === filterStatus.toLowerCase();
-
-      return matchesSearch && matchesCity && matchesStatus;
-    });
-
-    const sorted = [...filtered].sort((a, b) => {
-      let aVal: string = "";
-      let bVal: string = "";
-
-      if (sortField === "city") {
-        aVal = (a.address?.city || "").toLowerCase();
-        bVal = (b.address?.city || "").toLowerCase();
-      } else if (sortField === "name") {
-        aVal = (a.name || "").toLowerCase();
-        bVal = (b.name || "").toLowerCase();
-      } else if (sortField === "phone") {
-        aVal = (a.phone || "").toLowerCase();
-        bVal = (b.phone || "").toLowerCase();
-      } else if (sortField === "status") {
-        aVal = (a.status || "").toLowerCase();
-        bVal = (b.status || "").toLowerCase();
-      }
-
-      if (aVal < bVal) return sortOrder === "asc" ? -1 : 1;
-      if (aVal > bVal) return sortOrder === "asc" ? 1 : -1;
-      return 0;
-    });
-
-    return sorted;
-  }, [clinics, searchTerm, filterCity, filterStatus, sortField, sortOrder]);
 
   const SortIcon = ({ field }: { field: SortField }) => {
     if (sortField !== field) return null;
@@ -145,6 +110,55 @@ export default function Clinics() {
   const getClinicPlanName = (clinic: ClinicResponse) => {
     return clinic.current_plan?.name?.trim() || "Free Plan";
   };
+
+  const filteredClinics = useMemo(() => {
+    const getCreatedDate = (clinic: ClinicResponse) => {
+      const raw = clinic.created_at || clinic.createdAt;
+      if (!raw) return null;
+      const parsed = new Date(raw);
+      return Number.isNaN(parsed.getTime()) ? null : parsed;
+    };
+
+    const fromDate = createdFrom ? new Date(`${createdFrom}T00:00:00`) : null;
+    const toDate = createdTo ? new Date(`${createdTo}T23:59:59.999`) : null;
+
+    return clinics.filter((clinic) => {
+      const createdDate = getCreatedDate(clinic);
+      const matchesFrom = !fromDate || (!!createdDate && createdDate >= fromDate);
+      const matchesTo = !toDate || (!!createdDate && createdDate <= toDate);
+      return matchesFrom && matchesTo;
+    });
+  }, [clinics, createdFrom, createdTo]);
+
+  const sortedClinics = useMemo(() => {
+    const sorted = [...filteredClinics];
+
+    sorted.sort((a, b) => {
+      const normalize = (value?: string) => (value || "").toLowerCase();
+      let aVal: string = "";
+      let bVal: string = "";
+
+      if (sortField === "city") {
+        aVal = normalize(a.address?.city);
+        bVal = normalize(b.address?.city);
+      } else if (sortField === "name") {
+        aVal = normalize(a.name);
+        bVal = normalize(b.name);
+      } else if (sortField === "phone") {
+        aVal = normalize(a.phone);
+        bVal = normalize(b.phone);
+      } else if (sortField === "status") {
+        aVal = normalize(a.status);
+        bVal = normalize(b.status);
+      }
+
+      if (aVal < bVal) return sortOrder === "asc" ? -1 : 1;
+      if (aVal > bVal) return sortOrder === "asc" ? 1 : -1;
+      return 0;
+    });
+
+    return sorted;
+  }, [filteredClinics, sortField, sortOrder]);
 
   const handleDelete = async (clinic: ClinicResponse) => {
     if (!confirm(`Are you sure you want to deactivate ${clinic.name}?`)) {
@@ -222,7 +236,7 @@ export default function Clinics() {
         )}
 
         {/* Filter + Table View */}
-        <div className="mb-6 grid gap-3 md:grid-cols-4">
+        <div className="mb-6 grid gap-3 md:grid-cols-6">
           <div className="md:col-span-2">
             <label className="text-xs uppercase tracking-wider text-slate-500">Search clinics</label>
             <input
@@ -239,9 +253,12 @@ export default function Clinics() {
             <label className="text-xs uppercase tracking-wider text-slate-500">Filter city</label>
             <select
               value={filterCity}
-              onChange={(e) => setFilterCity(e.target.value)}
-              className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-200"
-            >
+              onChange={(e) => {
+                setFilterCity(e.target.value);
+                setCurrentPage(1);
+              }}
+                className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-200"
+              >
               <option value="">All cities</option>
               {uniqueCities.map((city) => (
                 <option key={city} value={city}>
@@ -254,14 +271,41 @@ export default function Clinics() {
             <label className="text-xs uppercase tracking-wider text-slate-500">Status</label>
             <select
               value={filterStatus}
-              onChange={(e) => setFilterStatus(e.target.value)}
-              className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-200"
-            >
+              onChange={(e) => {
+                setFilterStatus(e.target.value);
+                setCurrentPage(1);
+              }}
+                className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-200"
+              >
               <option value="">All statuses</option>
               <option value="Active">Active</option>
               <option value="Inactive">Inactive</option>
               <option value="Pending">Pending</option>
             </select>
+          </div>
+          <div>
+            <label className="text-xs uppercase tracking-wider text-slate-500">Created from</label>
+            <input
+              type="date"
+              value={createdFrom}
+              onChange={(e) => {
+                setCreatedFrom(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-200"
+            />
+          </div>
+          <div>
+            <label className="text-xs uppercase tracking-wider text-slate-500">Created to</label>
+            <input
+              type="date"
+              value={createdTo}
+              onChange={(e) => {
+                setCreatedTo(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-200"
+            />
           </div>
           <div className="flex items-end">
             <button
@@ -269,6 +313,8 @@ export default function Clinics() {
                 setSearchTerm("");
                 setFilterCity("");
                 setFilterStatus("");
+                setCreatedFrom("");
+                setCreatedTo("");
               }}
               className="w-full rounded-xl border border-slate-300 px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 transition"
             >
@@ -276,16 +322,18 @@ export default function Clinics() {
             </button>
           </div>
         </div>
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-2 text-sm text-slate-600">
-          <span className="text-slate-600">
-            Showing {processedClinics.length} of {totalItems} clinic{totalItems !== 1 ? "s" : ""}
-          </span>
-          {(filterCity || filterStatus || searchTerm) && (
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-2 text-sm text-slate-600">
+            <span className="text-slate-600">
+              Showing {sortedClinics.length} of {totalItems} clinic{totalItems !== 1 ? "s" : ""}
+            </span>
+          {(filterCity || filterStatus || searchTerm || createdFrom || createdTo) && (
             <button
               onClick={() => {
                 setSearchTerm("");
                 setFilterCity("");
                 setFilterStatus("");
+                setCreatedFrom("");
+                setCreatedTo("");
               }}
               className="text-sky-600 underline text-xs"
             >
@@ -370,7 +418,7 @@ export default function Clinics() {
                   {/* Body */}
                   <tbody className="divide-y divide-slate-100">
 
-                    {processedClinics.map((clinic) => (
+                  {sortedClinics.map((clinic) => (
                       <tr
                         key={getClinicId(clinic)}
                         className="group hover:bg-slate-50 transition"

@@ -66,6 +66,7 @@ export interface ClinicResponse {
     updated_at?: string;
   };
   created_at?: string;
+  createdAt?: string;
   updated_at?: string;
 }
 
@@ -91,7 +92,15 @@ export const createClinic = async (data: ClinicFormData): Promise<ClinicResponse
  * Get all clinics for super admin
  */
 export const getAllClinics = async (
-  options?: { page?: number; limit?: number }
+  options?: {
+    page?: number;
+    limit?: number;
+    search?: string;
+    city?: string;
+    status?: string;
+    created_from?: string;
+    created_to?: string;
+  }
 ): Promise<ClinicsListResponse> => {
   const response = await apiClient.get("/api/clinics", { params: options });
   const payload = response.data;

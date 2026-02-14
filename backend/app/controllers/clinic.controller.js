@@ -52,6 +52,11 @@ exports.findAll = async (req, res) => {
     const result = await clinicService.getAllClinics({
       page: pagination.hasPagination ? pagination.page : undefined,
       limit: pagination.hasPagination ? pagination.limit : undefined,
+      search: req.query.search,
+      city: req.query.city,
+      status: req.query.status,
+      created_from: req.query.created_from,
+      created_to: req.query.created_to,
     });
     const clinics = Array.isArray(result) ? result : (result?.data || []);
     const paginationMeta = Array.isArray(result) ? undefined : result?.pagination;
