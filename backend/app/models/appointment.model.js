@@ -115,7 +115,7 @@ appointmentSchema.index({ clinic_id: 1, appointment_date: 1 });
 appointmentSchema.pre('save', async function (next) {
   try {
     // Generate File Number if not provided, clinic_id exists, and appointment is provisional
-    if (this.provisional === false || !this.clinic_id) {
+    if (this.provisional === true || !this.clinic_id) {
       return next();
     }
 
