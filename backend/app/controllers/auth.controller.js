@@ -15,6 +15,43 @@ function maskMobileNumber(mobileNumber) {
     if (value.length < 4) return "****";
     return `******${value.slice(-4)}`;
 }
+
+function getPatientOtpKey(patientId) {
+    return `patient:${String(patientId)}`;
+}
+
+function getStaffOtpKey(userId) {
+    return `staff:${String(userId)}`;
+}
+
+async function sendPatientOtpViaPreferredChannel({ identifier, patient, otp, purpose }) {
+    const isEmailIdentifier = String(identifier || "").includes("@");
+
+    if (isEmailIdentifier) {
+        if (!patient.email) {
+            throw new Error("Email is not available for this account");
+        }
+
+        const subject = purpose === "login" ? "Your Login OTP" : "Your Password Reset OTP";
+        const text = `Your OTP is ${otp}. It is valid for 10 minutes.`;
+        const html = `<p>Your OTP is <b>${otp}</b>.</p><p>It is valid for 10 minutes.</p>`;
+        await sendEmail({ to: patient.email, subject, text, html });
+        return;
+    }
+
+    if (!patient.contact_number) {
+        throw new Error("Mobile number is not available for this account");
+    }
+
+    const normalizedMobile = smsService.normalizeMobileNumber(patient.contact_number);
+    if (!normalizedMobile) {
+        throw new Error("Registered mobile number is invalid");
+    }
+
+    const tenDigitMobile = normalizedMobile.slice(-10);
+    const smsText = smsService.buildOtpMessage(otp);
+    await smsService.sendSms({ mobileNumber: tenDigitMobile, message: smsText });
+}
 /**
  * Register (Doctor / Admin)
  */
@@ -111,37 +148,60 @@ exports.login = async (req, res) => {
  */
 exports.sendMobileOtp = async (req, res) => {
     try {
-        const { mobile_number } = req.body;
-        if (!mobile_number) {
-            return res.status(400).send({ message: "mobile_number is required" });
+        const identifier = req.body?.identifier || req.body?.mobile_number;
+        if (!identifier) {
+            return res.status(400).send({ message: "identifier (email or mobile) is required" });
         }
 
-        logger.info({ mobile: maskMobileNumber(mobile_number) }, "Received request to send mobile OTP");
-        const normalizedMobile = smsService.normalizeMobileNumber(mobile_number);
-        if (!normalizedMobile) {
-            logger.warn({ mobile: maskMobileNumber(mobile_number) }, "Invalid mobile number format for OTP request");
-            return res.status(400).send({ message: "Invalid mobile number format" });
+        const rawIdentifier = String(identifier).trim();
+        let user = null;
+        let tenDigitMobile = null;
+        const isEmailIdentifier = rawIdentifier.includes("@");
+
+        if (isEmailIdentifier) {
+            user = await Profile.findOne({ email: rawIdentifier.toLowerCase() });
+            if (!user) {
+                logger.warn({ email: rawIdentifier.toLowerCase() }, "OTP request failed: user not found for email");
+                return res.status(404).send({ message: "User not found for this email" });
+            }
+        } else {
+            const normalizedMobile = smsService.normalizeMobileNumber(rawIdentifier);
+            if (!normalizedMobile) {
+                logger.warn({ mobile: maskMobileNumber(rawIdentifier) }, "Invalid mobile number format for OTP request");
+                return res.status(400).send({ message: "Invalid mobile number format" });
+            }
+
+            tenDigitMobile = normalizedMobile.slice(-10);
+            user = await Profile.findOne({ mobile_number: tenDigitMobile });
+            if (!user) {
+                logger.warn({ mobile: maskMobileNumber(tenDigitMobile) }, "OTP request failed: user not found for mobile number");
+                return res.status(404).send({ message: "User not found for this mobile number" });
+            }
         }
 
-        const tenDigitMobile = normalizedMobile.slice(-10);
-        const user = await Profile.findOne({ mobile_number: tenDigitMobile });
-        if (!user) {
-            logger.warn({ mobile: maskMobileNumber(tenDigitMobile) }, "OTP request failed: user not found for mobile number");
-            return res.status(404).send({ message: "User not found for this mobile number" });
+        const otpKey = getStaffOtpKey(user._id);
+        const otp = await otpService.createOtp(otpKey, undefined, "login");
+        let gatewayResponse = null;
+        if (isEmailIdentifier) {
+            const subject = "Your Login OTP";
+            const text = `Your OTP is ${otp}. It is valid for 10 minutes.`;
+            const html = `<p>Your OTP is <b>${otp}</b>.</p><p>It is valid for 10 minutes.</p>`;
+            await emailService.sendEmail({ to: user.email, subject, text, html });
+        } else if (tenDigitMobile) {
+            const smsText = smsService.buildOtpMessage(otp);
+            const smsResult = await smsService.sendSms({ mobileNumber: tenDigitMobile, message: smsText });
+            gatewayResponse = smsResult?.raw;
         }
-
-        const otp = await otpService.createOtp(tenDigitMobile);
-        const smsText = smsService.buildOtpMessage(otp);
-        const smsResult = await smsService.sendSms({ mobileNumber: tenDigitMobile, message: smsText });
 
         logger.info({
             userId: user._id,
-            mobile: maskMobileNumber(tenDigitMobile),
-            gatewayResponse: smsResult?.raw
+            identifierType: isEmailIdentifier ? "email" : "mobile",
+            mobile: tenDigitMobile ? maskMobileNumber(tenDigitMobile) : undefined,
+            gatewayResponse,
         }, "Mobile OTP sent");
         return res.status(200).send({ message: "OTP sent successfully" });
     } catch (err) {
-        logger.error({ err, mobile: maskMobileNumber(req.body?.mobile_number) }, "Error sending mobile OTP");
+        logger.error({ err }, "Error sending mobile OTP");
         return res.status(500).send({ message: err.message || "Failed to send OTP" });
     }
 };
@@ -151,26 +211,37 @@ exports.sendMobileOtp = async (req, res) => {
  */
 exports.verifyMobileOtp = async (req, res) => {
     try {
-        const { mobile_number, otp } = req.body;
-        if (!mobile_number || !otp) {
-            return res.status(400).send({ message: "mobile_number and otp are required" });
+        const identifier = req.body?.identifier || req.body?.mobile_number;
+        const { otp } = req.body;
+        if (!identifier || !otp) {
+            return res.status(400).send({ message: "identifier and otp are required" });
         }
 
-        const normalizedMobile = smsService.normalizeMobileNumber(mobile_number);
-        if (!normalizedMobile) {
-            return res.status(400).send({ message: "Invalid mobile number format" });
+        const rawIdentifier = String(identifier).trim();
+        const isEmailIdentifier = rawIdentifier.includes("@");
+        let user = null;
+        let tenDigitMobile = null;
+
+        if (isEmailIdentifier) {
+            user = await Profile.findOne({ email: rawIdentifier.toLowerCase() });
+        } else {
+            const normalizedMobile = smsService.normalizeMobileNumber(rawIdentifier);
+            if (!normalizedMobile) {
+                return res.status(400).send({ message: "Invalid mobile number format" });
+            }
+            tenDigitMobile = normalizedMobile.slice(-10);
+            user = await Profile.findOne({ mobile_number: tenDigitMobile });
         }
 
-        const tenDigitMobile = normalizedMobile.slice(-10);
-        const user = await Profile.findOne({ mobile_number: tenDigitMobile });
         if (!user) {
-            return res.status(401).send({ message: "Invalid OTP or mobile number" });
+            return res.status(401).send({ message: "Invalid OTP or identifier" });
         }
 
-        const verifyResult = await otpService.verifyOtp(tenDigitMobile, String(otp).trim());
+        const otpKey = getStaffOtpKey(user._id);
+        const verifyResult = await otpService.verifyOtp(otpKey, String(otp).trim(), "login");
         if (!verifyResult.valid) {
             logger.warn({
-                mobile: maskMobileNumber(tenDigitMobile),
+                userId: user._id,
                 reason: verifyResult.reason,
                 attemptsLeft: verifyResult.attemptsLeft
             }, "OTP verification failed");
@@ -183,7 +254,11 @@ exports.verifyMobileOtp = async (req, res) => {
             { expiresIn: "1d" }
         );
 
-        logger.info({ userId: user._id, mobile: maskMobileNumber(tenDigitMobile) }, "Mobile OTP login successful");
+        logger.info({
+            userId: user._id,
+            identifierType: isEmailIdentifier ? "email" : "mobile",
+            mobile: tenDigitMobile ? maskMobileNumber(tenDigitMobile) : undefined
+        }, "Mobile OTP login successful");
         return res.status(200).send({
             token,
             role: user.role,
@@ -269,6 +344,139 @@ exports.patientLogin = async (req, res) => {
             success: false,
             message: "Invalid email or password",
             code: "INVALID_CREDENTIALS"
+        });
+    }
+};
+
+/**
+ * Send OTP for patient login.
+ * Accepts identifier as email or mobile number.
+ */
+exports.sendPatientLoginOtp = async (req, res) => {
+    try {
+        const { identifier } = req.body;
+        if (!identifier) {
+            return res.status(400).json({
+                success: false,
+                message: "Email or mobile number is required",
+                code: "MISSING_IDENTIFIER",
+            });
+        }
+
+        const rawIdentifier = String(identifier).trim();
+        let patient = null;
+
+        if (rawIdentifier.includes("@")) {
+            patient = await Patient.findOne({ email: rawIdentifier.toLowerCase() });
+        } else {
+            const normalizedMobile = smsService.normalizeMobileNumber(rawIdentifier);
+            if (normalizedMobile) {
+                const tenDigitMobile = normalizedMobile.slice(-10);
+                patient = await Patient.findOne({ contact_number: tenDigitMobile });
+            }
+        }
+
+        if (!patient) {
+            return res.status(401).json({
+                success: false,
+                message: "Account not found",
+                code: "PATIENT_NOT_FOUND",
+            });
+        }
+
+        const otpKey = getPatientOtpKey(patient._id);
+        const otp = await otpService.createOtp(otpKey, undefined, "patient_login");
+        await sendPatientOtpViaPreferredChannel({
+            identifier: rawIdentifier,
+            patient,
+            otp,
+            purpose: "login",
+        });
+
+        logger.info({ patientId: patient._id }, "Patient login OTP sent");
+        return res.status(200).json({
+            success: true,
+            message: "OTP sent successfully",
+        });
+    } catch (err) {
+        logger.error({ err }, "Error sending patient login OTP");
+        return res.status(500).json({
+            success: false,
+            message: err.message || "Failed to send OTP",
+            code: "SEND_OTP_ERROR",
+        });
+    }
+};
+
+/**
+ * Verify OTP and login patient.
+ */
+exports.verifyPatientLoginOtp = async (req, res) => {
+    try {
+        const { identifier, otp } = req.body;
+        if (!identifier || !otp) {
+            return res.status(400).json({
+                success: false,
+                message: "Identifier and OTP are required",
+                code: "MISSING_FIELDS",
+            });
+        }
+
+        const rawIdentifier = String(identifier).trim();
+        let patient = null;
+
+        if (rawIdentifier.includes("@")) {
+            patient = await Patient.findOne({ email: rawIdentifier.toLowerCase() });
+        } else {
+            const normalizedMobile = smsService.normalizeMobileNumber(rawIdentifier);
+            if (normalizedMobile) {
+                const tenDigitMobile = normalizedMobile.slice(-10);
+                patient = await Patient.findOne({ contact_number: tenDigitMobile });
+            }
+        }
+
+        if (!patient) {
+            return res.status(401).json({
+                success: false,
+                message: "Invalid OTP or account details",
+                code: "INVALID_OTP_LOGIN",
+            });
+        }
+
+        const otpKey = getPatientOtpKey(patient._id);
+        const verifyResult = await otpService.verifyOtp(otpKey, String(otp).trim(), "patient_login");
+        if (!verifyResult.valid) {
+            return res.status(401).json({
+                success: false,
+                message: "Invalid or expired OTP",
+                code: verifyResult.reason || "INVALID_OTP",
+            });
+        }
+
+        const token = jwt.sign(
+            { id: patient._id, patient_id: patient._id, email: patient.email, full_name: patient.full_name, role: "patient" },
+            JWT_SECRET,
+            { expiresIn: "7d" }
+        );
+
+        logger.info({ patientId: patient._id }, "Patient OTP login successful");
+        return res.status(200).json({
+            success: true,
+            data: {
+                token,
+                patient_id: patient._id,
+                email: patient.email,
+                full_name: patient.full_name,
+                uhid: patient.uhid
+            },
+            message: "Login successful"
+        });
+    } catch (err) {
+        logger.error({ err }, "Error verifying patient login OTP");
+        return res.status(500).json({
+            success: false,
+            message: "Failed to verify OTP",
+            code: "VERIFY_OTP_ERROR",
         });
     }
 };
@@ -374,6 +582,141 @@ exports.patientRegister = async (req, res) => {
             success: false,
             message: err.message || "Error registering patient",
             code: "REGISTRATION_ERROR"
+        });
+    }
+};
+
+/**
+ * Send OTP for patient forgot-password flow.
+ * Accepts identifier as email or mobile number.
+ */
+exports.sendPatientPasswordResetOtp = async (req, res) => {
+    try {
+        const { identifier } = req.body;
+
+        if (!identifier) {
+            return res.status(400).json({
+                success: false,
+                message: "Email or mobile number is required",
+                code: "MISSING_IDENTIFIER",
+            });
+        }
+
+        const rawIdentifier = String(identifier).trim();
+        let patient = null;
+
+        if (rawIdentifier.includes("@")) {
+            patient = await Patient.findOne({ email: rawIdentifier.toLowerCase() });
+        } else {
+            const normalizedMobile = smsService.normalizeMobileNumber(rawIdentifier);
+            if (normalizedMobile) {
+                const tenDigitMobile = normalizedMobile.slice(-10);
+                patient = await Patient.findOne({ contact_number: tenDigitMobile });
+            }
+        }
+
+        // Do not reveal account existence
+        if (!patient) {
+            return res.status(200).json({
+                success: true,
+                message: "If an account exists, OTP has been sent to the registered mobile number",
+            });
+        }
+
+        const otpKey = getPatientOtpKey(patient._id);
+        const otp = await otpService.createOtp(otpKey, undefined, "patient_password_reset");
+        await sendPatientOtpViaPreferredChannel({
+            identifier: rawIdentifier,
+            patient,
+            otp,
+            purpose: "password_reset",
+        });
+
+        logger.info({ patientId: patient._id }, "Patient password reset OTP sent");
+
+        return res.status(200).json({
+            success: true,
+            message: "OTP sent successfully",
+        });
+    } catch (err) {
+        logger.error({ err }, "Error sending patient password reset OTP");
+        return res.status(500).json({
+            success: false,
+            message: err.message || "Failed to send OTP",
+            code: "SEND_OTP_ERROR",
+        });
+    }
+};
+
+/**
+ * Reset patient password using OTP.
+ * Accepts identifier as email or mobile number.
+ */
+exports.resetPatientPasswordWithOtp = async (req, res) => {
+    try {
+        const { identifier, otp, newPassword } = req.body;
+
+        if (!identifier || !otp || !newPassword) {
+            return res.status(400).json({
+                success: false,
+                message: "Identifier, OTP, and new password are required",
+                code: "MISSING_FIELDS",
+            });
+        }
+
+        if (String(newPassword).length < 8) {
+            return res.status(400).json({
+                success: false,
+                message: "Password must be at least 8 characters long",
+                code: "WEAK_PASSWORD",
+            });
+        }
+
+        const rawIdentifier = String(identifier).trim();
+        let patient = null;
+
+        if (rawIdentifier.includes("@")) {
+            patient = await Patient.findOne({ email: rawIdentifier.toLowerCase() }).select("+password");
+        } else {
+            const normalizedMobileFromInput = smsService.normalizeMobileNumber(rawIdentifier);
+            if (normalizedMobileFromInput) {
+                const tenDigitFromInput = normalizedMobileFromInput.slice(-10);
+                patient = await Patient.findOne({ contact_number: tenDigitFromInput }).select("+password");
+            }
+        }
+
+        if (!patient) {
+            return res.status(400).json({
+                success: false,
+                message: "Invalid OTP or account details",
+                code: "INVALID_RESET_REQUEST",
+            });
+        }
+
+        const otpKey = getPatientOtpKey(patient._id);
+        const verifyResult = await otpService.verifyOtp(otpKey, String(otp).trim(), "patient_password_reset");
+        if (!verifyResult.valid) {
+            return res.status(400).json({
+                success: false,
+                message: "Invalid or expired OTP",
+                code: verifyResult.reason || "INVALID_OTP",
+            });
+        }
+
+        patient.password = newPassword;
+        await patient.save();
+
+        logger.info({ patientId: patient._id }, "Patient password reset via OTP");
+        return res.status(200).json({
+            success: true,
+            message: "Password reset successful. Please login with your new password",
+        });
+    } catch (err) {
+        logger.error({ err }, "Error resetting patient password with OTP");
+        return res.status(500).json({
+            success: false,
+            message: err.message || "Failed to reset password",
+            code: "RESET_PASSWORD_ERROR",
         });
     }
 };

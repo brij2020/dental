@@ -5,7 +5,12 @@ const otpSchema = new mongoose.Schema(
     mobile_number: {
       type: String,
       required: true,
-      unique: true,
+      trim: true,
+    },
+    purpose: {
+      type: String,
+      required: true,
+      default: "login",
       trim: true,
     },
     otp_hash: {
@@ -29,5 +34,7 @@ const otpSchema = new mongoose.Schema(
     },
   }
 );
+
+otpSchema.index({ mobile_number: 1, purpose: 1 }, { unique: true });
 
 module.exports = mongoose.model("Otp", otpSchema);

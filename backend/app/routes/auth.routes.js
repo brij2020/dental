@@ -203,6 +203,8 @@ module.exports = app => {
    *         description: Invalid credentials
    */
   router.post("/patient-login", auth.patientLogin);
+  router.post("/patient-login/send-otp", auth.sendPatientLoginOtp);
+  router.post("/patient-login/verify-otp", auth.verifyPatientLoginOtp);
 
   /**
    * @swagger
@@ -240,6 +242,8 @@ module.exports = app => {
    *         description: Email already registered
    */
   router.post("/patient-register", auth.patientRegister);
+  router.post("/patient-forgot-password/send-otp", auth.sendPatientPasswordResetOtp);
+  router.post("/patient-forgot-password/reset-with-otp", auth.resetPatientPasswordWithOtp);
 
   app.use("/api/auth", router);
 

@@ -21,7 +21,7 @@ export default function Login() {
   const [loginMode, setLoginMode] = useState<"password" | "otp">("password");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [mobileNumber, setMobileNumber] = useState("");
+  const [otpIdentifier, setOtpIdentifier] = useState("");
   const [otp, setOtp] = useState("");
   const [otpSent, setOtpSent] = useState(false);
   const [showPwd, setShowPwd] = useState(false);
@@ -35,11 +35,12 @@ export default function Login() {
       if (loginMode === "password") {
         await login(email, password);
       } else {
-        await loginWithMobileOtp(mobileNumber, otp);
+        await loginWithMobileOtp(otpIdentifier.trim(), otp);
       }
       navigate("/dashboard", { replace: true });
-    } catch (error: any) {
-      const msg = error?.response?.data?.message || error?.message || "Login failed";
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { message?: string } }; message?: string };
+      const msg = err?.response?.data?.message || err?.message || "Login failed";
       toast.error(msg);
     } finally {
       setSubmitting(false);
@@ -47,24 +48,44 @@ export default function Login() {
   };
 
   const onSendOtp = async () => {
-    const digits = mobileNumber.replace(/\D/g, "");
-    if (digits.length !== 10) {
-      toast.error("Enter a valid 10-digit mobile number");
+    const identifier = otpIdentifier.trim();
+    if (!identifier) {
+      toast.error("Enter registered email or mobile number");
       return;
+    }
+
+    if (!identifier.includes("@")) {
+      const digits = identifier.replace(/\D/g, "");
+      if (digits.length !== 10) {
+        toast.error("Enter a valid 10-digit mobile number");
+        return;
+      }
+      setOtpIdentifier(digits);
+    }
+
+    if (identifier.includes("@")) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(identifier)) {
+        toast.error("Enter a valid email address");
+        return;
+      }
     }
 
     setSubmitting(true);
     try {
-      await sendMobileOtp(digits);
+      await sendMobileOtp(identifier);
       setOtpSent(true);
       toast.success("OTP sent successfully");
-    } catch (error: any) {
-      const msg = error?.response?.data?.message || error?.message || "Failed to send OTP";
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { message?: string } }; message?: string };
+      const msg = err?.response?.data?.message || err?.message || "Failed to send OTP";
       toast.error(msg);
     } finally {
       setSubmitting(false);
     }
   };
+
+  const otpLoginLabel = "Email or Mobile";
 
   return (
     <div className="min-h-screen grid lg:grid-cols-2 bg-slate-50">
@@ -119,7 +140,7 @@ export default function Login() {
                     loginMode === "otp" ? "bg-white text-slate-900 shadow-sm" : "text-slate-600 hover:text-slate-900"
                   }`}
                 >
-                  Mobile OTP
+                  OTP Login
                 </button>
               </div>
               <form onSubmit={onSubmit} className="mt-6 space-y-5">
@@ -178,21 +199,21 @@ export default function Login() {
                 ) : (
                   <>
                     <div>
-                      <label htmlFor="mobile_number" className="block text-sm font-medium text-slate-700">
-                        Mobile Number
+                      <label htmlFor="otp_identifier" className="block text-sm font-medium text-slate-700">
+                        {otpLoginLabel}
                       </label>
                       <div className="mt-2 relative">
                         <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
                           <IconDeviceMobile className="h-5 w-5 text-slate-400" />
                         </span>
                         <input
-                          id="mobile_number"
+                          id="otp_identifier"
                           required
-                          type="tel"
-                          value={mobileNumber}
-                          onChange={(e) => setMobileNumber(e.target.value)}
+                          type="text"
+                          value={otpIdentifier}
+                          onChange={(e) => setOtpIdentifier(e.target.value)}
                           className="w-full rounded-xl border border-slate-300 bg-white pl-10 pr-3 py-2.5 text-slate-900 outline-none focus:ring-4 focus:ring-sky-300/40 focus:border-sky-400 transition"
-                          placeholder="9876543210"
+                          placeholder="you@clinic.com or 9876543210"
                         />
                       </div>
                     </div>

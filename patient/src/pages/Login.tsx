@@ -1,67 +1,118 @@
 import React from "react";
-import Input from "../Components/input";
-import { useForm } from "react-hook-form";
 import { toast } from "react-toastify";
 import { useNavigate } from "react-router-dom";
 import { api } from "../lib/apiClient";
 
-type LoginFormInputs = {
-  email: string;
-  password: string;
-};
+type LoginMode = "password" | "otp";
 
 const Login: React.FC = () => {
   const navigate = useNavigate();
+  const [mode, setMode] = React.useState<LoginMode>("password");
+  const [email, setEmail] = React.useState("");
+  const [password, setPassword] = React.useState("");
+  const [identifier, setIdentifier] = React.useState("");
+  const [otp, setOtp] = React.useState("");
+  const [otpSent, setOtpSent] = React.useState(false);
+  const [loading, setLoading] = React.useState(false);
 
-  const {
-    register,
-    handleSubmit,
-    formState: { errors, isSubmitting },
-  } = useForm<LoginFormInputs>({
-    mode: "onTouched",
-  });
+  const persistPatientSession = (sessionData: any) => {
+    localStorage.setItem("authToken", sessionData.token);
+    localStorage.setItem("patient_id", sessionData.patient_id);
+    localStorage.setItem("patient_email", sessionData.email);
+    localStorage.setItem("patient_name", sessionData.full_name);
+    localStorage.setItem("patient_uhid", sessionData.uhid);
+  };
 
-  const onSubmit = async (data: LoginFormInputs) => {
-    if(isSubmitting) return;
+  const handlePasswordLogin = async () => {
+    if (!email.trim() || !password.trim()) {
+      toast.error("Email and password are required");
+      return;
+    }
+
     try {
-      console.log("🚀 Logging in patient:", data.email);
-      
+      setLoading(true);
       const response: any = await api.post("/api/auth/patient-login", {
-        email: data.email,
-        password: data.password,
+        email: email.trim(),
+        password: password,
       });
 
-      console.log("📋 API Response:", response);
-
       if (!response.success) {
-        console.error("❌ Login failed:", response.error);
         toast.error(response.error || "Login failed");
         return;
       }
 
-      // response.data contains the backend response with patient data
       const backendData = response.data;
-      
-      if(backendData?.success && backendData?.data) {
-        console.log("✅ Login successful:", backendData.data);
-        // Store token and patient info in localStorage
-        localStorage.setItem("authToken", backendData.data.token);
-        localStorage.setItem("patient_id", backendData.data.patient_id);
-        localStorage.setItem("patient_email", backendData.data.email);
-        localStorage.setItem("patient_name", backendData.data.full_name);
-        localStorage.setItem("patient_uhid", backendData.data.uhid);
+      if (backendData?.success && backendData?.data) {
+        persistPatientSession(backendData.data);
         toast.success("Login successful!");
         navigate("/");
       }
-    } catch (err) {
-      console.error("❌ Unexpected error:", err);
+    } catch {
       toast.error("An unexpected error occurred");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSendOtp = async () => {
+    if (!identifier.trim()) {
+      toast.error("Please enter email or mobile number");
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const response: any = await api.post("/api/auth/patient-login/send-otp", {
+        identifier: identifier.trim(),
+      });
+
+      if (!response.success) {
+        toast.error(response.error || "Failed to send OTP");
+        return;
+      }
+
+      setOtpSent(true);
+      toast.success(response.data?.message || "OTP sent successfully");
+    } catch {
+      toast.error("Failed to send OTP");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleOtpLogin = async () => {
+    if (!identifier.trim() || !otp.trim()) {
+      toast.error("Identifier and OTP are required");
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const response: any = await api.post("/api/auth/patient-login/verify-otp", {
+        identifier: identifier.trim(),
+        otp: otp.trim(),
+      });
+
+      if (!response.success) {
+        toast.error(response.error || "Invalid OTP");
+        return;
+      }
+
+      const backendData = response.data;
+      if (backendData?.success && backendData?.data) {
+        persistPatientSession(backendData.data);
+        toast.success("Login successful!");
+        navigate("/");
+      }
+    } catch {
+      toast.error("Failed to verify OTP");
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
     <div className="flex h-screen w-screen">
-      {/* Left side - Logo */}
       <div className="w-1/2 bg-gradient-to-r from-blue-600 via-blue-400 to-blue-200 flex items-center justify-center">
         <img
           src="/logo.png"
@@ -70,78 +121,135 @@ const Login: React.FC = () => {
         />
       </div>
 
-      {/* Right side - Login Form */}
       <div className="w-1/2 flex items-center justify-center bg-gradient-to-l from-blue-600 via-blue-400 to-blue-200">
-        <form
-          onSubmit={handleSubmit(onSubmit)}
-          className="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-sm text-sm"
-        >
-          <h2 className="text-3xl font-bold mb-8 text-blue-900 text-center">
-            Log In
-          </h2>
+        <div className="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-sm text-sm">
+          <h2 className="text-3xl font-bold mb-2 text-blue-900 text-center">Log In</h2>
+          <p className="text-gray-600 text-xs mb-6 text-center">
+            Access your patient account securely
+          </p>
 
-          {/* Email */}
-          <div className="mb-4 w-full">
-            <Input
-              as="input"
-              id="email"
-              label={<span className="block text-blue-900">Email</span>}
-              type="email"
-              placeholder="Enter your Email"
-              {...register("email", {
-                required: "Email is required",
-                pattern: {
-                  value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
-                  message: "Invalid email address",
-                },
-              })}
-              className={`w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-600 hover:ring-2 hover:ring-blue-400 bg-white text-blue-900 border-blue-300 ${
-                errors.email ? "border-red-500" : ""
+          <div className="mb-5 grid grid-cols-2 rounded-lg bg-blue-50 p-1">
+            <button
+              type="button"
+              onClick={() => {
+                setMode("password");
+                setOtpSent(false);
+                setOtp("");
+              }}
+              className={`py-2 rounded-md text-sm font-semibold transition ${
+                mode === "password" ? "bg-white text-blue-800 shadow-sm" : "text-blue-700"
               }`}
-            />
-            {errors.email && (
-              <p className="text-red-500 text-xs mt-1">
-                {errors.email.message}
-              </p>
-            )}
+            >
+              Password
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode("otp")}
+              className={`py-2 rounded-md text-sm font-semibold transition ${
+                mode === "otp" ? "bg-white text-blue-800 shadow-sm" : "text-blue-700"
+              }`}
+            >
+              OTP Login
+            </button>
           </div>
 
-          {/* Password */}
-          <div className="mb-6 w-full">
-            <Input
-              as="input"
-              id="password"
-              label={<span className="text-blue-900">Password</span>}
-              type="password"
-              placeholder="Enter Password"
-              {...register("password", {
-                required: "Password is required",
-                minLength: {
-                  value: 8,
-                  message: "Password must be at least 8 characters",
-                },
-              })}
-              className={`w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-600 hover:ring-2 hover:ring-blue-400 bg-white text-blue-900 border-blue-300 ${
-                errors.password ? "border-red-500" : ""
-              }`}
-            />
-            {errors.password && (
-              <p className="text-red-500 text-xs mt-1">
-                {errors.password.message}
-              </p>
-            )}
+          {mode === "password" ? (
+            <>
+              <div className="mb-4">
+                <label className="block text-blue-900 font-semibold mb-1">Email</label>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="Enter your email"
+                  className="w-full px-3 py-2 border rounded border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-600"
+                />
+              </div>
+
+              <div className="mb-6">
+                <label className="block text-blue-900 font-semibold mb-1">Password</label>
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Enter your password"
+                  className="w-full px-3 py-2 border rounded border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-600"
+                />
+              </div>
+
+              <button
+                type="button"
+                onClick={handlePasswordLogin}
+                disabled={loading}
+                className={`w-full text-white py-2 rounded-lg transition ${
+                  loading ? "bg-gray-400 cursor-not-allowed" : "bg-blue-800 hover:bg-blue-900"
+                }`}
+              >
+                {loading ? "Logging In..." : "Log In"}
+              </button>
+            </>
+          ) : (
+            <>
+              <div className="mb-4">
+                <label className="block text-blue-900 font-semibold mb-1">Email or Mobile</label>
+                <input
+                  type="text"
+                  value={identifier}
+                  onChange={(e) => setIdentifier(e.target.value)}
+                  placeholder="Enter email or mobile number"
+                  className="w-full px-3 py-2 border rounded border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-600"
+                />
+              </div>
+
+              {otpSent && (
+                <div className="mb-4">
+                  <label className="block text-blue-900 font-semibold mb-1">OTP</label>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={6}
+                    value={otp}
+                    onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
+                    placeholder="Enter 6-digit OTP"
+                    className="w-full px-3 py-2 border rounded border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-600"
+                  />
+                </div>
+              )}
+
+              <button
+                type="button"
+                onClick={otpSent ? handleOtpLogin : handleSendOtp}
+                disabled={loading}
+                className={`w-full text-white py-2 rounded-lg transition ${
+                  loading ? "bg-gray-400 cursor-not-allowed" : "bg-blue-800 hover:bg-blue-900"
+                }`}
+              >
+                {loading ? (otpSent ? "Verifying..." : "Sending OTP...") : (otpSent ? "Verify OTP & Log In" : "Send OTP")}
+              </button>
+
+              {otpSent && (
+                <button
+                  type="button"
+                  onClick={handleSendOtp}
+                  disabled={loading}
+                  className="w-full mt-2 py-2 rounded-lg border border-blue-200 text-blue-700 hover:bg-blue-50 transition"
+                >
+                  Resend OTP
+                </button>
+              )}
+            </>
+          )}
+
+          <div className="mt-3 text-right">
+            <button
+              type="button"
+              onClick={() => navigate("/forgot-password")}
+              className="text-blue-700 hover:underline text-sm font-semibold"
+            >
+              Forgot Password?
+            </button>
           </div>
 
-          {/* Login Button */}
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className={`${isSubmitting ? "bg-gray-400 cursor-not-allowed" : "bg-blue-800 hover:bg-blue-900 cursor-pointer"} w-full text-white py-2 rounded-lg transition`}
-          >
-            {isSubmitting ? "Logging In..." : "Log In"}
-          </button>
-
-          {/* Create Account */}
           <div className="mt-6 text-center">
             <p className="text-gray-600 text-sm">
               Don’t have an account?{" "}
@@ -154,7 +262,7 @@ const Login: React.FC = () => {
               </button>
             </p>
           </div>
-        </form>
+        </div>
       </div>
     </div>
   );

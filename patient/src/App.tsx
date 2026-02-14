@@ -4,6 +4,7 @@ import "./input.css";
 import { Routes, Route, BrowserRouter } from "react-router-dom";
 import Login from "./pages/Login";
 import SignUp from "./pages/SignUp";
+import ForgotPassword from "./pages/ForgotPassword";
 import "react-toastify/dist/ReactToastify.css";
 import ClinicListsForAppointment from "./pages/ClinicListForAppointments";
 import DashboardLanding from "./pages/DashboardLanding";
@@ -23,6 +24,7 @@ function App() {
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<SignUp />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route 
           path="/" 
           element={

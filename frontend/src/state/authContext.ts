@@ -14,8 +14,8 @@ export type AuthContextValue = {
   user: AppUser | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
-  sendMobileOtp: (mobileNumber: string) => Promise<void>;
-  loginWithMobileOtp: (mobileNumber: string, otp: string) => Promise<void>;
+  sendMobileOtp: (identifier: string) => Promise<void>;
+  loginWithMobileOtp: (identifier: string, otp: string) => Promise<void>;
   logout: () => Promise<void>;
 };
 

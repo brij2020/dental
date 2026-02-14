@@ -88,6 +88,14 @@ export function useFetchClinicsAndDoctors(): UseFetchClinicsAndDoctorsReturn {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
 
+  const normalizeToArray = <T,>(payload: unknown): T[] => {
+    if (Array.isArray(payload)) return payload as T[];
+    if (payload && typeof payload === "object" && Array.isArray((payload as { data?: unknown }).data)) {
+      return (payload as { data: T[] }).data;
+    }
+    return [];
+  };
+
   // Fetch all clinics
   const fetchClinics = async () => {
     try {
@@ -95,11 +103,11 @@ export function useFetchClinicsAndDoctors(): UseFetchClinicsAndDoctorsReturn {
       setError(null);
       console.log('📋 Fetching clinics...');
 
-      const response = await api.get<Clinic[]>('/api/clinics');
+      const response = await api.get('/api/clinics');
 
       if (response.success && 'data' in response) {
         console.log('✅ Clinics fetched:', response.data);
-        setClinics(response.data);
+        setClinics(normalizeToArray<Clinic>(response.data));
       } else {
         const errorMsg = 'error' in response ? response.error : 'Failed to fetch clinics';
         throw new Error(errorMsg);
@@ -120,11 +128,11 @@ export function useFetchClinicsAndDoctors(): UseFetchClinicsAndDoctorsReturn {
       setError(null);
       console.log('👨‍⚕️ Fetching doctors for clinic:', clinicId);
 
-      const response = await api.get<Doctor[]>(`/api/profile/clinic/${clinicId}`);
+      const response = await api.get(`/api/profile/clinic/${clinicId}`);
 
       if (response.success && 'data' in response) {
         console.log('✅ Doctors fetched:', response.data);
-        setDoctors(response.data);
+        setDoctors(normalizeToArray<Doctor>(response.data));
       } else {
         const errorMsg = 'error' in response ? response.error : 'Failed to fetch doctors';
         throw new Error(errorMsg);
@@ -153,7 +161,7 @@ export function useFetchClinicsAndDoctors(): UseFetchClinicsAndDoctorsReturn {
       setLoading(true);
       setError(null);
 
-      const response = await api.get<AppointmentHistory[]>(
+      const response = await api.get(
         `/api/appointments/patient-history/${patientId}`,
         {
           params: { doctorId }
@@ -162,7 +170,7 @@ export function useFetchClinicsAndDoctors(): UseFetchClinicsAndDoctorsReturn {
 
       if (response.success && 'data' in response) {
         console.log('✅ Patient history fetched:', response.data);
-        setPatientHistory(response.data);
+        setPatientHistory(normalizeToArray<AppointmentHistory>(response.data));
       } else {
         const errorMsg = 'error' in response ? response.error : 'Failed to fetch patient history';
         throw new Error(errorMsg);

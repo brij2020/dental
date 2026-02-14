@@ -38,7 +38,17 @@ const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) => {
     // No need for additional fetching
   }, [user]);
 
-  const applySession = (responseData: any, fallbackEmail?: string) => {
+  const applySession = (
+    responseData: {
+      token?: string;
+      id?: string;
+      email?: string;
+      role?: string;
+      clinic_id?: string;
+      full_name?: string;
+    },
+    fallbackEmail?: string
+  ) => {
     if (!responseData?.token) {
       throw new Error("No token received from server");
     }
@@ -70,15 +80,15 @@ const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) => {
     }
   };
 
-  const sendMobileOtp = async (mobileNumber: string) => {
-    await post("/api/auth/send-mobile-otp", { mobile_number: mobileNumber });
+  const sendMobileOtp = async (identifier: string) => {
+    await post("/api/auth/send-mobile-otp", { identifier });
   };
 
-  const loginWithMobileOtp = async (mobileNumber: string, otp: string) => {
+  const loginWithMobileOtp = async (identifier: string, otp: string) => {
     setLoading(true);
     try {
       const response = await post("/api/auth/verify-mobile-otp", {
-        mobile_number: mobileNumber,
+        identifier,
         otp,
       });
       applySession(response.data);

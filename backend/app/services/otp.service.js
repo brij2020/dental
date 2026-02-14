@@ -24,22 +24,22 @@ function hashOtp(otp, mobileNumber) {
     .digest("hex");
 }
 
-async function createOtp(mobileNumber, ttlMs = OTP_TTL_MS) {
+async function createOtp(mobileNumber, ttlMs = OTP_TTL_MS, purpose = "login") {
   const otp = generateOtp(6);
   const expiresAt = new Date(Date.now() + ttlMs);
   const otp_hash = hashOtp(otp, mobileNumber);
 
   await Otp.findOneAndUpdate(
-    { mobile_number: mobileNumber },
-    { otp_hash, expiresAt, attempts: 0 },
+    { mobile_number: mobileNumber, purpose },
+    { otp_hash, expiresAt, attempts: 0, purpose },
     { upsert: true, new: true, setDefaultsOnInsert: true }
   );
 
   return otp;
 }
 
-async function verifyOtp(mobileNumber, inputOtp) {
-  const record = await Otp.findOne({ mobile_number: mobileNumber });
+async function verifyOtp(mobileNumber, inputOtp, purpose = "login") {
+  const record = await Otp.findOne({ mobile_number: mobileNumber, purpose });
   if (!record) {
     return { valid: false, reason: "OTP_NOT_FOUND" };
   }

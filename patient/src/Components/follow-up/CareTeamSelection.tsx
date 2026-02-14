@@ -55,6 +55,8 @@ const CareTeamSelection: React.FC<CareTeamSelectionProps> = ({
   onDoctorSelect,
   loading = false
 }) => {
+  const safeClinics = Array.isArray(clinics) ? clinics : [];
+
   return (
     <div className="bg-white p-4 flex justify-start items-center rounded-sm border border-gray-300">
       <div className='flex-1'>
@@ -77,7 +79,7 @@ const CareTeamSelection: React.FC<CareTeamSelectionProps> = ({
               className="w-full p-2 border border-gray-300 rounded-sm bg-gray-50 text-sm outline-none appearance-none disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <option value="" disabled>{loading ? 'Loading clinics...' : 'Select a clinic...'}</option>
-              {clinics.map(clinic => (
+              {safeClinics.map(clinic => (
                 <option key={clinic.id} value={clinic.clinic_id}>{clinic.name}</option>
               ))}
             </select>
