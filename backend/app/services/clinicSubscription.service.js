@@ -30,6 +30,15 @@ const purchaseSubscription = async ({ clinicId, subscriptionId, user }) => {
       throw new Error("Subscription not available for this clinic");
     }
 
+    const active = await getActiveSubscriptionByClinicId(clinicId);
+    if (active) {
+      const activePrice = active.price_snapshot ?? 0;
+      const newPrice = subscription.price ?? 0;
+      if (activePrice > 0 && newPrice <= activePrice) {
+        throw new Error("Existing subscription must be upgraded to a higher-tier plan");
+      }
+    }
+
     const now = new Date();
     const endDate = new Date(now.getTime() + subscription.duration_days * 24 * 60 * 60 * 1000);
 
