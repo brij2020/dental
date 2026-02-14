@@ -110,6 +110,7 @@ function CalendarClinicListPage() {
     setSelectedClinic(clinic);
     setIsPopupOpen(true);
   };
+  console.log(loadingClinics , clinicsError,"----")
 
   return (
     <div className="min-h-screen py-4">

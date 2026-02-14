@@ -38,33 +38,50 @@ const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) => {
     // No need for additional fetching
   }, [user]);
 
+  const applySession = (responseData: any, fallbackEmail?: string) => {
+    if (!responseData?.token) {
+      throw new Error("No token received from server");
+    }
+
+    const token = responseData.token;
+    const userData: AppUser = {
+      id: responseData.id,
+      email: responseData.email || fallbackEmail || "",
+      role: responseData.role,
+      clinic_id: responseData.clinic_id,
+      full_name: responseData.full_name,
+    };
+
+    localStorage.setItem("auth_token", token);
+    localStorage.setItem("user_data", JSON.stringify(userData));
+    setAuthToken(token);
+    setUser(userData);
+  };
+
   const login = async (email: string, password: string) => {
     setLoading(true);
     try {
       const response = await post("/api/auth/login", { email, password });
-      
-      if (!response.data.token) {
-        throw new Error("No token received from server");
-      }
+      applySession(response.data, email);
+      setLoading(false);
+    } catch (error) {
+      setLoading(false);
+      throw error;
+    }
+  };
 
-      const token = response.data.token;
-      const userData: AppUser = {
-        id: response.data.id,
-        email: email,
-        role: response.data.role,
-        clinic_id: response.data.clinic_id,
-        full_name: response.data.full_name,
-      };
+  const sendMobileOtp = async (mobileNumber: string) => {
+    await post("/api/auth/send-mobile-otp", { mobile_number: mobileNumber });
+  };
 
-      // Store token and user data
-      localStorage.setItem("auth_token", token);
-      localStorage.setItem("user_data", JSON.stringify(userData));
-      
-      // Set the token for future API calls
-      setAuthToken(token);
-      
-      // Update user state
-      setUser(userData);
+  const loginWithMobileOtp = async (mobileNumber: string, otp: string) => {
+    setLoading(true);
+    try {
+      const response = await post("/api/auth/verify-mobile-otp", {
+        mobile_number: mobileNumber,
+        otp,
+      });
+      applySession(response.data);
       setLoading(false);
     } catch (error) {
       setLoading(false);
@@ -92,7 +109,7 @@ const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) => {
   };
 
   const value = useMemo(
-    () => ({ user, loading, login, logout }),
+    () => ({ user, loading, login, sendMobileOtp, loginWithMobileOtp, logout }),
     [user, loading]
   );
 

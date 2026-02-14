@@ -85,6 +85,8 @@ module.exports = app => {
  *         description: Invalid credentials
  */
   router.post("/login", auth.login);
+  router.post("/send-mobile-otp", auth.sendMobileOtp);
+  router.post("/verify-mobile-otp", auth.verifyMobileOtp);
   /**
  * @swagger
  * /api/auth/change-password:

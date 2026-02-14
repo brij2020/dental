@@ -7,17 +7,31 @@ const crypto = require("crypto")
 const JWT_SECRET = process.env.JWT_SECRET || "secret123";
 const { logger } = require("../config/logger");
 const emailService = require('../services/email.service');
+const otpService = require("../services/otp.service");
+const smsService = require("../services/sms.service");
+
+function maskMobileNumber(mobileNumber) {
+    const value = String(mobileNumber || "");
+    if (value.length < 4) return "****";
+    return `******${value.slice(-4)}`;
+}
 /**
  * Register (Doctor / Admin)
  */
 exports.register = async (req, res) => {
     try {
-        const { email, password, full_name, clinic_id, role } = req.body;
+        const { email, password, full_name, clinic_id, role, mobile_number } = req.body;
 
-        if (!email || !password || !full_name) {
+        if (!email || !password || !full_name || !mobile_number) {
             return res.status(400).send({ message: "Required fields missing" });
         }
 
+        const normalizedMobile = smsService.normalizeMobileNumber(mobile_number);
+        if (!normalizedMobile) {
+            return res.status(400).send({ message: "Invalid mobile number format" });
+        }
+
+        const tenDigitMobile = normalizedMobile.slice(-10);
         const hashedPassword = await bcrypt.hash(password, 10);
 
         const user = new Profile({
@@ -25,15 +39,19 @@ exports.register = async (req, res) => {
             password: hashedPassword,
             full_name,
             clinic_id,
-            role: role || "doctor"
+            role: role || "doctor",
+            mobile_number: tenDigitMobile
         });
 
         await user.save();
 
+        logger.info({ userId: user._id, mobile: maskMobileNumber(tenDigitMobile) }, "User registered with mobile number");
         res.status(201).send({ message: "User registered successfully" });
     } catch (err) {
         if (err.code === 11000) {
-            return res.status(409).send({ message: "Email already exists" });
+            const field = Object.keys(err.keyPattern || {})[0];
+            const message = field === "mobile_number" ? "Mobile number already exists" : "Email already exists";
+            return res.status(409).send({ message });
         }
         res.status(500).send({ message: err.message });
     }
@@ -85,6 +103,98 @@ exports.login = async (req, res) => {
     } catch (err) {
         logger.error({ err }, 'Login error');
         res.status(401).send({ message: "Invalid email or password" });
+    }
+};
+
+/**
+ * Send mobile OTP for staff login
+ */
+exports.sendMobileOtp = async (req, res) => {
+    try {
+        const { mobile_number } = req.body;
+        if (!mobile_number) {
+            return res.status(400).send({ message: "mobile_number is required" });
+        }
+
+        logger.info({ mobile: maskMobileNumber(mobile_number) }, "Received request to send mobile OTP");
+        const normalizedMobile = smsService.normalizeMobileNumber(mobile_number);
+        if (!normalizedMobile) {
+            logger.warn({ mobile: maskMobileNumber(mobile_number) }, "Invalid mobile number format for OTP request");
+            return res.status(400).send({ message: "Invalid mobile number format" });
+        }
+
+        const tenDigitMobile = normalizedMobile.slice(-10);
+        const user = await Profile.findOne({ mobile_number: tenDigitMobile });
+        if (!user) {
+            logger.warn({ mobile: maskMobileNumber(tenDigitMobile) }, "OTP request failed: user not found for mobile number");
+            return res.status(404).send({ message: "User not found for this mobile number" });
+        }
+
+        const otp = await otpService.createOtp(tenDigitMobile);
+        const smsText = `Your OTP for SPAI LABS login is ${otp}. Valid for 5 minutes.`;
+        const smsResult = await smsService.sendSms({ mobileNumber: tenDigitMobile, message: smsText });
+
+        logger.info({
+            userId: user._id,
+            mobile: maskMobileNumber(tenDigitMobile),
+            gatewayResponse: smsResult?.raw
+        }, "Mobile OTP sent");
+        return res.status(200).send({ message: "OTP sent successfully" });
+    } catch (err) {
+        logger.error({ err, mobile: maskMobileNumber(req.body?.mobile_number) }, "Error sending mobile OTP");
+        return res.status(500).send({ message: err.message || "Failed to send OTP" });
+    }
+};
+
+/**
+ * Verify mobile OTP and login
+ */
+exports.verifyMobileOtp = async (req, res) => {
+    try {
+        const { mobile_number, otp } = req.body;
+        if (!mobile_number || !otp) {
+            return res.status(400).send({ message: "mobile_number and otp are required" });
+        }
+
+        const normalizedMobile = smsService.normalizeMobileNumber(mobile_number);
+        if (!normalizedMobile) {
+            return res.status(400).send({ message: "Invalid mobile number format" });
+        }
+
+        const tenDigitMobile = normalizedMobile.slice(-10);
+        const user = await Profile.findOne({ mobile_number: tenDigitMobile });
+        if (!user) {
+            return res.status(401).send({ message: "Invalid OTP or mobile number" });
+        }
+
+        const verifyResult = await otpService.verifyOtp(tenDigitMobile, String(otp).trim());
+        if (!verifyResult.valid) {
+            logger.warn({
+                mobile: maskMobileNumber(tenDigitMobile),
+                reason: verifyResult.reason,
+                attemptsLeft: verifyResult.attemptsLeft
+            }, "OTP verification failed");
+            return res.status(401).send({ message: "Invalid or expired OTP" });
+        }
+
+        const token = jwt.sign(
+            { id: user._id, role: user.role, clinic_id: user.clinic_id, full_name: user.full_name },
+            JWT_SECRET,
+            { expiresIn: "1d" }
+        );
+
+        logger.info({ userId: user._id, mobile: maskMobileNumber(tenDigitMobile) }, "Mobile OTP login successful");
+        return res.status(200).send({
+            token,
+            role: user.role,
+            id: user._id,
+            clinic_id: user.clinic_id,
+            full_name: user.full_name,
+            email: user.email,
+        });
+    } catch (err) {
+        logger.error({ err }, "Error verifying mobile OTP");
+        return res.status(500).send({ message: "Failed to verify OTP" });
     }
 };
 

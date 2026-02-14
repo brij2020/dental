@@ -67,6 +67,7 @@ exports.findAll = async (req, res) => {
     if (pagination) payload.pagination = pagination;
     res.status(200).send(payload);
   } catch (err) {
+    logger.error({ err }, "Error retrieving clinics");
     res.status(500).send({
       message: err.message || "Error retrieving clinics"
     });

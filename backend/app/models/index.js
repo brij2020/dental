@@ -21,5 +21,6 @@ db.problems = require("./problem.model.js")
 db.chiefComplaints = require("./chiefComplaint.model.js")
 db.consultations = require("./consultation.model.js")
 db.treatmentProcedures = require("./treatmentProcedure.model.js")
+db.otps = require("./otp.model.js")
 
 module.exports = db;
