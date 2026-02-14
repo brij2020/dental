@@ -34,7 +34,7 @@ interface Patient {
   created_at?: string;
 }
 
-const ITEMS_PER_PAGE = 25;
+const ITEMS_PER_PAGE = 10;
 const formatDate = (value?: string) => {
   if (!value) return '-';
   const parsed = new Date(value);
