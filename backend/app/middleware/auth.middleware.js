@@ -1,5 +1,6 @@
 const jwt = require("jsonwebtoken");
 const JWT_SECRET = process.env.JWT_SECRET || "secret123";
+const JWT_ISSUER = process.env.JWT_ISSUER || "dental-system";
 
 /**
  * Verify Token
@@ -12,7 +13,7 @@ exports.verifyToken = (req, res, next) => {
   }
 
   try {
-    const decoded = jwt.verify(token.replace("Bearer ", ""), JWT_SECRET);
+	const decoded = jwt.verify(token.replace("Bearer ", ""), JWT_SECRET, { issuer: JWT_ISSUER });
     req.user = decoded;
     next();
   } catch (err) {

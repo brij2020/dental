@@ -1,8 +1,11 @@
 // src/state/auth.tsx
 
-import React, { useEffect, useMemo, useState } from "react";
-import { post, setAuthToken } from "../lib/apiClient";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { get, post, setAuthToken } from "../lib/apiClient";
+import { toast } from "react-toastify";
 import { AuthContext, type AppUser } from "./authContext";
+
+const TOKEN_STATUS_CHECK_INTERVAL_MS = 60 * 1000;
 
 const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) => {
   const [user, setUser] = useState<AppUser | null>(null);
@@ -99,7 +102,7 @@ const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) => {
     }
   };
 
-  const logout = async () => {
+  const logout = useCallback(async () => {
     setLoading(true);
     try {
       // Clear localStorage
@@ -116,12 +119,49 @@ const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) => {
       setLoading(false);
       throw error;
     }
-  };
+  }, []);
 
   const value = useMemo(
     () => ({ user, loading, login, sendMobileOtp, loginWithMobileOtp, logout }),
-    [user, loading]
+    [user, loading, login, sendMobileOtp, loginWithMobileOtp, logout]
   );
+
+  useEffect(() => {
+    if (!user) return;
+
+    let canceled = false;
+    const handleTokenCheck = async () => {
+      if (canceled) return;
+      try {
+        await get("/api/auth/token-status");
+        return;
+      } catch (error) {
+        if (canceled) return;
+        const axiosError = error as {
+          response?: {
+            status?: number;
+            data?: {
+              code?: string;
+            };
+          };
+        };
+        const status = axiosError.response?.status;
+        const code = axiosError.response?.data?.code;
+        if (status === 401 || code === "TOKEN_EXPIRED" || code === "TOKEN_INVALID") {
+          toast.warn("Session expired. Please log in again.", { autoClose: 5000, hideProgressBar: true });
+          await logout();
+        }
+      }
+    };
+
+    handleTokenCheck();
+    const intervalId = window.setInterval(handleTokenCheck, TOKEN_STATUS_CHECK_INTERVAL_MS);
+
+    return () => {
+      canceled = true;
+      window.clearInterval(intervalId);
+    };
+  }, [user, logout]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

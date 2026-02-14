@@ -9,6 +9,7 @@ const { logger } = require("../config/logger");
 const emailService = require('../services/email.service');
 const otpService = require("../services/otp.service");
 const smsService = require("../services/sms.service");
+const JWT_ISSUER = process.env.JWT_ISSUER || "dental-system";
 
 function maskMobileNumber(mobileNumber) {
     const value = String(mobileNumber || "");
@@ -126,7 +127,7 @@ exports.login = async (req, res) => {
         const token = jwt.sign(
             { id: user._id, role: user.role, clinic_id: user.clinic_id, full_name: user.full_name },
             JWT_SECRET,
-            { expiresIn: "1d" }
+            { expiresIn: "1d", issuer: JWT_ISSUER }
         );
 
         logger.info({ userId: user._id, email }, 'Login successful');
@@ -251,7 +252,7 @@ exports.verifyMobileOtp = async (req, res) => {
         const token = jwt.sign(
             { id: user._id, role: user.role, clinic_id: user.clinic_id, full_name: user.full_name },
             JWT_SECRET,
-            { expiresIn: "1d" }
+            { expiresIn: "1d", issuer: JWT_ISSUER }
         );
 
         logger.info({
@@ -323,7 +324,7 @@ exports.patientLogin = async (req, res) => {
         const token = jwt.sign(
             { id: patient._id, patient_id: patient._id, email: patient.email, full_name: patient.full_name, role: "patient" },
             JWT_SECRET,
-            { expiresIn: "7d" }
+            { expiresIn: "7d", issuer: JWT_ISSUER }
         );
 
         logger.info({ patientId: patient._id, email }, 'Patient login successful');
@@ -456,7 +457,7 @@ exports.verifyPatientLoginOtp = async (req, res) => {
         const token = jwt.sign(
             { id: patient._id, patient_id: patient._id, email: patient.email, full_name: patient.full_name, role: "patient" },
             JWT_SECRET,
-            { expiresIn: "7d" }
+            { expiresIn: "7d", issuer: JWT_ISSUER }
         );
 
         logger.info({ patientId: patient._id }, "Patient OTP login successful");
@@ -536,7 +537,7 @@ exports.patientRegister = async (req, res) => {
         const token = jwt.sign(
             { id: patient._id, patient_id: patient._id, email: patient.email, full_name: patient.full_name, role: "patient" },
             JWT_SECRET,
-            { expiresIn: "7d" }
+            { expiresIn: "7d", issuer: JWT_ISSUER }
         );
 
         logger.info({ patientId: patient._id, email: normalizedEmail }, 'Patient registered successfully');
@@ -749,6 +750,73 @@ exports.changePassword = async (req, res) => {
   } catch (err) {
     logger.error({ err }, 'Error changing password');
     res.status(500).send({ message: err.message });
+  }
+};
+
+exports.tokenStatus = (req, res) => {
+  const authHeader = req.headers["authorization"];
+  if (!authHeader) {
+    return res.status(401).json({
+      success: false,
+      message: "Authorization header missing",
+      code: "TOKEN_MISSING",
+    });
+  }
+
+  const token = authHeader.replace("Bearer ", "");
+  if (!token) {
+    return res.status(401).json({
+      success: false,
+      message: "Bearer token is required",
+      code: "TOKEN_MISSING",
+    });
+  }
+
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET, { issuer: JWT_ISSUER });
+    const expiresAt = decoded.exp ? new Date(decoded.exp * 1000).toISOString() : null;
+    const issuedAt = decoded.iat ? new Date(decoded.iat * 1000).toISOString() : null;
+
+    return res.status(200).json({
+      success: true,
+      valid: true,
+      expiresAt,
+      issuedAt,
+      user: {
+        id: decoded.id,
+        role: decoded.role,
+        clinic_id: decoded.clinic_id,
+        full_name: decoded.full_name,
+      },
+    });
+  } catch (err) {
+    logger.warn({ err }, "Token validation failed");
+
+    if (err.name === "TokenExpiredError") {
+      return res.status(401).json({
+        success: false,
+        valid: false,
+        code: "TOKEN_EXPIRED",
+        message: "Token has expired",
+        expiresAt: err.expiredAt?.toISOString(),
+      });
+    }
+
+    if (err.name === "JsonWebTokenError") {
+      return res.status(401).json({
+        success: false,
+        valid: false,
+        code: "TOKEN_INVALID",
+        message: "Token is invalid",
+      });
+    }
+
+    return res.status(500).json({
+      success: false,
+      valid: false,
+      code: "TOKEN_ERROR",
+      message: "Failed to validate token",
+    });
   }
 };
 

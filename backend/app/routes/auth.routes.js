@@ -174,6 +174,7 @@ module.exports = app => {
  *         description: Invalid or expired token
  */
   router.post("/reset-password", throttle({ windowMs: 60 * 60 * 1000, max: 3, scope: "auth-reset-password" }), auth.resetPassword);
+  router.get("/token-status", throttle({ windowMs: 60 * 1000, max: 10, scope: "auth-token-status" }), auth.tokenStatus);
 
   /**
    * @swagger
