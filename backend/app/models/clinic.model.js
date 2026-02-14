@@ -97,6 +97,33 @@ const clinicSchema = new mongoose.Schema(
         ref: "Profile"
       }
     ],
+
+    // Snapshot of currently active subscription plan for quick clinic-level access
+    current_plan: {
+      subscription_id: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Subscription",
+        default: null,
+      },
+      name: {
+        type: String,
+        default: "Free Plan",
+        trim: true,
+      },
+      price: {
+        type: Number,
+        default: 0,
+      },
+      currency: {
+        type: String,
+        default: "INR",
+        trim: true,
+      },
+      updated_at: {
+        type: Date,
+        default: Date.now,
+      },
+    },
   },
   {
     timestamps: true

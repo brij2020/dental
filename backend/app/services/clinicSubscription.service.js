@@ -1,6 +1,7 @@
 const db = require("../models");
 const ClinicSubscription = db.clinicSubscriptions;
 const Subscription = db.subscriptions;
+const Clinic = db.clinics;
 const { logger } = require("../config/logger");
 
 const DEFAULT_FREE_LIMITS = {
@@ -25,6 +26,7 @@ const getActiveSubscriptionByClinicId = async (clinicId) => {
 
   const now = new Date();
   const active = await ClinicSubscription.findOne({
+    clinic_id: clinicId,
     status: "active",
     end_date: { $gte: now },
   }).sort({ end_date: -1 });
@@ -78,6 +80,26 @@ const purchaseSubscription = async ({ clinicId, subscriptionId, user }) => {
       features_snapshot: subscription.features || [],
       limits_snapshot: subscription.limits || {},
     });
+
+    const clinicUpdated = await Clinic.findOneAndUpdate(
+      { clinic_id: clinicId },
+      {
+        $set: {
+          current_plan: {
+            subscription_id: subscription._id,
+            name: subscription.name,
+            price: subscription.price ?? 0,
+            currency: subscription.currency || "INR",
+            updated_at: new Date(),
+          },
+        },
+      },
+      { new: true }
+    );
+
+    if (!clinicUpdated) {
+      throw new Error("Clinic not found");
+    }
 
     return created;
   } catch (err) {

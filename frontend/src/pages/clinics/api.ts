@@ -40,6 +40,7 @@ export interface ClinicFormData {
 
 export interface ClinicResponse {
   id: string;
+  _id?: string;
   name: string;
   phone: string;
   address: {
@@ -57,6 +58,13 @@ export interface ClinicResponse {
   };
   description: string;
   status: string;
+  current_plan?: {
+    subscription_id?: string | null;
+    name?: string;
+    price?: number;
+    currency?: string;
+    updated_at?: string;
+  };
   created_at?: string;
   updated_at?: string;
 }
@@ -136,9 +144,4 @@ export const deactivateClinic = async (clinicId: string): Promise<ClinicResponse
  */
 export const deleteClinic = async (clinicId: string): Promise<void> => {
   await apiClient.delete(`/api/clinics/${clinicId}`);
-};
-
-export const getClinicActiveSubscription = async (clinicId: string): Promise<any> => {
-  const response = await apiClient.get(`/api/clinic-subscriptions/active`, { params: { clinic_id: clinicId } });
-  return response.data;
 };

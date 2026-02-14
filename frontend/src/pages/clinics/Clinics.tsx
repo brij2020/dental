@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { getAllClinics, deactivateClinic, getClinicActiveSubscription } from "./api";
+import { getAllClinics, deactivateClinic } from "./api";
 import type { ClinicResponse } from "./api";
 import {
   IconPlus,
@@ -32,7 +32,6 @@ export default function Clinics() {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
-  const [subscriptionMap, setSubscriptionMap] = useState<Record<string, string>>({});
   const hasFetchedOnceRef = useRef(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterCity, setFilterCity] = useState("");
@@ -60,26 +59,6 @@ export default function Clinics() {
         setClinics(pageData);
         setTotalItems(pagination?.total ?? pageData.length);
         setTotalPages(Math.max(1, pagination?.pages ?? 1));
-        if (pageData.length > 0) {
-          const activeSubs: Record<string, string> = {};
-          await Promise.all(
-            pageData.map(async (clinic) => {
-              try {
-                const resp = await getClinicActiveSubscription(getClinicId(clinic));
-                if (resp?.data?.data?.name_snapshot) {
-                  activeSubs[getClinicId(clinic)] = resp.data.data.name_snapshot;
-                } else {
-                  activeSubs[getClinicId(clinic)] = "Free plan";
-                }
-              } catch (err) {
-                activeSubs[getClinicId(clinic)] = "Free plan";
-              }
-            })
-          );
-          setSubscriptionMap(activeSubs);
-        } else {
-          setSubscriptionMap({});
-        }
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to load clinics");
         setClinics([]);
@@ -160,7 +139,11 @@ export default function Clinics() {
   };
 
   const getClinicId = (clinic: ClinicResponse) => {
-    return clinic.id || (clinic as any)._id;
+    return clinic.id || clinic._id || "";
+  };
+
+  const getClinicPlanName = (clinic: ClinicResponse) => {
+    return clinic.current_plan?.name?.trim() || "Free Plan";
   };
 
   const handleDelete = async (clinic: ClinicResponse) => {
@@ -426,7 +409,7 @@ export default function Clinics() {
 
                         <td className="px-6 py-4">
                           <span className="inline-flex px-3 py-1 rounded-full text-xs font-medium bg-indigo-50 text-indigo-600">
-                            {subscriptionMap[getClinicId(clinic)] || "Free plan"}
+                            {getClinicPlanName(clinic)}
                           </span>
                         </td>
 
