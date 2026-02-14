@@ -93,8 +93,11 @@ export interface AdminSchedule {
  */
 export const fetchAllClinics = async (): Promise<Clinic[]> => {
   try {
-    const response = await apiClient.get<Clinic[]>('/api/clinics');
-    return response.data || [];
+    const response = await apiClient.get<any>('/api/clinics');
+    const payload = response.data;
+    if (Array.isArray(payload)) return payload;
+    if (Array.isArray(payload?.data)) return payload.data;
+    return [];
   } catch (error) {
     console.error('Error fetching clinics:', error);
     throw new Error('Failed to fetch clinics');
@@ -106,8 +109,11 @@ export const fetchAllClinics = async (): Promise<Clinic[]> => {
  */
 export const fetchActiveClinics = async (): Promise<Clinic[]> => {
   try {
-    const response = await apiClient.get<Clinic[]>('/api/clinics/active');
-    return response.data || [];
+    const response = await apiClient.get<any>('/api/clinics/active');
+    const payload = response.data;
+    if (Array.isArray(payload)) return payload;
+    if (Array.isArray(payload?.data)) return payload.data;
+    return [];
   } catch (error) {
     console.error('Error fetching active clinics:', error);
     throw new Error('Failed to fetch active clinics');
@@ -128,10 +134,13 @@ export const searchClinics = async (filters: ClinicSearchFilters): Promise<Clini
     if (filters.pin) queryParams.append('pin', filters.pin);
     if (filters.location) queryParams.append('location', filters.location);
 
-    const response = await apiClient.get<Clinic[]>(
+    const response = await apiClient.get<any>(
       `/api/clinics/search/filter?${queryParams.toString()}`
     );
-    return response.data || [];
+    const payload = response.data;
+    if (Array.isArray(payload)) return payload;
+    if (Array.isArray(payload?.data)) return payload.data;
+    return [];
   } catch (error) {
     console.error('Error searching clinics:', error);
     throw new Error('Failed to search clinics');
