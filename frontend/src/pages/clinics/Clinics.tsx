@@ -154,8 +154,8 @@ export default function Clinics() {
 
   const SortIcon = ({ field }: { field: SortField }) => {
     if (sortField !== field) return null;
-    return sortOrder === "asc" ? 
-      <IconArrowUp size={16} className="inline ml-1" /> : 
+    return sortOrder === "asc" ?
+      <IconArrowUp size={16} className="inline ml-1" /> :
       <IconArrowDown size={16} className="inline ml-1" />;
   };
 
@@ -312,128 +312,174 @@ export default function Clinics() {
         </div>
 
         {!loading && clinics.length > 0 && (
-          <div className="bg-white rounded-lg shadow-md border border-slate-200 overflow-hidden">
-            <div className="relative overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-slate-50 border-b border-slate-200">
-                  <tr>
-                    <th className="px-6 py-4 text-left">
-                      <button
-                        onClick={() => handleSort("name")}
-                        className="font-semibold text-slate-900 hover:text-indigo-600 transition-colors flex items-center"
-                      >
-                        Clinic Name
-                        <SortIcon field="name" />
-                      </button>
-                    </th>
-                    <th className="px-6 py-4 text-left">
-                      <button
-                        onClick={() => handleSort("phone")}
-                        className="font-semibold text-slate-900 hover:text-indigo-600 transition-colors flex items-center"
-                      >
-                        Phone
-                        <SortIcon field="phone" />
-                      </button>
-                    </th>
-                    <th className="px-6 py-4 text-left">
-                      <button
-                        onClick={() => handleSort("city")}
-                        className="font-semibold text-slate-900 hover:text-indigo-600 transition-colors flex items-center"
-                      >
-                        City
-                        <SortIcon field="city" />
-                      </button>
-                    </th>
-                    <th className="px-6 py-4 text-left">
-                      <button
-                        onClick={() => handleSort("status")}
-                        className="font-semibold text-slate-900 hover:text-indigo-600 transition-colors flex items-center"
-                      >
-                        Status
-                        <SortIcon field="status" />
-                      </button>
-                    </th>
-                    <th className="px-6 py-4 text-left">
-                      <span className="font-semibold text-slate-900">Admin / Doctor</span>
-                    </th>
-                    <th className="px-6 py-4 text-left">
-                      <span className="font-semibold text-slate-900">Motto</span>
-                    </th>
-                    <th className="px-6 py-4 text-left">
-                      <span className="font-semibold text-slate-900">Subscription</span>
-                    </th>
-                    <th className="px-6 py-4 text-center">
-                      <span className="font-semibold text-slate-900">Actions</span>
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {processedClinics.map((clinic) => (
-                    <tr key={getClinicId(clinic)} className="border-b border-slate-200 hover:bg-slate-50 transition-colors">
-                      <td className="px-6 py-4">
-                        <span className="font-medium text-slate-900">{clinic.name}</span>
-                      </td>
-                      <td className="px-6 py-4 text-slate-600">
-                        {clinic.phone}
-                      </td>
-                      <td className="px-6 py-4 text-slate-600">
-                        {clinic.address?.city || "-"}
-                      </td>
-                      <td className="px-6 py-4">
-                        <span
-                          className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${
-                            clinic.status === "Active"
-                              ? "bg-green-100 text-green-800"
-                              : "bg-gray-100 text-gray-800"
-                          }`}
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+
+            <div className="relative">
+
+              {/* Scroll Wrapper */}
+              <div className="overflow-x-auto max-h-[600px]">
+
+                <table className="min-w-full text-sm">
+
+                  {/* Header */}
+                  <thead className="bg-slate-50 border-b border-slate-200 sticky top-0 z-10">
+                    <tr className="text-xs uppercase tracking-wide text-slate-500">
+
+                      <th className="px-6 py-4 text-left font-semibold">
+                        <button
+                          onClick={() => handleSort("name")}
+                          className="flex items-center gap-2 hover:text-indigo-600 transition"
                         >
-                          {clinic.status}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-slate-600">
-                        {clinic.admin_staff_name || clinic.contact_name || "-"}
-                      </td>
-                      <td className="px-6 py-4 text-slate-600 truncate max-w-xs">
-                        {clinic.branding_moto || "-"}
-                      </td>
-                      <td className="px-6 py-4 text-slate-600">
-                        {subscriptionMap[getClinicId(clinic)] || "Free plan"}
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex justify-center gap-2">
-                          <button
-                            onClick={() => navigate(`/clinics/${getClinicId(clinic)}/edit`)}
-                            className="inline-flex items-center gap-1 px-3 py-2 text-sm border border-indigo-300 text-indigo-600 rounded hover:bg-indigo-50 transition-colors"
-                          >
-                            <IconEdit size={16} />
-                            Edit
-                          </button>
-                          <button
-                            onClick={() => handleDelete(clinic)}
-                            disabled={deleting === getClinicId(clinic)}
-                            className="inline-flex items-center gap-1 px-3 py-2 text-sm border border-red-300 text-red-600 rounded hover:bg-red-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                          >
-                            {deleting === getClinicId(clinic) ? (
-                              <>
-                                <IconLoader size={16} className="animate-spin" />
-                                Deactivating...
-                              </>
-                            ) : (
-                              <>
-                                <IconTrash size={16} />
-                                Deactivate
-                              </>
-                            )}
-                          </button>
-                        </div>
-                      </td>
+                          Clinic Name
+                          <SortIcon field="name" />
+                        </button>
+                      </th>
+
+                      <th className="px-6 py-4 text-left font-semibold">
+                        <button
+                          onClick={() => handleSort("phone")}
+                          className="flex items-center gap-2 hover:text-indigo-600 transition"
+                        >
+                          Phone
+                          <SortIcon field="phone" />
+                        </button>
+                      </th>
+
+                      <th className="px-6 py-4 text-left font-semibold">
+                        <button
+                          onClick={() => handleSort("city")}
+                          className="flex items-center gap-2 hover:text-indigo-600 transition"
+                        >
+                          City
+                          <SortIcon field="city" />
+                        </button>
+                      </th>
+
+                      <th className="px-6 py-4 text-left font-semibold">
+                        <button
+                          onClick={() => handleSort("status")}
+                          className="flex items-center gap-2 hover:text-indigo-600 transition"
+                        >
+                          Status
+                          <SortIcon field="status" />
+                        </button>
+                      </th>
+
+                      <th className="px-6 py-4 text-left font-semibold">
+                        Admin / Doctor
+                      </th>
+
+                      <th className="px-6 py-4 text-left font-semibold">
+                        Motto
+                      </th>
+
+                      <th className="px-6 py-4 text-left font-semibold">
+                        Subscription
+                      </th>
+
+                      <th className="px-6 py-4 text-center font-semibold">
+                        Actions
+                      </th>
+
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-              {isPageLoading && <TableOverlayLoader />}
+                  </thead>
+
+                  {/* Body */}
+                  <tbody className="divide-y divide-slate-100">
+
+                    {processedClinics.map((clinic) => (
+                      <tr
+                        key={getClinicId(clinic)}
+                        className="group hover:bg-slate-50 transition"
+                      >
+
+                        <td className="px-6 py-4 font-medium text-slate-900">
+                          {clinic.name}
+                        </td>
+
+                        <td className="px-6 py-4 text-slate-600">
+                          {clinic.phone}
+                        </td>
+
+                        <td className="px-6 py-4 text-slate-600">
+                          {clinic.address?.city || "-"}
+                        </td>
+
+                        <td className="px-6 py-4">
+                          <span
+                            className={`inline-flex px-3 py-1 rounded-full text-xs font-medium ${clinic.status === "Active"
+                                ? "bg-emerald-100 text-emerald-700"
+                                : "bg-slate-100 text-slate-600"
+                              }`}
+                          >
+                            {clinic.status}
+                          </span>
+                        </td>
+
+                        <td className="px-6 py-4 text-slate-600">
+                          {clinic.admin_staff_name || clinic.contact_name || "-"}
+                        </td>
+
+                        <td className="px-6 py-4 text-slate-600 truncate max-w-[220px]">
+                          {clinic.branding_moto || "-"}
+                        </td>
+
+                        <td className="px-6 py-4">
+                          <span className="inline-flex px-3 py-1 rounded-full text-xs font-medium bg-indigo-50 text-indigo-600">
+                            {subscriptionMap[getClinicId(clinic)] || "Free plan"}
+                          </span>
+                        </td>
+
+                        <td className="px-6 py-4">
+                          <div className="flex justify-center gap-2 opacity-80 group-hover:opacity-100 transition">
+
+                            <button
+                              onClick={() => navigate(`/clinics/${getClinicId(clinic)}/edit`)}
+                              className="flex items-center gap-1 px-3 py-2 text-sm border border-indigo-200 text-indigo-600 rounded-lg hover:bg-indigo-50 transition"
+                            >
+                              <IconEdit size={16} />
+                              Edit
+                            </button>
+
+                            <button
+                              onClick={() => handleDelete(clinic)}
+                              disabled={deleting === getClinicId(clinic)}
+                              className="flex items-center gap-1 px-3 py-2 text-sm border border-red-200 text-red-600 rounded-lg hover:bg-red-50 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              {deleting === getClinicId(clinic) ? (
+                                <>
+                                  <IconLoader size={16} className="animate-spin" />
+                                  Deactivating...
+                                </>
+                              ) : (
+                                <>
+                                  <IconTrash size={16} />
+                                  Deactivate
+                                </>
+                              )}
+                            </button>
+
+                          </div>
+                        </td>
+
+                      </tr>
+                    ))}
+
+                  </tbody>
+
+                </table>
+              </div>
+
+              {/* Overlay Loader */}
+              {isPageLoading && (
+                <div className="absolute inset-0 bg-white/70 backdrop-blur-[1px] flex items-center justify-center z-20 transition">
+                  <TableOverlayLoader />
+                </div>
+              )}
+
             </div>
           </div>
+
         )}
         {!loading && clinics.length > 0 && (
           <TablePagination

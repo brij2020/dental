@@ -122,22 +122,6 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(({ id, label, icon:
 
 export default function BookAppointmentModal({ open, onClose, onSuccess, patient, clinicId, appointment = null, isEditing = false }: Props) {
   const { user } = useAuth(); 
-  type ApiSuccessResponse<T> = {
-    success: true;
-    data: T;
-    status: number;
-  };
-
-  type ApiErrorResponse = {
-    success: false;
-    error: string;
-    code: string;
-    status: any;
-  };
-
-  type ApiResponse<T> = ApiSuccessResponse<T> | ApiErrorResponse;
-
-  const isApiSuccess = <T,>(res: ApiResponse<T>): res is ApiSuccessResponse<T> => res.success;
   const [date, setDate] = useState('');
   const [time, setTime] = useState('');
   const [saving, setSaving] = useState(false);
@@ -211,15 +195,8 @@ export default function BookAppointmentModal({ open, onClose, onSuccess, patient
         }),
       ]);
 
-      let limit = 0;
-      if (isApiSuccess(subResp) && subResp.data) {
-        limit = subResp.data?.data?.limits_snapshot?.max_appointments || 0;
-      }
-
-      let appointments: any[] = [];
-      if (isApiSuccess(appointmentsResp) && appointmentsResp.data) {
-        appointments = appointmentsResp.data?.data || [];
-      }
+      const limit = subResp.data?.data?.limits_snapshot?.max_appointments || 0;
+      const appointments = appointmentsResp.data?.data || [];
 
       const filtered = appointments.filter((apt: any) =>
         ['scheduled', 'confirmed', 'completed'].includes(apt?.status)
