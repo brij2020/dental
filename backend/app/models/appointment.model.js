@@ -112,47 +112,97 @@ appointmentSchema.index({ clinic_id: 1, appointment_date: 1 });
  *   - ##### = 5-digit increment (00001, 00002, etc.)
  *   Example: MA2600001 (for "Manas Dental", year 2026, 1st appointment)
  */
+const generateAppointmentFileNumber = async (clinicId) => {
+  try {
+    const currentYear = new Date().getFullYear().toString().slice(-2);
+    const Clinic = mongoose.model('Clinic');
+    const clinic = await Clinic.findOne({ clinic_id: clinicId });
+
+    if (!clinic || !clinic.name) {
+      return null;
+    }
+
+    const clinicPrefix = clinic.name.substring(0, 2).toUpperCase();
+    const startOfYear = new Date(new Date().getFullYear(), 0, 1);
+    const appointmentCountThisYear = await mongoose.model('Appointment').countDocuments({
+      clinic_id: clinicId,
+      createdAt: { $gte: startOfYear }
+    });
+
+    const sequence = String(appointmentCountThisYear + 1).padStart(5, '0');
+    return `${clinicPrefix}${currentYear}${sequence}`;
+  } catch (clinicError) {
+    console.warn('Could not generate appointment file number:', clinicError.message);
+    return null;
+  }
+};
+
 appointmentSchema.pre('save', async function (next) {
   try {
-    const skipFileNumberCreation = this.provisional === false && !this.isModified('provisional');
-    if (skipFileNumberCreation || !this.clinic_id) {
+    if (this.provisional !== false || !this.clinic_id) {
       return next();
     }
 
-    if (!this.file_number && this.clinic_id) {
-      try {
-        const currentYear = new Date().getFullYear().toString().slice(-2);
-        
-        // Fetch clinic details to get clinic name
-        const Clinic = mongoose.model('Clinic');
-        const clinic = await Clinic.findOne({ clinic_id: this.clinic_id });
-        
-        if (clinic && clinic.name) {
-          // Get first 2 letters of clinic name (uppercase)
-          const clinicPrefix = clinic.name.substring(0, 2).toUpperCase();
-          
-          // Get count of appointments for this clinic in current year
-          const startOfYear = new Date(new Date().getFullYear(), 0, 1);
-          const appointmentCountThisYear = await mongoose.model('Appointment').countDocuments({
-            clinic_id: this.clinic_id,
-            createdAt: { $gte: startOfYear }
-          });
-          
-          // Generate 5-digit sequence
-          const sequence = String(appointmentCountThisYear + 1).padStart(5, '0');
-          
-          // Format: CCYY#####
-          this.file_number = `${clinicPrefix}${currentYear}${sequence}`;
-        }
-      } catch (clinicError) {
-        console.warn('Could not generate appointment file number:', clinicError.message);
-        // File number is optional, don't block appointment creation
+    if (!this.file_number) {
+      const generated = await generateAppointmentFileNumber(this.clinic_id);
+      if (generated) {
+        this.file_number = generated;
       }
     }
-    
+
     next();
   } catch (error) {
     console.error('Error in appointment pre-save hook:', error);
+    next(error);
+  }
+});
+
+appointmentSchema.pre('findOneAndUpdate', async function (next) {
+  try {
+    const update = this.getUpdate();
+    if (!update) {
+      return next();
+    }
+
+    const provisionalValue = update.$set?.provisional ?? update.provisional;
+    if (provisionalValue !== false) {
+      return next();
+    }
+
+    const hasFileNumberInUpdate = update.$set?.file_number ?? update.file_number;
+    if (hasFileNumberInUpdate) {
+      return next();
+    }
+
+    const docToUpdate = await this.model.findOne(this.getQuery());
+    if (!docToUpdate) {
+      return next();
+    }
+
+    if (docToUpdate.file_number) {
+      return next();
+    }
+
+    const clinicId = update.$set?.clinic_id ?? update.clinic_id ?? docToUpdate.clinic_id;
+    if (!clinicId) {
+      return next();
+    }
+
+    const generated = await generateAppointmentFileNumber(clinicId);
+    if (!generated) {
+      return next();
+    }
+
+    if (update.$set) {
+      update.$set.file_number = generated;
+    } else {
+      update.file_number = generated;
+    }
+
+    this.setUpdate(update);
+    next();
+  } catch (error) {
+    console.error('Error generating file number on update:', error);
     next(error);
   }
 });
