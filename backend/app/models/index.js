@@ -22,5 +22,7 @@ db.chiefComplaints = require("./chiefComplaint.model.js")
 db.consultations = require("./consultation.model.js")
 db.treatmentProcedures = require("./treatmentProcedure.model.js")
 db.otps = require("./otp.model.js")
+db.subscriptions = require("./subscription.model.js")
+db.clinicSubscriptions = require("./clinicSubscription.model.js")
 
 module.exports = db;

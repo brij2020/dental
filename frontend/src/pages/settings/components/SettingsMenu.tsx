@@ -12,6 +12,7 @@ import {
   IconPill,
   IconVideo,
   IconAlertCircle,
+  IconCreditCard,
 } from '@tabler/icons-react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../../state/useAuth';
@@ -145,6 +146,22 @@ export const SettingsMenu = () => {
           description="Manage clinic panel associations."
           icon={IconBuildingHospital}
           to="/settings/clinic-panels"
+        />
+      )}
+      {isSuperAdmin && (
+        <MenuItem
+          title="Subscriptions"
+          description="Create and manage subscription plans."
+          icon={IconCreditCard}
+          to="/settings/subscriptions"
+        />
+      )}
+      {isAdmin && (
+        <MenuItem
+          title="Subscription Plan"
+          description="Purchase a plan for your clinic."
+          icon={IconCreditCard}
+          to="/settings/subscription-plan"
         />
       )}
     </div>

@@ -17,5 +17,6 @@ module.exports = app => {
   require("./consultation.routes")(app);
   require("./treatmentProcedure.routes")(app);
   require("./analytics.routes")(app);
+  require("./subscription.routes")(app);
+  require("./clinicSubscription.routes")(app);
 };
-

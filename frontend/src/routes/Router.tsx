@@ -33,6 +33,8 @@ const ProcedureProblemsPanel = lazy(() => import("../pages/settings/components/P
 const ProblemsPanel = lazy(() => import("../pages/settings/components/ProblemsPanel"));
 const FeesPanel = lazy(() => import("../pages/settings/components/FeesPanel"));
 const ClinicPanelsPanel = lazy(() => import("../pages/settings/components/ClinicPanelsPanel"));
+const SubscriptionsPanel = lazy(() => import("../pages/settings/components/SubscriptionsPanel"));
+const ClinicSubscriptionPanel = lazy(() => import("../pages/settings/components/ClinicSubscriptionPanel"));
 
 const PatientPanel = lazy(() => import("../pages/settings/components/PatientPanel"));
 const VideoConsultationTimingsPanel = lazy(() => import("../pages/settings/components/VideoConsultationTimingsPanel"));
@@ -82,6 +84,8 @@ const router = createBrowserRouter([
               { path: "fees", element: withSuspense(<FeesPanel />) },
               { path: "clinic-panels", element: withSuspense(<ClinicPanelsPanel />) },
               { path: "patients", element: withSuspense(<PatientPanel />) },
+              { path: "subscriptions", element: withSuspense(<SubscriptionsPanel />) },
+              { path: "subscription-plan", element: withSuspense(<ClinicSubscriptionPanel />) },
 
               { path: "video-consultation-timings", element: withSuspense(<VideoConsultationTimingsPanel />) },
               { path: "consent", element: withSuspense(<ConsentFormPanel />) },

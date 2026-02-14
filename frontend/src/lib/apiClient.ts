@@ -114,6 +114,35 @@ export const del = async <T = any>(
 };
 
 /**
+ * Subscriptions
+ */
+export const getSubscriptions = async () => {
+  return get(`/api/subscriptions`);
+};
+
+export const createSubscription = async (payload: any) => {
+  return post(`/api/subscriptions`, payload);
+};
+
+export const updateSubscription = async (id: string, payload: any) => {
+  return put(`/api/subscriptions/${id}`, payload);
+};
+
+export const getActiveClinicSubscription = async (clinicId?: string) => {
+  const params = clinicId ? { params: { clinic_id: clinicId } } : undefined;
+  return get(`/api/clinic-subscriptions/active`, params);
+};
+
+export const purchaseClinicSubscription = async (payload: any) => {
+  return post(`/api/clinic-subscriptions/purchase`, payload);
+};
+
+export const getClinicSubscriptionHistory = async (clinicId?: string) => {
+  const params = clinicId ? { params: { clinic_id: clinicId } } : undefined;
+  return get(`/api/clinic-subscriptions/history`, params);
+};
+
+/**
  * Create a profile (staff member)
  */
 export const createProfile = async (profileData: any): Promise<AxiosResponse<any>> => {

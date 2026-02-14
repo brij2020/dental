@@ -2,6 +2,7 @@
 const AppointmentService = require('../services/appointment.service');
 const db = require('../models');
 const Appointment = db.appointments;
+const clinicSubscriptionService = require("../services/clinicSubscription.service");
 
 exports.book = async (req, res) => {
   try {
@@ -57,6 +58,28 @@ exports.book = async (req, res) => {
         message: 'Invalid appointment_time format. Expected HH:MM',
         code: 'INVALID_TIME_FORMAT',
       });
+    }
+
+    const activeSub = await clinicSubscriptionService.getActiveSubscriptionByClinicId(clinic_id);
+    const maxAppointments = activeSub?.limits_snapshot?.max_appointments || 0;
+    if (maxAppointments > 0) {
+      const now = new Date();
+      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+      const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString().split('T')[0];
+
+      const appointmentCount = await Appointment.countDocuments({
+        clinic_id,
+        appointment_date: { $gte: monthStart, $lt: monthEnd },
+        status: { $in: ['scheduled', 'confirmed', 'completed'] }
+      });
+
+      if (appointmentCount >= maxAppointments) {
+        return res.status(403).json({
+          success: false,
+          message: 'Appointment limit reached for current subscription',
+          code: 'SUBSCRIPTION_LIMIT_REACHED',
+        });
+      }
     }
 
     // Check if patient already has an appointment on the same day at the same clinic

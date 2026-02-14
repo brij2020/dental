@@ -2,6 +2,7 @@ const db = require("../models");
 const Profile = db.profiles;
 const ProfileArchive = db.profileArchives;
 const { logger } = require("../config/logger");
+const clinicSubscriptionService = require("./clinicSubscription.service");
 
 /**
  * Create doctor profile
@@ -12,6 +13,23 @@ const createProfile = async (profileData, options = {}) => {
 
     if (!email || !full_name || !clinic_id) {
       throw new Error("Email, Full name and Clinic ID are required");
+    }
+
+    const activeSub = await clinicSubscriptionService.getActiveSubscriptionByClinicId(clinic_id);
+    const limits = activeSub?.limits_snapshot || {};
+
+    if (profileData.role === "doctor" && limits.max_doctors && limits.max_doctors > 0) {
+      const doctorCount = await Profile.countDocuments({ clinic_id, role: "doctor" });
+      if (doctorCount >= limits.max_doctors) {
+        throw new Error("Doctor limit reached for current subscription");
+      }
+    }
+
+    if ((profileData.role === "admin" || profileData.role === "receptionist") && limits.max_staff && limits.max_staff > 0) {
+      const staffCount = await Profile.countDocuments({ clinic_id, role: { $in: ["admin", "receptionist"] } });
+      if (staffCount >= limits.max_staff) {
+        throw new Error("Staff limit reached for current subscription");
+      }
     }
 
     const doctor = new Profile({
