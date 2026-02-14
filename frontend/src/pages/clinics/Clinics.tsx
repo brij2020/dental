@@ -106,8 +106,8 @@ export default function Clinics() {
     });
 
     const sorted = [...filtered].sort((a, b) => {
-      let aVal: any;
-      let bVal: any;
+      let aVal: string = "";
+      let bVal: string = "";
 
       if (sortField === "city") {
         aVal = (a.address?.city || "").toLowerCase();
@@ -122,11 +122,6 @@ export default function Clinics() {
         aVal = (a.status || "").toLowerCase();
         bVal = (b.status || "").toLowerCase();
       }
-
-      if (aVal < bVal) return sortOrder === "asc" ? -1 : 1;
-      if (aVal > bVal) return sortOrder === "asc" ? 1 : -1;
-      return 0;
-    });
 
       if (aVal < bVal) return sortOrder === "asc" ? -1 : 1;
       if (aVal > bVal) return sortOrder === "asc" ? 1 : -1;
