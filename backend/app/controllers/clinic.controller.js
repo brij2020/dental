@@ -40,31 +40,24 @@ exports.create = async (req, res) => {
  */
 exports.findAll = async (req, res) => {
   try {
-    const { page, limit } = req.query;
-
-    if (page !== undefined && (!Number.isInteger(Number(page)) || Number(page) < 1)) {
+    const { parsePagination } = require("../utils/pagination");
+    const pagination = parsePagination(req.query);
+    if (pagination.error) {
       return res.status(400).send({
-        message: "Invalid page. Expected a positive integer",
-        code: "INVALID_PAGE",
-      });
-    }
-
-    if (limit !== undefined && (!Number.isInteger(Number(limit)) || Number(limit) < 1)) {
-      return res.status(400).send({
-        message: "Invalid limit. Expected a positive integer",
-        code: "INVALID_LIMIT",
+        message: pagination.error,
+        code: pagination.code,
       });
     }
 
     const result = await clinicService.getAllClinics({
-      page: page || undefined,
-      limit: limit || undefined,
+      page: pagination.hasPagination ? pagination.page : undefined,
+      limit: pagination.hasPagination ? pagination.limit : undefined,
     });
     const clinics = Array.isArray(result) ? result : (result?.data || []);
-    const pagination = Array.isArray(result) ? undefined : result?.pagination;
+    const paginationMeta = Array.isArray(result) ? undefined : result?.pagination;
 
     const payload = { data: clinics };
-    if (pagination) payload.pagination = pagination;
+    if (paginationMeta) payload.pagination = paginationMeta;
     res.status(200).send(payload);
   } catch (err) {
     logger.error({ err }, "Error retrieving clinics");

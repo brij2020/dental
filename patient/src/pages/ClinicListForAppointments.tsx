@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import type { ChangeEvent } from "react";
 import CalenderProvider from "../contexts/Calender";
 import "react-datepicker/dist/react-datepicker.css";
@@ -10,6 +10,7 @@ import { states, stateCities } from '../services/locations'
 import CustomModal from "@/Components/CustomModal";
 import AppointmentDateTime from "@/Components/bookAppointments/AppointmentDateTime";
 import Loading from "@/Components/Loading";
+import Pagination from "@/Components/Pagination";
 
 
 
@@ -29,6 +30,8 @@ function CalendarClinicListPage() {
 
   const [selectedClinic, setSelectedClinic] = useState<Clinic | null>(null);
   const [isPopupOpen, setIsPopupOpen] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(6);
 
 
   const filteredClinics = useMemo(() => {
@@ -69,6 +72,18 @@ function CalendarClinicListPage() {
     return filterClinics;
 
   }, [filters, clinics, loadingClinics]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filters, clinics]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredClinics.length / pageSize));
+  const safePage = Math.min(currentPage, totalPages);
+
+  const paginatedClinics = useMemo(() => {
+    const start = (safePage - 1) * pageSize;
+    return filteredClinics.slice(start, start + pageSize);
+  }, [filteredClinics, pageSize, safePage]);
 
   const handleFilterChange = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -177,8 +192,8 @@ function CalendarClinicListPage() {
             <div className="flex-grow border-t border-gray-300"></div>
           </div>
 
-          <div className="mb-3 text-[12px] text-gray-600">
-            Showing {filteredClinics.length} of {clinics?.length} clinics
+          <div className="mb-3 text-[12px] text-gray-600 flex items-center justify-between gap-2">
+            <span>Showing {filteredClinics.length} of {clinics?.length} clinics</span>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-2 md:gap-4">
@@ -193,9 +208,20 @@ function CalendarClinicListPage() {
                 <p className="text-xs">Try adjusting your search criteria</p>
               </div>
             ) : (
-              filteredClinics.map(clinic => <ClinicCard key={clinic.id} clinic={clinic} onBookClick={() => handleBookClick(clinic)} />)
+              paginatedClinics.map(clinic => <ClinicCard key={clinic.id} clinic={clinic} onBookClick={() => handleBookClick(clinic)} />)
             )}
           </div>
+
+          {!loadingClinics && !clinicsError && filteredClinics.length > 0 && (
+            <Pagination
+              className="mt-6"
+              currentPage={safePage}
+              totalPages={totalPages}
+              onPageChange={setCurrentPage}
+              pageSize={pageSize}
+              onPageSizeChange={setPageSize}
+            />
+          )}
 
         </div>
 
