@@ -64,12 +64,14 @@ exports.book = async (req, res) => {
     const maxAppointments = activeSub?.limits_snapshot?.max_appointments || 0;
     if (maxAppointments > 0) {
       const now = new Date();
-      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
-      const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString().split('T')[0];
+      const monthStartDate = new Date(now.getFullYear(), now.getMonth(), 1);
+      const nextMonthStartDate = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+      const monthStart = monthStartDate.toISOString().split('T')[0];
+      const monthUpperBound = nextMonthStartDate.toISOString().split('T')[0];
 
       const appointmentCount = await Appointment.countDocuments({
         clinic_id,
-        appointment_date: { $gte: monthStart, $lt: monthEnd },
+        appointment_date: { $gte: monthStart, $lt: monthUpperBound },
         status: { $in: ['scheduled', 'confirmed', 'completed'] }
       });
 
