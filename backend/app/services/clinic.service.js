@@ -148,7 +148,13 @@ const getAllClinics = async (filters = {}) => {
         { "address.city": regex },
         { phone: regex },
         { branding_moto: regex },
+        { admin_staff_name: regex },
+        { "current_plan.name": regex },
       ];
+    }
+
+    if (isValidString(filters.subscription_id)) {
+      query["current_plan.subscription_id"] = filters.subscription_id.trim();
     }
 
     if (isValidString(filters.city)) {

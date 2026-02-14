@@ -57,6 +57,7 @@ exports.findAll = async (req, res) => {
       status: req.query.status,
       created_from: req.query.created_from,
       created_to: req.query.created_to,
+      subscription_id: req.query.subscription_id,
     });
     const clinics = Array.isArray(result) ? result : (result?.data || []);
     const paginationMeta = Array.isArray(result) ? undefined : result?.pagination;

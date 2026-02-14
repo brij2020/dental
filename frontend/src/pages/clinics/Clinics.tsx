@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { getAllClinics, deactivateClinic } from "./api";
+import { getSubscriptions } from "../../lib/apiClient";
 import type { ClinicResponse } from "./api";
 import {
   IconPlus,
@@ -16,6 +17,10 @@ import TableOverlayLoader from "../../components/TableOverlayLoader";
 
 type SortField = "name" | "phone" | "city" | "status";
 type SortOrder = "asc" | "desc";
+type SubscriptionOption = {
+  _id: string;
+  name: string;
+};
 
 export default function Clinics() {
   const PAGE_SIZE = 10;
@@ -34,8 +39,9 @@ export default function Clinics() {
   const [totalPages, setTotalPages] = useState(1);
   const hasFetchedOnceRef = useRef(false);
   const [searchTerm, setSearchTerm] = useState("");
-  const [filterCity, setFilterCity] = useState("");
-  const [filterStatus, setFilterStatus] = useState("");
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState(searchTerm);
+  const [filterSubscriptionId, setFilterSubscriptionId] = useState("");
+  const [subscriptions, setSubscriptions] = useState<SubscriptionOption[]>([]);
   const [createdFrom, setCreatedFrom] = useState("");
   const [createdTo, setCreatedTo] = useState("");
 
@@ -45,6 +51,24 @@ export default function Clinics() {
       return () => clearTimeout(timer);
     }
   }, [success]);
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const response = await getSubscriptions();
+        const list = response.data?.data || response.data || [];
+        if (mounted) {
+          setSubscriptions(list);
+        }
+      } catch (err) {
+        console.error("Failed to fetch subscriptions", err);
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   useEffect(() => {
     const fetchClinics = async () => {
@@ -59,8 +83,7 @@ export default function Clinics() {
           page: currentPage,
           limit: PAGE_SIZE,
           search: searchTerm,
-          city: filterCity,
-          status: filterStatus,
+          subscription_id: filterSubscriptionId || undefined,
           created_from: createdFrom || undefined,
           created_to: createdTo || undefined,
         });
@@ -85,7 +108,7 @@ export default function Clinics() {
     };
 
     fetchClinics();
-    }, [PAGE_SIZE, currentPage, searchTerm, filterCity, filterStatus, createdFrom, createdTo]);
+    }, [PAGE_SIZE, currentPage, searchTerm, filterSubscriptionId, createdFrom, createdTo]);
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -185,14 +208,6 @@ export default function Clinics() {
     }
   };
 
-  const uniqueCities = useMemo(() => {
-    const cities = clinics
-      .map((c) => c.address?.city?.trim() || "")
-      .filter((city) => city.length > 0);
-
-    return Array.from(new Set(cities)).sort();
-  }, [clinics]);
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-6">
       <div className="max-w-7xl mx-auto">
@@ -236,7 +251,7 @@ export default function Clinics() {
         )}
 
         {/* Filter + Table View */}
-        <div className="mb-6 grid gap-3 md:grid-cols-6">
+        <div className="mb-6 grid gap-3 md:grid-cols-5">
           <div className="md:col-span-2">
             <label className="text-xs uppercase tracking-wider text-slate-500">Search clinics</label>
             <input
@@ -245,42 +260,26 @@ export default function Clinics() {
                 setSearchTerm(e.target.value);
                 setCurrentPage(1);
               }}
-              placeholder="Search by name, city, phone..."
+              placeholder="Search by clinic name, admin, phone, or description..."
               className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-200"
             />
           </div>
           <div>
-            <label className="text-xs uppercase tracking-wider text-slate-500">Filter city</label>
+            <label className="text-xs uppercase tracking-wider text-slate-500">Subscription</label>
             <select
-              value={filterCity}
+              value={filterSubscriptionId}
               onChange={(e) => {
-                setFilterCity(e.target.value);
+                setFilterSubscriptionId(e.target.value);
                 setCurrentPage(1);
               }}
-                className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-200"
-              >
-              <option value="">All cities</option>
-              {uniqueCities.map((city) => (
-                <option key={city} value={city}>
-                  {city}
+              className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-200"
+            >
+              <option value="">All plans</option>
+              {subscriptions.map((plan) => (
+                <option key={plan._id} value={plan._id}>
+                  {plan.name}
                 </option>
               ))}
-            </select>
-          </div>
-          <div>
-            <label className="text-xs uppercase tracking-wider text-slate-500">Status</label>
-            <select
-              value={filterStatus}
-              onChange={(e) => {
-                setFilterStatus(e.target.value);
-                setCurrentPage(1);
-              }}
-                className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-200"
-              >
-              <option value="">All statuses</option>
-              <option value="Active">Active</option>
-              <option value="Inactive">Inactive</option>
-              <option value="Pending">Pending</option>
             </select>
           </div>
           <div>
@@ -307,16 +306,15 @@ export default function Clinics() {
               className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-200"
             />
           </div>
-          <div className="flex items-end">
+          <div className="flex items-end md:justify-end">
             <button
               onClick={() => {
                 setSearchTerm("");
-                setFilterCity("");
-                setFilterStatus("");
+                setFilterSubscriptionId("");
                 setCreatedFrom("");
                 setCreatedTo("");
               }}
-              className="w-full rounded-xl border border-slate-300 px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 transition"
+              className="md:col-span-1 w-full rounded-xl border border-slate-300 px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 transition"
             >
               Clear filters
             </button>
@@ -326,12 +324,12 @@ export default function Clinics() {
             <span className="text-slate-600">
               Showing {sortedClinics.length} of {totalItems} clinic{totalItems !== 1 ? "s" : ""}
             </span>
-          {(filterCity || filterStatus || searchTerm || createdFrom || createdTo) && (
+          {(filterSubscriptionId || searchTerm || createdFrom || createdTo) && (
             <button
               onClick={() => {
                 setSearchTerm("");
-                setFilterCity("");
-                setFilterStatus("");
+                setFilterAdminName("");
+                setFilterSubscriptionId("");
                 setCreatedFrom("");
                 setCreatedTo("");
               }}
