@@ -36,13 +36,13 @@ export const NAV_ITEMS: NavItem[] = [
     roles: [ROLES.SUPER_ADMIN],
   },
   { 
-    label: "Patients",
+    label: "Appointments",
     to: "/patients",
     icon: (p) => <IconUsers className={`h-4 w-4 ${p.className ?? ""}`} />,
     roles: [ROLES.ADMIN, ROLES.DOCTOR],
   },
   { 
-    label: "Appointments",
+    label: "Consultations",
     to: "/appointments",
     icon: (p) => <IconCalendarTime className={`h-4 w-4 ${p.className ?? ""}`} />,
     roles: [ROLES.ADMIN, ROLES.RECEPTIONIST, ROLES.DOCTOR,],
