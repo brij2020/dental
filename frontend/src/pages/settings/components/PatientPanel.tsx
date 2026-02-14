@@ -150,37 +150,60 @@ export default function PatientPanel() {
     setSelectedPatients(new Set(patients.map((p) => p._id)));
   };
 
-  const handleDownloadPatients = () => {
-    if (patients.length === 0) {
-      toast.info('No patients to download');
+  const handleDownloadPatients = async () => {
+    if (!clinicId) {
+      toast.error('Clinic is required to download patients.');
       return;
     }
 
-    const headers = ['Name', 'Gender', 'DOB', 'UHID', 'Contact', 'Registered On', 'Subscription', 'Email'];
-    const rows = patients.map((patient) => [
-      escapeCsvValue(patient.full_name),
-      escapeCsvValue(patient.gender || '-'),
-      escapeCsvValue(patient.date_of_birth || patient.dob || '-'),
-      escapeCsvValue(patient.uhid || '-'),
-      escapeCsvValue(patient.phone || patient.contact_number),
-      escapeCsvValue(patient.createdAt || patient.created_at || '-'),
-      escapeCsvValue(
-        patient.subscription_plan?.trim() ||
-          patient.subscription?.trim() ||
-          patient.plan_name?.trim() ||
-          'Free Plan'
-      ),
-      escapeCsvValue(patient.email),
-    ]);
+    const downloadLimit = Math.max(paginationMeta.total || ITEMS_PER_PAGE, ITEMS_PER_PAGE);
+    const params: Record<string, any> = {
+      clinic_id: clinicId,
+      page: 1,
+      limit: downloadLimit,
+    };
+    if (activeFilters.search) params.search = activeFilters.search;
+    if (activeFilters.from) params.registered_from = activeFilters.from;
+    if (activeFilters.to) params.registered_to = activeFilters.to;
 
-    const csvContent = [headers.map((header) => `"${header}"`).join(','), ...rows.map((row) => row.join(','))].join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const blobUrl = window.URL.createObjectURL(blob);
-    const anchor = document.createElement('a');
-    anchor.href = blobUrl;
-    anchor.download = `patients_${new Date().toISOString().slice(0, 10)}.csv`;
-    anchor.click();
-    window.URL.revokeObjectURL(blobUrl);
+    try {
+      const response = await getClinicRelatedPatients(params);
+      const exportPatients = response.data?.data || [];
+      if (exportPatients.length === 0) {
+        toast.info('No patients to download');
+        return;
+      }
+
+      const headers = ['Name', 'Gender', 'DOB', 'UHID', 'File Number', 'Contact', 'Registered On', 'Subscription', 'Email'];
+      const rows = exportPatients.map((patient) => [
+        escapeCsvValue(patient.full_name),
+        escapeCsvValue(patient.gender || '-'),
+        escapeCsvValue(patient.date_of_birth || patient.dob || '-'),
+        escapeCsvValue(patient.uhid || '-'),
+        escapeCsvValue(patient.latest_file_number || '—'),
+        escapeCsvValue(patient.phone || patient.contact_number),
+        escapeCsvValue(patient.createdAt || patient.created_at || '-'),
+        escapeCsvValue(
+          patient.subscription_plan?.trim() ||
+            patient.subscription?.trim() ||
+            patient.plan_name?.trim() ||
+            'Free Plan'
+        ),
+        escapeCsvValue(patient.email),
+      ]);
+
+      const csvContent = [headers.map((header) => `"${header}"`).join(','), ...rows.map((row) => row.join(','))].join('\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const blobUrl = window.URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = blobUrl;
+      anchor.download = `patients_${new Date().toISOString().slice(0, 10)}.csv`;
+      anchor.click();
+      window.URL.revokeObjectURL(blobUrl);
+    } catch (error) {
+      console.error('Error downloading patients:', error);
+      toast.error('Failed to download patients.');
+    }
   };
 
   const handleDelete = async (patientId: string) => {
