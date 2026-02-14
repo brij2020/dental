@@ -636,7 +636,7 @@ const ToothDamageModal: React.FC<Props> = ({
               <div>
                 <div className="flex items-center justify-between mb-1.5">
                   <label className="block text-sm font-medium text-slate-700">
-                    Enter problem solution
+                    Enter Clinical Finding
                   </label>
                   <button
                     type="button"
@@ -747,7 +747,7 @@ const ToothDamageModal: React.FC<Props> = ({
               <div>
                 <div className="flex items-center justify-between mb-1.5">
                   <label className="block text-sm font-medium text-slate-700">
-                    Enter problem solution
+                   Enter Clinical Procedure
                   </label>
                   <button
                     type="button"

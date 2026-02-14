@@ -1,3 +1,4 @@
+const mongoose = require("mongoose");
 const { logger } = require("../config/logger");
 const Patient = require("../models/patient.model");
 const Appointment = require("../models/appointment.model");
@@ -195,20 +196,24 @@ exports.getClinicRelatedPatients = async (filters = {}) => {
     ];
 
     const appointmentRecords = await Appointment.aggregate(appointmentPipeline);
-    const appointmentPatientIds = appointmentRecords
-      .map((record) => (record._id ? String(record._id) : null))
-      .filter(Boolean);
+    const appointmentPatientObjectIds = [];
+    const fileNumberByPatientId = new Map();
 
-    const fileNumberByPatientId = new Map(
-      appointmentRecords.map((record) => [String(record._id), record.file_number || null])
-    );
+    appointmentRecords.forEach((record) => {
+      if (!record._id) return;
+      const idString = String(record._id);
+      fileNumberByPatientId.set(idString, record.file_number || null);
+      if (mongoose.Types.ObjectId.isValid(idString)) {
+        appointmentPatientObjectIds.push(new mongoose.Types.ObjectId(idString));
+      }
+    });
 
     const baseConditions = [
       { clinic_id: clinicId, registration_type: "clinic" }
     ];
 
-    if (appointmentPatientIds.length > 0) {
-      baseConditions.push({ _id: { $in: appointmentPatientIds } });
+    if (appointmentPatientObjectIds.length > 0) {
+      baseConditions.push({ _id: { $in: appointmentPatientObjectIds } });
     }
 
     if (baseConditions.length === 0) {
@@ -233,12 +238,18 @@ exports.getClinicRelatedPatients = async (filters = {}) => {
       searchClauses.push({ contact_number: { $regex: regex } });
 
       const lowerSearchTerm = searchTerm.toLowerCase();
-      const matchingFilePatients = appointmentRecords
+      const matchingFilePatientObjectIds = appointmentRecords
         .filter((record) => record.file_number && record.file_number.toLowerCase().includes(lowerSearchTerm))
-        .map((record) => String(record._id));
+        .map((record) => {
+          const idString = String(record._id);
+          return mongoose.Types.ObjectId.isValid(idString)
+            ? new mongoose.Types.ObjectId(idString)
+            : null;
+        })
+        .filter(Boolean);
 
-      if (matchingFilePatients.length > 0) {
-        searchClauses.push({ _id: { $in: matchingFilePatients } });
+      if (matchingFilePatientObjectIds.length > 0) {
+        searchClauses.push({ _id: { $in: matchingFilePatientObjectIds } });
       }
     }
 
