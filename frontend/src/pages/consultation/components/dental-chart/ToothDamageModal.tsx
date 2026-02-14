@@ -6,6 +6,7 @@ import {
   createMultipleTreatmentProcedures,
   getProcedures,
 } from "../../../../lib/apiClient";
+import type { TreatmentProcedureRow } from "../../types";
 import {
   IconX,
   IconDeviceFloppy,
@@ -13,6 +14,7 @@ import {
   IconTrash,
   IconCash,
 } from "@tabler/icons-react";
+import { normalizeToothNumber } from "./toothNumbers";
 
 // --- PROPS ---
 type Props = {
@@ -22,6 +24,7 @@ type Props = {
   consultationId: string;
   clinicId: string;
   onSaveSuccess: () => void;
+  onProcedureSaved?: (procedures: TreatmentProcedureRow | TreatmentProcedureRow[]) => void;
 };
 
 type ProcedureOption = {
@@ -37,6 +40,7 @@ const ToothDamageModal: React.FC<Props> = ({
   consultationId,
   clinicId,
   onSaveSuccess,
+  onProcedureSaved,
 }) => {
   const [activeTab, setActiveTab] = useState<"one" | "multi">("one");
   const [isSaving, setIsSaving] = useState(false);
@@ -423,6 +427,14 @@ const ToothDamageModal: React.FC<Props> = ({
   );
 
   // --- SAVE TO MONGODB ---
+  const ensureNormalizedToothNumber = (value: number | null | undefined) => {
+    const normalized = normalizeToothNumber(value);
+    if (normalized == null) {
+      throw new Error("Invalid tooth number");
+    }
+    return normalized;
+  };
+
   const handleSave = async () => {
     if (isSaving) return;
     setIsSaving(true);
@@ -437,18 +449,19 @@ const ToothDamageModal: React.FC<Props> = ({
         const response = await createTreatmentProcedure({
           consultation_id: consultationId,
           clinic_id: clinicId,
-          tooth_number: toothNumber!,
+          tooth_number: ensureNormalizedToothNumber(toothNumber),
           problems: filteredProblems.length > 0 ? filteredProblems : [],
           solutions: filteredSolutions.length > 0 ? filteredSolutions : [],
           cost: numericCost ?? 0,
           tooth_damage: toothDamage?.trim() || "",
         });
-        
-        if (!response.data || !response.data.success) {
 
-          throw new Error('Failed to create treatment procedure');
+        if (!response.data || !response.data.success) {
+          throw new Error("Failed to create treatment procedure");
         }
-        onSaveSuccess();
+
+        const created = response.data?.data;
+        if (created) onProcedureSaved?.(created);
       } else {
         // Multiple teeth procedure
         const perToothCost: number | null =
@@ -456,10 +469,18 @@ const ToothDamageModal: React.FC<Props> = ({
             ? Number((numericCost / selectedTeethList.length).toFixed(2))
             : null;
 
-        const procedures = selectedTeethList.map((tooth) => ({
+        const normalizedTeeth = selectedTeethList.map((tooth) =>
+          normalizeToothNumber(tooth),
+        );
+
+        if (normalizedTeeth.includes(null)) {
+          throw new Error("Invalid tooth selected");
+        }
+
+        const procedures = normalizedTeeth.map((tooth) => ({
           consultation_id: consultationId,
           clinic_id: clinicId,
-          tooth_number: tooth,
+          tooth_number: tooth!,
           problems: filteredProblems.length > 0 ? filteredProblems : [],
           solutions: filteredSolutions.length > 0 ? filteredSolutions : [],
           cost: perToothCost ?? 0,
@@ -470,6 +491,10 @@ const ToothDamageModal: React.FC<Props> = ({
           const response = await createMultipleTreatmentProcedures(procedures);
           if (!response.data || !response.data.success) {
             throw new Error('Failed to create treatment procedures');
+          }
+          const created = response.data?.data;
+          if (Array.isArray(created) && created.length > 0) {
+            onProcedureSaved?.(created);
           }
         }
       }
@@ -609,7 +634,7 @@ const ToothDamageModal: React.FC<Props> = ({
               <div>
                 <div className="flex items-center justify-between mb-1.5">
                   <label className="block text-sm font-medium text-slate-700">
-                    Enter problem
+                  Enter Clinical Finding
                   </label>
                   <button
                     type="button"
@@ -636,7 +661,7 @@ const ToothDamageModal: React.FC<Props> = ({
               <div>
                 <div className="flex items-center justify-between mb-1.5">
                   <label className="block text-sm font-medium text-slate-700">
-                    Enter Clinical Finding
+                   Enter Clinical Procedure
                   </label>
                   <button
                     type="button"

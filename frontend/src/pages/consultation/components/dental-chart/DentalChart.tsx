@@ -7,38 +7,15 @@ import {
   ADULT_SVG_BY_INDEX,
   ADULT_UPPER_POSITIONS,
   ADULT_TOOTH_COUNT_PER_JAW,
-    ADULT_UPPER_NUMBER_POSITIONS,
+  ADULT_UPPER_NUMBER_POSITIONS,
   ADULT_LOWER_NUMBER_POSITIONS,
 } from './adultTeeth';
+import { getAdultDisplayNumber } from './toothNumbers';
 
 const TOTAL_ADULT = ADULT_TOOTH_COUNT_PER_JAW * 2;
 const QUADRANT_ADULT = ADULT_TOOTH_COUNT_PER_JAW / 2; // typically 8
 
 // NEW: map internal index -> FDI label for ADULT
-const getAdultDisplayNumber = (toothNumber: number): number => {
-  if (toothNumber <= ADULT_TOOTH_COUNT_PER_JAW) {
-    // UPPER
-    const idx = toothNumber; // 1..16
-    if (idx <= QUADRANT_ADULT) {
-      // 1..8 -> 18..11
-      return 18 - (idx - 1);
-    } else {
-      // 9..16 -> 21..28
-      return 20 + (idx - QUADRANT_ADULT);
-    }
-  } else {
-    // LOWER – reuse your mirror math
-    const upperIndex = (TOTAL_ADULT + 1) - toothNumber; // 16..1
-    if (upperIndex <= QUADRANT_ADULT) {
-      // 1..8 -> 48..41
-      return 48 - (upperIndex - 1);
-    } else {
-      // 9..16 -> 31..38
-      return 30 + (upperIndex - QUADRANT_ADULT);
-    }
-  }
-};
-
 const parseDeg = (t: string) => {
   const m = t?.match(/rotate\((-?\d+)deg\)/);
   return m ? parseInt(m[1], 10) : 0;
@@ -142,13 +119,16 @@ const AdultDentalLayer: React.FC<{ onToothClick?: (toothNumber: number) => void 
   );
 };
 
+import type { TreatmentProcedureRow } from '../../types';
+
 // --- UPDATED: Add Props ---
 type DentalChartProps = {
   consultationId: string;
   clinicId: string;
+  onProcedureSaved?: (procedures: TreatmentProcedureRow | TreatmentProcedureRow[]) => void;
 };
 
-const DentalChart: React.FC<DentalChartProps> = ({ consultationId, clinicId }) => {
+const DentalChart: React.FC<DentalChartProps> = ({ consultationId, clinicId, onProcedureSaved }) => {
   const [isDamageOpen, setDamageOpen] = React.useState(false);
   const [selectedToothDisplay, setSelectedToothDisplay] = React.useState<number | null>(null);
 
@@ -184,6 +164,7 @@ const DentalChart: React.FC<DentalChartProps> = ({ consultationId, clinicId }) =
           setDamageOpen(false);
           // Optionally trigger a refetch of procedures here
         }}
+        onProcedureSaved={onProcedureSaved}
       />
     </div>
   );

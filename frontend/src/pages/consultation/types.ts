@@ -39,6 +39,7 @@ export type TreatmentProcedureRow = {
   problems: string[] | null;
   solutions: string[] | null;
   cost: number;
+  tooth_damage: string | null;
   created_at: string; // ISO timestamp
 };
 

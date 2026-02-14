@@ -26,6 +26,7 @@ import type { BillingData } from './components/Billing';
 import type { FollowUpData } from './components/FollowUp';
 import FollowUp from './components/FollowUp';
 import type { ConsultationRow } from './types';
+import type { TreatmentProcedureRow } from './types';
 import { Modal } from '../../components/Modal';
 import PatientDetailModal from './PatientDetailModal';
 // --- UPDATED: Imports for icons ---
@@ -73,7 +74,7 @@ export default function Consultation() {
   const [isFollowUpModalOpen, setIsFollowUpModalOpen] = useState(false);
   const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
   const [prescriptions, setPrescriptions] = useState<any[] | null>(null);
-  const [procedures, setProcedures] = useState<any[] | null>(null);
+  const [procedures, setProcedures] = useState<TreatmentProcedureRow[] | null>(null);
   const [payments, setPayments] = useState<any[] | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   // Track if a procedure was just saved so preview can refresh
@@ -96,9 +97,9 @@ export default function Consultation() {
 
         // Procedures
         try {
-          const procResp = await getTreatmentProceduresByConsultationId(consultationId);
-          const procData = procResp?.data?.data || procResp?.data || procResp;
-          if (mounted) setProcedures(Array.isArray(procData) ? procData : (procData ? [procData] : []));
+        const procResp = await getTreatmentProceduresByConsultationId(consultationId);
+        const procData = procResp?.data?.data || procResp?.data || procResp;
+        if (mounted) setProcedures(Array.isArray(procData) ? procData : (procData ? [procData] : []));
         } catch (procErr) {
           console.warn('Failed to load procedures for preview:', procErr);
           if (mounted) setProcedures([]);
@@ -395,6 +396,13 @@ export default function Consultation() {
   };
 
 
+  const handleProcedureCreatedFromExam = (
+    entries: TreatmentProcedureRow | TreatmentProcedureRow[],
+  ) => {
+    const newEntries = Array.isArray(entries) ? entries : [entries];
+    setProcedures((prev) => (prev ? [...newEntries, ...prev] : [...newEntries]));
+  };
+
   const handleSaveClinicalExamination = async (
     data: ClinicalExaminationData,
   ) => {
@@ -632,6 +640,7 @@ export default function Consultation() {
             consultationId={consultationId}
             clinicId={consultationData.clinic_id}
             procedures={procedures || []}
+            onProcedureCreated={handleProcedureCreatedFromExam}
           />
         );
       }

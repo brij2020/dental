@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react'; // <-- Import useEffect
 import DentalChart from './dental-chart/DentalChart';
+import type { TreatmentProcedureRow } from '../types';
 
 type TextAreaProps = React.TextareaHTMLAttributes<HTMLTextAreaElement> & {
   label: string;
@@ -28,26 +29,25 @@ export type ClinicalExaminationData = {
     notes: string;
 };
 
-type ProcedureType = {
-  id?: string;
-  _id?: string;
-  tooth_number?: string | number;
-  problems?: string[];
-  solutions?: string[];
-  cost?: number;
-  amount?: number;
-};
-
 type Props = {
   onSaveAndContinue: (data: ClinicalExaminationData) => void;
   isSaving: boolean;
   initialData: ClinicalExaminationData | null;
   consultationId: string;
   clinicId: string;
-  procedures?: ProcedureType[];
+  procedures?: TreatmentProcedureRow[];
+  onProcedureCreated?: (procedures: TreatmentProcedureRow | TreatmentProcedureRow[]) => void;
 };
 
-export default function ClinicalExamination({ onSaveAndContinue, isSaving, initialData, consultationId, clinicId, procedures = [] }: Props) {
+export default function ClinicalExamination({
+  onSaveAndContinue,
+  isSaving,
+  initialData,
+  consultationId,
+  clinicId,
+  procedures = [],
+  onProcedureCreated,
+}: Props) {
   const [formData, setFormData] = useState<ClinicalExaminationData>({
     chiefComplaints: '',
     onExamination: '',
@@ -74,6 +74,19 @@ export default function ClinicalExamination({ onSaveAndContinue, isSaving, initi
   const setConsultationData = (data: ClinicalExaminationData) => {
     setData(data);
   };
+  const [displayProcedures, setDisplayProcedures] = useState<TreatmentProcedureRow[]>(procedures);
+
+  useEffect(() => {
+    setDisplayProcedures(procedures);
+  }, [procedures]);
+
+  const handleProceduresCreated = (newEntries: TreatmentProcedureRow | TreatmentProcedureRow[]) => {
+    const entries = Array.isArray(newEntries) ? newEntries : [newEntries];
+    if (entries.length === 0) return;
+    setDisplayProcedures((prev) => [...entries, ...prev]);
+    onProcedureCreated?.(entries);
+  };
+
   return (
     <div className="space-y-6">
       {/* Top section: Examination and placeholder */}
@@ -89,15 +102,51 @@ export default function ClinicalExamination({ onSaveAndContinue, isSaving, initi
                 placeholder="e.g., Sensitivity in upper right molar..."
                 rows={4}
             />
-            <TextArea 
-                label="On Examination" 
-                name="onExamination"
-                id="onExamination"
-                value={formData.onExamination} // Value is now driven by state
-                onChange={handleChange}
-                placeholder="e.g., Deep caries noted on tooth #3..."
-                rows={5}
-            />
+            <div className="space-y-3">
+              <TextArea 
+                  label="On Examination" 
+                  name="onExamination"
+                  id="onExamination"
+                  value={formData.onExamination} // Value is now driven by state
+                  onChange={handleChange}
+                  placeholder="e.g., Deep caries noted on tooth #3..."
+                  rows={5}
+              />
+              {displayProcedures && displayProcedures.length > 0 && (
+                <div className="bg-white shadow-lg rounded-3xl border border-slate-100 overflow-hidden">
+                  <div className="px-5 py-3 border-b border-slate-100">
+                    <p className="text-xs font-semibold tracking-[0.2em] uppercase text-slate-500">
+                      Recent Tooth Damage Entries
+                    </p>
+                    <p className="text-[13px] text-slate-500 mt-0.5">
+                      Automatically populated from the dental chart.
+                    </p>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full text-xs">
+                      <thead>
+                        <tr className="text-left text-xs uppercase tracking-wide text-slate-400 bg-slate-50">
+                          <th className="px-4 py-3 font-semibold">Tooth</th>
+                          <th className="px-4 py-3 font-semibold">Problems</th>
+                          <th className="px-4 py-3 font-semibold">Solutions</th>
+                          <th className="px-4 py-3 text-right font-semibold">Cost</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {displayProcedures.map((proc) => (
+                          <tr key={proc.id} className="border-b border-slate-100 last:border-b-0">
+                            <td className="px-4 py-3 text-slate-800 font-medium text-sm">{proc.tooth_number}</td>
+                            <td className="px-4 py-3 text-slate-600">{proc.problems?.join(', ') || '—'}</td>
+                            <td className="px-4 py-3 text-slate-600">{proc.solutions?.join(', ') || '—'}</td>
+                            <td className="px-4 py-3 text-right text-slate-700 font-semibold">₹{typeof proc.cost === 'number' ? proc.cost.toFixed(2) : '0.00'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </div>
             <TextArea 
                 label="Advice" 
                 name="advice"
@@ -111,7 +160,11 @@ export default function ClinicalExamination({ onSaveAndContinue, isSaving, initi
         </div>
         {/* --- DENTAL CHART INTEGRATION --- */}
         <div className="lg:col-span-3 bg-white p-4 rounded-2xl shadow-sm border border-slate-200/80 flex flex-col items-center justify-center aspect-square">
-          <DentalChart consultationId={consultationId} clinicId={clinicId} />
+          <DentalChart
+            consultationId={consultationId}
+            clinicId={clinicId}
+            onProcedureSaved={handleProceduresCreated}
+          />
         </div>
       </div>
       {/* 
@@ -120,14 +173,18 @@ export default function ClinicalExamination({ onSaveAndContinue, isSaving, initi
 
       {/* Tooth Damage Table: Show after On Examination */}
       {(() => {
-        if (!procedures || procedures.length === 0) return null;
-        const toothDamageProcedures = procedures.filter((p) =>
-          (Array.isArray(p.problems) && p.problems.some((pr) => typeof pr === 'string' && pr.toLowerCase().includes('damage')))
-          || (Array.isArray(p.solutions) && p.solutions.some((sol) => typeof sol === 'string' && sol.toLowerCase().includes('damage')))
-        );
+        if (!displayProcedures || displayProcedures.length === 0) return null;
+        const toothDamageProcedures = displayProcedures.filter((p) => {
+          const hasProblems =
+            Array.isArray(p.problems) && p.problems.some((pr) => typeof pr === 'string' && pr.trim() !== "");
+          const hasSolutions =
+            Array.isArray(p.solutions) && p.solutions.some((sol) => typeof sol === 'string' && sol.trim() !== "");
+          const hasDamageText = !!p.tooth_damage?.trim();
+          return hasProblems || hasSolutions || hasDamageText;
+        });
         if (!toothDamageProcedures.length) return null;
         return (
-          <div className="mt-4">
+          <div className="mt-4 overflow-x-auto">
             <strong className="block mb-1">Tooth Damage</strong>
             <table className="min-w-full border text-xs">
               <thead>
@@ -136,15 +193,17 @@ export default function ClinicalExamination({ onSaveAndContinue, isSaving, initi
                   <th className="border px-2 py-1">Problem(s)</th>
                   <th className="border px-2 py-1">Solution(s)</th>
                   <th className="border px-2 py-1">Cost</th>
+                  <th className="border px-2 py-1">Damage Notes</th>
                 </tr>
               </thead>
               <tbody>
                 {toothDamageProcedures.map((p) => (
-                  <tr key={p.id || p._id}>
+                  <tr key={p.id}>
                     <td className="border px-2 py-1">{p.tooth_number ?? '-'}</td>
                     <td className="border px-2 py-1">{Array.isArray(p.problems) ? p.problems.join(', ') : '-'}</td>
                     <td className="border px-2 py-1">{Array.isArray(p.solutions) ? p.solutions.join(', ') : '-'}</td>
-                    <td className="border px-2 py-1">{p.cost ?? p.amount ?? '-'}</td>
+                    <td className="border px-2 py-1">{p.cost ?? '-'}</td>
+                    <td className="border px-2 py-1">{p.tooth_damage || '-'}</td>
                   </tr>
                 ))}
               </tbody>
