@@ -20,6 +20,7 @@ type AppointmentCardProps = {
 const AppointmentCard: React.FC<AppointmentCardProps> = ({ appointment, appointmentType, className, onRefetch }) => {
     const [openModal, setOpenModal] = useState(false)
     const [currentModal, setCurrentModal] = useState<"reschedule" | "cancel" | null>(null)
+    const [detailModalOpen, setDetailModalOpen] = useState(false)
     const navigate = useNavigate()
 
     const formattedDate = useMemo(() => {
@@ -103,7 +104,10 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({ appointment, appointm
                         <PopoverContent className='w-fit min-w-[220px] p-1.5 mr-4'>
                             <div className='flex flex-col'>
 
-                                <div className='flex items-center gap-3 rounded-sm p-1.5 cursor-pointer text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900'>
+                                <div
+                                  onClick={() => setDetailModalOpen(true)}
+                                  className='flex items-center gap-3 rounded-sm p-1.5 cursor-pointer text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900'
+                                >
                                     <span className="material-symbols-sharp text-[16px]">info</span>
                                     <p className='text-[13px]'>View Details</p>
                                 </div>
@@ -147,6 +151,45 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({ appointment, appointm
                 <CustomModal openModal={openModal} setOpenModal={setOpenModal}>
                 {currentModal === "reschedule" && <RescheduleModal setOpenModal={setOpenModal} appointment={appointment} onSuccess={onRefetch} />}
                 {currentModal === "cancel" && <CancelModal setOpenModal={setOpenModal} appointment={appointment} onSuccess={onRefetch} />}
+            </CustomModal>
+
+            <CustomModal openModal={detailModalOpen} setOpenModal={setDetailModalOpen}>
+                <div className="max-w-[90vw] w-[min(420px,90vw)] bg-white text-zinc-900 rounded-2xl p-6 shadow-lg space-y-4">
+                    <div>
+                        <p className="text-xs uppercase tracking-[0.2em] text-zinc-400">Appointment Details</p>
+                        <h3 className="text-xl font-semibold text-zinc-900 mt-1">Clinic visit</h3>
+                    </div>
+                    <div className="space-y-3">
+                        <div>
+                            <p className="text-xs text-zinc-500">Appointment UID</p>
+                            <p className="text-sm font-semibold text-zinc-900">{appointment?.appointment_uid || appointment?.id || appointment?._id || "N/A"}</p>
+                        </div>
+                        <div>
+                            <p className="text-xs text-zinc-500">Date &amp; Time</p>
+                            <p className="text-sm font-semibold text-zinc-900">{formattedDate?.month} {formattedDate?.day}, {formattedDate?.year} · {formattedTime}</p>
+                        </div>
+                        <div>
+                            <p className="text-xs text-zinc-500">Status</p>
+                            <p className="text-sm font-semibold text-zinc-900 capitalize">{appointment?.status || "Scheduled"}</p>
+                        </div>
+                        <div>
+                            <p className="text-xs text-zinc-500">Clinic</p>
+                            <p className="text-sm font-semibold text-zinc-900">{appointment?.clinics?.name || "N/A"}</p>
+                            <p className="text-[13px] text-zinc-600 mt-0.5 line-clamp-3">{formattedClinicAddress}</p>
+                        </div>
+                        <div>
+                            <p className="text-xs text-zinc-500">Doctor / Host</p>
+                            <p className="text-sm font-semibold text-zinc-900">{appointment?.clinics?.admin_staff_name || "N/A"}</p>
+                        </div>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={() => setDetailModalOpen(false)}
+                        className="w-full text-center text-sm font-semibold text-blue-700 hover:text-blue-900 transition"
+                    >
+                        Close
+                    </button>
+                </div>
             </CustomModal>
         </div>
     )
