@@ -1,6 +1,7 @@
 import React from "react";
 import { toast } from "react-toastify";
 import { useNavigate } from "react-router-dom";
+import { Eye, EyeOff } from "lucide-react";
 import { api } from "../lib/apiClient";
 
 type LoginMode = "password" | "otp";
@@ -14,6 +15,7 @@ const Login: React.FC = () => {
   const [otp, setOtp] = React.useState("");
   const [otpSent, setOtpSent] = React.useState(false);
   const [loading, setLoading] = React.useState(false);
+  const [showPassword, setShowPassword] = React.useState(false);
 
   const persistPatientSession = (sessionData: any) => {
     localStorage.setItem("authToken", sessionData.token);
@@ -135,6 +137,7 @@ const Login: React.FC = () => {
                 setMode("password");
                 setOtpSent(false);
                 setOtp("");
+                setShowPassword(false);
               }}
               className={`py-2 rounded-md text-sm font-semibold transition ${
                 mode === "password" ? "bg-white text-blue-800 shadow-sm" : "text-blue-700"
@@ -144,7 +147,10 @@ const Login: React.FC = () => {
             </button>
             <button
               type="button"
-              onClick={() => setMode("otp")}
+              onClick={() => {
+                setMode("otp");
+                setShowPassword(false);
+              }}
               className={`py-2 rounded-md text-sm font-semibold transition ${
                 mode === "otp" ? "bg-white text-blue-800 shadow-sm" : "text-blue-700"
               }`}
@@ -168,13 +174,27 @@ const Login: React.FC = () => {
 
               <div className="mb-6">
                 <label className="block text-blue-900 font-semibold mb-1">Password</label>
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Enter your password"
-                  className="w-full px-3 py-2 border rounded border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-600"
-                />
+                <div className="relative">
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="Enter your password"
+                    className="w-full px-3 py-2 border rounded border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-600 pr-12"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((prev) => !prev)}
+                    className="absolute inset-y-0 right-3 flex items-center justify-center rounded-full p-1 text-blue-600 transition hover:text-blue-900 focus-visible:ring-2 focus-visible:ring-blue-500 focus:outline-none"
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                  >
+                    {showPassword ? (
+                      <EyeOff className="h-5 w-5" />
+                    ) : (
+                      <Eye className="h-5 w-5" />
+                    )}
+                  </button>
+                </div>
               </div>
 
               <button
