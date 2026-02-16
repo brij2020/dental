@@ -67,25 +67,11 @@ const SignUp: React.FC = () => {
       }
 
       // Support both shapes: { success: true, data: {...} } and legacy { success: true, token: ..., patient: {...} }
-      const payload = backendData.data || {
-        token: backendData.token,
-        patient_id: backendData.patient?.id || backendData.patient?._id,
-        email: backendData.patient?.email,
-        full_name: backendData.patient?.full_name,
-        uhid: backendData.patient?.uhid
-      };
+      console.log("✅ Registration successful");
 
-      console.log("✅ Registration successful:", payload);
-
-      if (payload?.token) localStorage.setItem("authToken", payload.token);
-      if (payload?.patient_id) localStorage.setItem("patient_id", payload.patient_id);
-      if (payload?.email) localStorage.setItem("patient_email", payload.email);
-      if (payload?.full_name) localStorage.setItem("patient_name", payload.full_name);
-      if (payload?.uhid) localStorage.setItem("patient_uhid", payload.uhid);
-
-      toast.success("Account created successfully!");
+      toast.success("Account created successfully! Please log in.");
       reset();
-      window.location.href = "/";
+      navigate("/login");
     } catch (error: unknown) {
       console.error("Unexpected error:", error);
       if (error instanceof Error) {
