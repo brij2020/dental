@@ -58,8 +58,7 @@ export default function useGetAppointments() {
                 ) {
                     upcoming.push(a);
                 } else if (
-                    a.status === "completed" &&
-                    (isPastDate || (isToday && isPastTime))
+                    (a.status === "completed" || a.status === "cancelled")
                 ) {
                     previous.push(a);
                 } else if (
