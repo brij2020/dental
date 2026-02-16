@@ -161,25 +161,32 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({ appointment, appointm
                     </div>
                     <div className="space-y-3">
                         <div>
-                            <p className="text-xs text-zinc-500">Appointment UID</p>
-                            <p className="text-sm font-semibold text-zinc-900">{appointment?.appointment_uid || appointment?.id || appointment?._id || "N/A"}</p>
-                        </div>
-                        <div>
-                            <p className="text-xs text-zinc-500">Date &amp; Time</p>
-                            <p className="text-sm font-semibold text-zinc-900">{formattedDate?.month} {formattedDate?.day}, {formattedDate?.year} · {formattedTime}</p>
-                        </div>
-                        <div>
-                            <p className="text-xs text-zinc-500">Status</p>
-                            <p className="text-sm font-semibold text-zinc-900 capitalize">{appointment?.status || "Scheduled"}</p>
-                        </div>
-                        <div>
                             <p className="text-xs text-zinc-500">Clinic</p>
                             <p className="text-sm font-semibold text-zinc-900">{appointment?.clinics?.name || "N/A"}</p>
-                            <p className="text-[13px] text-zinc-600 mt-0.5 line-clamp-3">{formattedClinicAddress}</p>
+                            <p className="text-[13px] text-zinc-600 mt-0.5 line-clamp-3 break-words">{formattedClinicAddress}</p>
                         </div>
                         <div>
                             <p className="text-xs text-zinc-500">Doctor / Host</p>
                             <p className="text-sm font-semibold text-zinc-900">{appointment?.clinics?.admin_staff_name || "N/A"}</p>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <p className="text-xs text-zinc-500">Date</p>
+                                <p className="text-sm font-semibold text-zinc-900">{formattedDate?.month} {formattedDate?.day}, {formattedDate?.year}</p>
+                            </div>
+                            <div>
+                                <p className="text-xs text-zinc-500">Time</p>
+                                <p className="text-sm font-semibold text-zinc-900">{formattedTime}</p>
+                            </div>
+                        </div>
+                        <div>
+                            <p className="text-xs text-zinc-500">Contact</p>
+                            {/* <p className="text-sm font-semibold text-zinc-900">{appointment?.clinics?.contact_name || "N/A"}</p> */}
+                            <p className="text-sm font-semibold text-zinc-900">{appointment?.clinics?.contact_number || "N/A"}</p>
+                        </div>
+                        <div>
+                            <p className="text-xs text-zinc-500">Status</p>
+                            <p className="text-sm font-semibold text-zinc-900 capitalize">{appointment?.status || "Scheduled"}</p>
                         </div>
                     </div>
                     <button
