@@ -35,67 +35,67 @@ export default function useGetAppointments() {
                 console.log('✅ Appointments fetched:', data);
 
                 if (!Array.isArray(data) || data.length === 0) {
-                setAppointments({ upcoming: [], previous: [], missed: [] });
-                setLoading(false);
-                return;
-            }
-
-            const upcoming: Appointment[] = [];
-            const previous: Appointment[] = [];
-            const missed: Appointment[] = [];
-
-            data.forEach((a: any) => {
-                if (!a?.appointment_date || !a?.appointment_time) return;
-                const isToday = a.appointment_date === today;
-                const isFutureDate = a.appointment_date > today;
-                const isPastDate = a.appointment_date < today;
-                const isUpcomingTime = a.appointment_time >= nowTime;
-                const isPastTime = a.appointment_time <= nowTime;
-
-                if (
-                    a.status === "scheduled" &&
-                    (isFutureDate || (isToday && isUpcomingTime))
-                ) {
-                    upcoming.push(a);
-                } else if (
-                    (a.status === "completed" || a.status === "cancelled")
-                ) {
-                    previous.push(a);
-                } else if (
-                    a.status === "scheduled" &&
-                    (isPastDate || (isToday && isPastTime))
-                ) {
-                    missed.push(a);
+                    setAppointments({ upcoming: [], previous: [], missed: [] });
+                    setLoading(false);
+                    return;
                 }
-            });
 
-            // Sort upcoming appointments (earliest first)
-            const sortedUpcoming = upcoming.sort((a, b) => {
-                if (!a.appointment_date || !b.appointment_date) return 0;
-                const dateCompare = a.appointment_date.localeCompare(b.appointment_date);
-                if (dateCompare !== 0) return dateCompare;
-                if (!a.appointment_time || !b.appointment_time) return 0;
-                return a.appointment_time.localeCompare(b.appointment_time);
-            });
+                const upcoming: Appointment[] = [];
+                const previous: Appointment[] = [];
+                const missed: Appointment[] = [];
 
-            const sortedPrevious = previous.sort((a, b) => {
-                if (!a.appointment_date || !b.appointment_date) return 0;
-                const dateCompare = b.appointment_date.localeCompare(a.appointment_date);
-                if (dateCompare !== 0) return dateCompare;
-                if (!a.appointment_time || !b.appointment_time) return 0;
-                return b.appointment_time.localeCompare(a.appointment_time);
-            });
+                data.forEach((a: any) => {
+                    if (!a?.appointment_date || !a?.appointment_time) return;
+                    const isToday = a.appointment_date === today;
+                    const isFutureDate = a.appointment_date > today;
+                    const isPastDate = a.appointment_date < today;
+                    const isUpcomingTime = a.appointment_time >= nowTime;
+                    const isPastTime = a.appointment_time <= nowTime;
 
-            const sortedMissed = missed.sort((a, b) => {
-                if (!a.appointment_date || !b.appointment_date) return 0;
-                const dateCompare = b.appointment_date.localeCompare(a.appointment_date);
-                if (dateCompare !== 0) return dateCompare;
-                if (!a.appointment_time || !b.appointment_time) return 0;
-                return b.appointment_time.localeCompare(a.appointment_time);
-            });
+                    if (
+                        a.status === "scheduled" &&
+                        (isFutureDate || (isToday && isUpcomingTime))
+                    ) {
+                        upcoming.push(a);
+                } else if (
+                    a.status === "completed"
+                ) {
+                        previous.push(a);
+                    } else if (
+                        a.status === "scheduled" &&
+                        (isPastDate || (isToday && isPastTime))
+                    ) {
+                        missed.push(a);
+                    }
+                });
 
-            console.log('✅ Fetched appointments from backend:', { upcoming: sortedUpcoming.length, previous: sortedPrevious.length, missed: sortedMissed.length });
-            setAppointments({ upcoming: sortedUpcoming, previous: sortedPrevious, missed: sortedMissed });
+                // Sort upcoming appointments (earliest first)
+                const sortedUpcoming = upcoming.sort((a, b) => {
+                    if (!a.appointment_date || !b.appointment_date) return 0;
+                    const dateCompare = a.appointment_date.localeCompare(b.appointment_date);
+                    if (dateCompare !== 0) return dateCompare;
+                    if (!a.appointment_time || !b.appointment_time) return 0;
+                    return a.appointment_time.localeCompare(b.appointment_time);
+                });
+
+                const sortedPrevious = previous.sort((a, b) => {
+                    if (!a.appointment_date || !b.appointment_date) return 0;
+                    const dateCompare = b.appointment_date.localeCompare(a.appointment_date);
+                    if (dateCompare !== 0) return dateCompare;
+                    if (!a.appointment_time || !b.appointment_time) return 0;
+                    return b.appointment_time.localeCompare(a.appointment_time);
+                });
+
+                const sortedMissed = missed.sort((a, b) => {
+                    if (!a.appointment_date || !b.appointment_date) return 0;
+                    const dateCompare = b.appointment_date.localeCompare(a.appointment_date);
+                    if (dateCompare !== 0) return dateCompare;
+                    if (!a.appointment_time || !b.appointment_time) return 0;
+                    return b.appointment_time.localeCompare(a.appointment_time);
+                });
+
+                console.log('✅ Fetched appointments from backend:', { upcoming: sortedUpcoming.length, previous: sortedPrevious.length, missed: sortedMissed.length });
+                setAppointments({ upcoming: sortedUpcoming, previous: sortedPrevious, missed: sortedMissed });
             } else {
                 throw new Error('No data in response');
             }

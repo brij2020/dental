@@ -7,6 +7,7 @@ export interface Appointment {
     appointment_time: string;
     doctor_id: string;
     clinics: Clinic | null;
+    file_number?: string;
 
 }
 export interface Address {

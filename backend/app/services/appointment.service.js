@@ -231,8 +231,10 @@ class AppointmentService {
     return await Appointment.find({
       patient_id: patientId,
       doctor_id: doctorId,
+      status: 'completed',
     })
       .sort({ appointment_date: -1, appointment_time: -1 })
+      .limit(1)
       .lean(); // Use lean() for read-only queries for better performance
   }
 }

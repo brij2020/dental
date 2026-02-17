@@ -21,14 +21,16 @@ type SignUpFormInputs = {
 
 const SignUp: React.FC = () => {
   const navigate = useNavigate();
-  const [selectedState, setSelectedState] = React.useState("");
 
   const {
     register,
     handleSubmit,
+    watch,
     formState: { errors, isSubmitting },
     reset,
   } = useForm<SignUpFormInputs>({ mode: "onTouched" });
+
+  const watchedState = watch("state");
 
   const onSubmit = async (data: SignUpFormInputs) => {
     if(isSubmitting) return;
@@ -183,19 +185,18 @@ const SignUp: React.FC = () => {
 
             <div>
               <label className="block text-blue-900 font-semibold mb-1">State</label>
-              <select
-              {...register("state", { required: "State required" })}
-               value={selectedState}
-               onChange={(e) => setSelectedState(e.target.value)}
-               className="w-full px-3 py-2 border rounded border-blue-300 focus:ring-2 focus:ring-blue-600"
-               >
+            <select
+                {...register("state", { required: "State required" })}
+                autoComplete="address-level1"
+                className="w-full px-3 py-2 border rounded border-blue-300 focus:ring-2 focus:ring-blue-600"
+              >
                 <option value="">Select State</option>
-                 {states.map((state) => (
-                 <option key={state} value={state}>
-                 {state}
-                </option>
+                {states.map((state) => (
+                  <option key={state} value={state}>
+                    {state}
+                  </option>
                 ))}
-             </select>
+              </select>
 
               {errors.state && <p className="text-red-500 text-xs mt-1">{errors.state.message}</p>}
             </div>
@@ -203,18 +204,19 @@ const SignUp: React.FC = () => {
             <div>
               <label className="block text-blue-900 font-semibold mb-1">City</label>
               <select
-               {...register("city", { required: "City required" })}
-               disabled={!selectedState}
-              className="w-full px-3 py-2 border rounded border-blue-300 focus:ring-2 focus:ring-blue-600"
-               >
-              <option value="">Select City</option>
-                {selectedState &&
-                stateCities[selectedState]?.map((city) => (
-              <option key={city} value={city}>
-                  {city}
-              </option>
-               ))}
-            </select>
+                {...register("city", { required: "City required" })}
+                autoComplete="address-level2"
+                disabled={!watchedState}
+                className="w-full px-3 py-2 border rounded border-blue-300 focus:ring-2 focus:ring-blue-600"
+              >
+                <option value="">Select City</option>
+                {watchedState &&
+                  stateCities[watchedState]?.map((city) => (
+                    <option key={city} value={city}>
+                      {city}
+                    </option>
+                  ))}
+              </select>
 
               {errors.city && <p className="text-red-500 text-xs mt-1">{errors.city.message}</p>}
             </div>

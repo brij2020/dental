@@ -144,6 +144,10 @@ exports.book = async (req, res) => {
       appointment_type
     };
 
+    if (req.body?.file_number) {
+      appointmentData.file_number = req.body.file_number;
+    }
+
     // Mark as provisional if explicitly set by caller or when booking as a patient (patient portal)
     const provisionalFlag = (req.body && (req.body.provisional === true || req.body.provisional === 'true'))
       || (req.user && req.user.role === 'patient');

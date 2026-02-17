@@ -6,6 +6,7 @@ interface Patient {
   id: string;
   patient_id: string;
   full_name: string;
+  name?: string;
   gender?: string;
   date_of_birth?: string;
   address?: string;

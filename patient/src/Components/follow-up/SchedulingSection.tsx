@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import CalenderProvider from '@/contexts/Calender';
 import Datepicker from '@/Components/DatePicker';
@@ -63,7 +63,8 @@ const AppointmentSummary: React.FC<{
     selectedDoctor: Doctor | null;
     selectedClinic: Clinic | null;
     selectedTimeSlot: string | null;
-}> = ({ selectedDoctor, selectedClinic, selectedTimeSlot }) => {
+    patientName?: string;
+}> = ({ selectedDoctor, selectedClinic, selectedTimeSlot, patientName }) => {
     const { pickedDate } = useCalender();
 
     if (!pickedDate || !selectedTimeSlot || !selectedDoctor || !selectedClinic) {
@@ -77,13 +78,15 @@ const AppointmentSummary: React.FC<{
             </h3>
             {/* Responsive grid for summary details */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 text-sm">
-                <div className="flex items-center gap-1.5">
-                    <span className="material-symbols-outlined text-slate-900 text-[20px]">person</span>
-                    <span className="font-medium text-slate-900">{selectedDoctor.name}</span>
-                </div>
+                {patientName && (
+                    <div className="flex items-center gap-1.5">
+                        <span className="material-symbols-outlined text-slate-900 text-[20px]">badge</span>
+                        <span className="font-medium text-slate-900">{patientName}</span>
+                    </div>
+                )}
                 <div className="flex items-center gap-1.5">
                     <span className="material-symbols-outlined text-gray-500 text-[20px]">Stethoscope</span>
-                    <span className="text-slate-700">{selectedDoctor.specialty}</span>
+                    <span className="text-slate-700">{selectedDoctor.full_name || selectedDoctor.name}</span>
                 </div>
                 <div className="flex items-center gap-1.5">
                     <span className="material-symbols-outlined text-gray-500 text-[20px]">home_health</span>
@@ -109,21 +112,36 @@ interface SchedulingSectionProps {
     selectedClinic: any; // Accept any clinic type
     selectedTimeSlot: string | null;
     onTimeSelect: (time: string | null) => void;
+    onDateChange?: (date: Date | null) => void;
+    patientName?: string;
 }
 
 // --- MAIN SCHEDULING COMPONENT (RESPONSIVE) ---
+const CalenderObserver: React.FC<{ onDateChange?: (date: Date | null) => void }> = ({ onDateChange }) => {
+    const { pickedDate } = useCalender();
+    useEffect(() => {
+        if (onDateChange) {
+            onDateChange(pickedDate);
+        }
+    }, [onDateChange, pickedDate]);
+    return null;
+};
+
 const SchedulingSection: React.FC<SchedulingSectionProps> = ({ 
     selectedDoctor, 
     selectedClinic,
     selectedTimeSlot,
-    onTimeSelect 
+    onTimeSelect,
+    onDateChange,
+    patientName,
 }) => {
     const doctorId = selectedDoctor?.id || selectedDoctor?._id || '';
     const clinicId = selectedDoctor?.clinic_id || selectedClinic?.id || selectedClinic?._id || '';
     
     return (
         <CalenderProvider dentistId={doctorId.toString()} clinicId={clinicId.toString()}>
-            <div className="bg-white p-4 rounded-sm border border-gray-300">
+        <CalenderObserver onDateChange={onDateChange} />
+        <div className="bg-white p-4 rounded-sm border border-gray-300">
                 <h2 className="text-[18px] font-semibold flex items-center gap-2 mb-4 text-cyan-800">
                     <span className="material-symbols-sharp">calendar_month</span>
                     Schedule Your Appointment
@@ -147,6 +165,7 @@ const SchedulingSection: React.FC<SchedulingSectionProps> = ({
                     selectedDoctor={selectedDoctor}
                     selectedClinic={selectedClinic}
                     selectedTimeSlot={selectedTimeSlot}
+                    patientName={patientName}
                 />
             </div>
         </CalenderProvider>

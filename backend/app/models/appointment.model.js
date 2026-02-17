@@ -11,7 +11,6 @@ const appointmentSchema = new mongoose.Schema(
     },
     file_number: {
       type: String,
-      unique: true,
       sparse: true,
       trim: true,
       description: "Auto-generated file number in format: CCYY##### (CC=clinic name first 2 letters, YY=year last 2 digits, #####=5-digit increment)"
