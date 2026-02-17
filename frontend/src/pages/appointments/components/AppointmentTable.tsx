@@ -280,73 +280,94 @@ export default function AppointmentTable({
 
                   {editorOpenId === appt.id && (
                     <div
-                      className="absolute top-full mt-2 w-full sm:w-80 left-0 sm:left-1/2 sm:-translate-x-1/2 bg-white border border-slate-200 shadow-lg rounded-xl z-30"
-                      role="dialog" aria-label="Edit medical conditions"
+                      className="fixed inset-0 z-[9999] flex items-center justify-center px-4 py-8 bg-black/40 backdrop-blur-sm"
+                      role="dialog"
+                      aria-label="Edit medical conditions"
+                      onMouseDown={(event) => {
+                        if (event.target === event.currentTarget) {
+                          closeEditor();
+                        }
+                      }}
                     >
-                      <h4 className="text-sm font-semibold text-slate-900 px-4 pt-4">
-                        Edit Medical Conditions
-                      </h4>
+                      <div className="w-full max-w-[32rem] bg-white border border-slate-200 shadow-2xl rounded-2xl flex flex-col overflow-hidden">
+                        <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+                          <h4 className="text-sm font-semibold text-slate-900">
+                            Edit Medical Conditions
+                          </h4>
+                          <button
+                            type="button"
+                            onClick={closeEditor}
+                            className="text-slate-400 hover:text-slate-600"
+                          >
+                            <span className="sr-only">Close</span>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor" fill="none" strokeLinecap="round" strokeLinejoin="round">
+                              <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                              <path d="M18 6l-12 12" />
+                              <path d="M6 6l12 12" />
+                            </svg>
+                          </button>
+                        </div>
 
-                      <div className="max-h-80 overflow-auto p-4">
-                        {clinicConditions.length === 0 ? (
-                          <p className="text-sm text-slate-500">No conditions configured.</p>
-                        ) : (
-                          <ul className="space-y-2">
-                            {clinicConditions.map((c) => {
-                              const checked = (draftMap[appt.id] ?? []).includes(c.name);
-                              return (
-                                <li key={c.id} className="flex flex-col justify-center p-2 rounded-lg hover:bg-slate-50 transition-colors">
-                                  <label
-                                    htmlFor={`${appt.id}-${c.id}`}
-                                    className="flex items-center gap-3 cursor-pointer"
-                                  >
-                                    <input
-                                      id={`${appt.id}-${c.id}`}
-                                      type="checkbox"
-                                      className="h-4 w-4 rounded text-sky-600 focus:ring-sky-500 border-slate-300 shrink-0"
-                                      checked={checked}
-                                      onChange={() => toggleDraft(appt.id, c.name)}
-                                    />
-                                    <span className="text-sm text-slate-800 select-none">
-                                      {c.name}
-                                    </span>
-                                  </label>
-
-                                  {/* Render input box if checked and has_value is true */}
-                                  {checked && c.has_value && (
-                                    <div className="mt-2 ml-7">
+                        <div className="max-h-[60vh] overflow-y-auto overflow-x-hidden p-4 space-y-3">
+                          {clinicConditions.length === 0 ? (
+                            <p className="text-sm text-slate-500">No conditions configured.</p>
+                          ) : (
+                            <ul className="space-y-2">
+                              {clinicConditions.map((c) => {
+                                const checked = (draftMap[appt.id] ?? []).includes(c.name);
+                                return (
+                                  <li key={c.id} className="flex flex-col justify-center p-2 rounded-lg hover:bg-slate-50 transition-colors">
+                                    <label
+                                      htmlFor={`${appt.id}-${c.id}`}
+                                      className="flex items-center gap-3 cursor-pointer"
+                                    >
                                       <input
-                                        type="text"
-                                        placeholder="Value (e.g. 102 F)"
-                                        className="w-full px-2 py-1 text-sm border border-slate-300 rounded-md focus:ring-2 focus:ring-sky-200 outline-none"
-                                        value={draftValues[appt.id]?.[c.name] || ''}
-                                        onChange={(e) => handleValueChange(appt.id, c.name, e.target.value)}
-                                        onClick={(e) => e.stopPropagation()}
+                                        id={`${appt.id}-${c.id}`}
+                                        type="checkbox"
+                                        className="h-4 w-4 rounded text-sky-600 focus:ring-sky-500 border-slate-300 shrink-0"
+                                        checked={checked}
+                                        onChange={() => toggleDraft(appt.id, c.name)}
                                       />
-                                    </div>
-                                  )}
-                                </li>
-                              );
-                            })}
-                          </ul>
-                        )}
-                      </div>
+                                      <span className="text-sm text-slate-800 select-none">
+                                        {c.name}
+                                      </span>
+                                    </label>
 
-                      <div className="p-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-3 border-t border-slate-100">
-                        <button
-                          type="button"
-                          onClick={closeEditor}
-                          className="w-full sm:w-auto px-4 py-2 text-sm font-medium rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50 transition"
-                        >
-                          Cancel
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => saveDraft(appt.id)}
-                          className="w-full sm:w-auto px-4 py-2 text-sm font-medium rounded-lg bg-sky-600 text-white hover:bg-sky-700 transition"
-                        >
-                          Save
-                        </button>
+                                    {checked && c.has_value && (
+                                      <div className="mt-2 ml-7">
+                                        <input
+                                          type="text"
+                                          placeholder="Value (e.g. 102 F)"
+                                          className="w-full px-2 py-1 text-sm border border-slate-300 rounded-md focus:ring-2 focus:ring-sky-200 outline-none"
+                                          value={draftValues[appt.id]?.[c.name] || ''}
+                                          onChange={(e) => handleValueChange(appt.id, c.name, e.target.value)}
+                                          onClick={(e) => e.stopPropagation()}
+                                        />
+                                      </div>
+                                    )}
+                                  </li>
+                                );
+                              })}
+                            </ul>
+                          )}
+                        </div>
+
+                        <div className="p-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-3 border-t border-slate-100">
+                          <button
+                            type="button"
+                            onClick={closeEditor}
+                            className="w-full sm:w-auto px-4 py-2 text-sm font-medium rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50 transition"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => saveDraft(appt.id)}
+                            className="w-full sm:w-auto px-4 py-2 text-sm font-medium rounded-lg bg-sky-600 text-white hover:bg-sky-700 transition"
+                          >
+                            Save
+                          </button>
+                        </div>
                       </div>
                     </div>
                   )}
