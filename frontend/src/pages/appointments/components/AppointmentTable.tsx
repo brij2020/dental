@@ -60,6 +60,15 @@ export default function AppointmentTable({
   const [noteOpenId, setNoteOpenId] = React.useState<string | null>(null); // State for tracking open notes
   const [consentOpenId, setConsentOpenId] = React.useState<string | null>(null);
 
+  React.useEffect(() => {
+    if (!editorOpenId || typeof document === 'undefined') return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [editorOpenId]);
+
   // Stores the selected condition names (e.g., ["Fever", "Cough"])
   const [draftMap, setDraftMap] = React.useState<Record<string, string[]>>({});
 
