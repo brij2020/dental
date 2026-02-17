@@ -103,7 +103,11 @@ export default function FollowUpPage() {
         return [...previous].sort((a, b) => toTimestamp(b) - toTimestamp(a));
     }, [appointments?.previous]);
 
-    const lastAppointment = sortedPreviousAppointments[0] || null;
+    const completedAppointments = useMemo(() => {
+        return sortedPreviousAppointments.filter((appt) => appt?.status === "completed");
+    }, [sortedPreviousAppointments]);
+
+    const lastAppointment = completedAppointments[0] || sortedPreviousAppointments[0] || null;
     const lastVisitedClinics = useMemo(() => {
         if (!lastAppointment) return [];
         const ids: string[] = [];
