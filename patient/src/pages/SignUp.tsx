@@ -1,4 +1,5 @@
 import React from "react";
+import { Eye, EyeOff } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { toast } from "react-toastify";
 import { useNavigate } from "react-router-dom";
@@ -21,6 +22,7 @@ type SignUpFormInputs = {
 
 const SignUp: React.FC = () => {
   const navigate = useNavigate();
+  const [showPassword, setShowPassword] = React.useState(false);
 
   const {
     register,
@@ -250,15 +252,29 @@ const SignUp: React.FC = () => {
               <label className="block text-blue-900 font-semibold mb-1">
                 Password
               </label>
-              <input
-                type="password"
-                {...register("password", {
-                  required: "Password required",
-                  minLength: { value: 8, message: "Minimum 8 characters" },
-                })}
-                placeholder="Create password"
-                className="w-full px-3 py-2 border rounded border-blue-300 focus:ring-2 focus:ring-blue-600"
-              />
+              <div className="relative">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  {...register("password", {
+                    required: "Password required",
+                    minLength: { value: 8, message: "Minimum 8 characters" },
+                  })}
+                  placeholder="Create password"
+                  className="w-full px-3 py-2 border rounded border-blue-300 focus:ring-2 focus:ring-blue-600 pr-12"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((prev) => !prev)}
+                  className="absolute inset-y-0 right-3 flex items-center justify-center rounded-full p-1 text-blue-600 hover:text-blue-900 focus-visible:ring-2 focus-visible:ring-blue-500 focus:outline-none"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? (
+                    <EyeOff className="h-5 w-5" />
+                  ) : (
+                    <Eye className="h-5 w-5" />
+                  )}
+                </button>
+              </div>
               {errors.password && <p className="text-red-500 text-xs mt-1">{errors.password.message}</p>}
             </div>
           </div>
