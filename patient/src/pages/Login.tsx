@@ -3,11 +3,13 @@ import { toast } from "react-toastify";
 import { useNavigate } from "react-router-dom";
 import { Eye, EyeOff } from "lucide-react";
 import { api } from "../lib/apiClient";
+import { useProfile } from "../hooks/useProfile";
 
 type LoginMode = "password" | "otp";
 
 const Login: React.FC = () => {
   const navigate = useNavigate();
+  const { setUser } = useProfile();
   const [mode, setMode] = React.useState<LoginMode>("password");
   const [email, setEmail] = React.useState("");
   const [password, setPassword] = React.useState("");
@@ -23,6 +25,13 @@ const Login: React.FC = () => {
     localStorage.setItem("patient_email", sessionData.email);
     localStorage.setItem("patient_name", sessionData.full_name);
     localStorage.setItem("patient_uhid", sessionData.uhid);
+    setUser({
+      token: sessionData.token,
+      patient_id: sessionData.patient_id,
+      email: sessionData.email,
+      full_name: sessionData.full_name,
+      uhid: sessionData.uhid,
+    });
   };
 
   const handlePasswordLogin = async () => {

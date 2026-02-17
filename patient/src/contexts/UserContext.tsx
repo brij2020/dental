@@ -111,6 +111,12 @@ const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
   }, []);
 
   useEffect(() => {
+    if (user?.patient_id) {
+      fetchProfile(user.patient_id);
+    }
+  }, [user?.patient_id]);
+
+  useEffect(() => {
     if (!user) return;
 
     let canceled = false;
