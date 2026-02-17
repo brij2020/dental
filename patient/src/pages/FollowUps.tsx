@@ -104,7 +104,17 @@ export default function FollowUpPage() {
     }, [appointments?.previous]);
 
     const lastAppointment = sortedPreviousAppointments[0] || null;
-    const lastVisitedClinicId = lastAppointment?.clinic_id || lastAppointment?.clinics?.clinic_id || lastAppointment?.clinics?.id || lastAppointment?.clinics?._id || '';
+    const lastVisitedClinics = useMemo(() => {
+        if (!lastAppointment) return [];
+        const ids: string[] = [];
+        const clinicSnapshot = lastAppointment?.clinics;
+        if (lastAppointment.clinic_id) ids.push(lastAppointment.clinic_id);
+        if (clinicSnapshot?.clinic_id) ids.push(clinicSnapshot.clinic_id);
+        if (clinicSnapshot?.id) ids.push(clinicSnapshot.id);
+        if (clinicSnapshot?._id) ids.push(clinicSnapshot._id);
+        if (clinicSnapshot?.name) ids.push(clinicSnapshot.name);
+        return ids.filter(Boolean).map((id) => id.toString());
+    }, [lastAppointment]);
 
     const handleConfirm = async () => {
         if (!selectedDoctor || !selectedClinic || !selectedTimeSlot) {
@@ -201,27 +211,31 @@ export default function FollowUpPage() {
         setConfirmedAppointmentData(null);
     };
 
+    const matchClinicByIdentifier = useCallback(
+        (clinic: Clinic) => {
+            if (!lastVisitedClinics.length) return false;
+            const keys = [clinic.clinic_id, clinic.id, clinic._id, clinic.name];
+            return keys.some((key) => key && lastVisitedClinics.includes(key.toString()));
+        },
+        [lastVisitedClinics]
+    );
+
     const visibleClinics = useMemo(() => {
-        if (!lastVisitedClinicId) return clinics;
-        const filtered = clinics.filter(c =>
-            c.clinic_id === lastVisitedClinicId ||
-            c.id === lastVisitedClinicId ||
-            c._id === lastVisitedClinicId
-        );
+        if (!lastVisitedClinics.length) return clinics;
+        const filtered = clinics.filter((c) => matchClinicByIdentifier(c));
         return filtered.length ? filtered : clinics;
-    }, [clinics, lastVisitedClinicId]);
+    }, [clinics, lastVisitedClinics, matchClinicByIdentifier]);
 
     useEffect(() => {
-        if (!lastVisitedClinicId) return;
-        if (selectedClinicId === lastVisitedClinicId) return;
-        const match = clinics.find(c =>
-            c.clinic_id === lastVisitedClinicId ||
-            c.id === lastVisitedClinicId ||
-            c._id === lastVisitedClinicId
-        );
+        if (!lastVisitedClinics.length) return;
+        const alreadySelected = selectedClinicId && lastVisitedClinics.includes(selectedClinicId);
+        if (alreadySelected) return;
+        const match = clinics.find((clinic) => matchClinicByIdentifier(clinic));
         if (!match) return;
-        handleClinicSelect(lastVisitedClinicId);
-    }, [lastVisitedClinicId, clinics, selectedClinicId, handleClinicSelect]);
+        const clinicIdToSelect = match.clinic_id || match.id || match._id || "";
+        if (!clinicIdToSelect) return;
+        handleClinicSelect(clinicIdToSelect);
+    }, [clinics, selectedClinicId, matchClinicByIdentifier, handleClinicSelect, lastVisitedClinics]);
 
     if (loading && clinics.length === 0) {
         return <Loading size={"500px"} />;
