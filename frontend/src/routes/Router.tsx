@@ -4,6 +4,7 @@ import ProtectedRoute from "./ProtectedRoute";
 import DashboardLayout from "../layouts/DashboardLayout";
 import ErrorBoundary from "./ErrorBoundary";
 import SpinnerOverlay from "../components/SpinnerOverlay";
+import { useAuth } from "../state/useAuth";
 
 const Login         = lazy(() => import("../pages/auth/Login"));
 const ForgotPassword = lazy(() => import("../pages/auth/ForgotPassword"));
@@ -45,6 +46,23 @@ const withSuspense = (el: ReactNode) => (
   <Suspense fallback={<SpinnerOverlay />}>{el}</Suspense>
 );
 
+const RequireSuperAdmin = ({ children }: { children: ReactNode }) => {
+  const { user } = useAuth();
+
+  if (!user) {
+    return null;
+  }
+
+  if (user.role !== "super_admin") {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  return <>{children}</>;
+};
+
+const withSuperAdmin = (el: ReactNode) =>
+  withSuspense(<RequireSuperAdmin>{el}</RequireSuperAdmin>);
+
 const router = createBrowserRouter([
   { path: "/", element: <Navigate to="/dashboard" replace />, errorElement: <ErrorBoundary /> },
   { path: "/login", element: withSuspense(<Login />), errorElement: <ErrorBoundary /> },
@@ -59,9 +77,9 @@ const router = createBrowserRouter([
         errorElement: <ErrorBoundary />,
         children: [
           { path: "/dashboard",    element: withSuspense(<Dashboard />) },
-          { path: "/clinics",      element: withSuspense(<Clinics />) },
-          { path: "/clinics/create", element: withSuspense(<CreateClinic />) },
-          { path: "/clinics/:id/edit", element: withSuspense(<EditClinic />) },
+          { path: "/clinics",      element: withSuperAdmin(<Clinics />) },
+          { path: "/clinics/create", element: withSuperAdmin(<CreateClinic />) },
+          { path: "/clinics/:id/edit", element: withSuperAdmin(<EditClinic />) },
           { path: "/patients",     element: withSuspense(<Patients />) },
           { path: "/appointments", element: withSuspense(<Appointments />) },
           { path: "/insight-videos",      element: withSuspense(<InsightVideos />) },
