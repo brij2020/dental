@@ -54,6 +54,23 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({ appointment, appointm
         return String(address);
     }, [appointment?.clinics?.address]);
 
+    const statusBadgeClasses = {
+        completed: "bg-emerald-50 text-emerald-700 border border-emerald-100",
+        cancelled: "bg-rose-50 text-rose-700 border border-rose-100",
+        missed: "bg-amber-50 text-amber-700 border border-amber-100",
+        scheduled: "bg-sky-50 text-sky-700 border border-sky-100",
+    };
+
+    const statusTextClasses = {
+        completed: "text-emerald-700",
+        cancelled: "text-rose-700",
+        missed: "text-amber-700",
+        scheduled: "text-sky-700",
+    };
+
+    const badgeClass = statusBadgeClasses[appointment?.status as keyof typeof statusBadgeClasses] || "bg-slate-50 text-slate-700 border border-slate-100";
+    const textClass = statusTextClasses[appointment?.status as keyof typeof statusTextClasses] || "text-slate-900";
+
     return (
         <div className={`flex items-center border border-gray-300 bg-white ${appointmentType === "missed" ? "opacity-65" : ""} rounded-sm py-4 px-4 relative ${className}`}>
             <div className='flex md:items-center flex-col md:flex-row justify-between flex-1'>
@@ -88,6 +105,12 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({ appointment, appointm
                                 <span className="material-symbols-sharp text-[16px] text-zinc-400">stethoscope</span>
                                 <p className='text-[13px] text-zinc-600 text-ellipsis whitespace-nowrap overflow-x-hidden'>{appointment?.clinics?.admin_staff_name}</p>
                             </div>
+                        </div>
+                        <div className="flex items-center gap-2 mt-2">
+                            <span className="w-2 h-2 rounded-full bg-slate-400" />
+                            <span className={`text-[11px] font-semibold uppercase tracking-[0.2em] px-2 py-1 rounded-full ${badgeClass}`}>
+                                {appointment?.status || "unknown"}
+                            </span>
                         </div>
                     </div>
                     {/* {appointmentType === "upcoming" && (
@@ -186,7 +209,9 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({ appointment, appointm
                         </div>
                         <div>
                             <p className="text-xs text-zinc-500">Status</p>
-                            <p className="text-sm font-semibold text-zinc-900 capitalize">{appointment?.status || "Scheduled"}</p>
+                            <p className={`text-sm font-semibold capitalize ${appointment?.status === "cancelled" ? "text-rose-700" : appointment?.status === "completed" ? "text-emerald-700" : "text-slate-900"}`}>
+                                {appointment?.status || "Scheduled"}
+                            </p>
                         </div>
                     </div>
                     <button
