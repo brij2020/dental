@@ -44,10 +44,13 @@ const Login: React.FC = () => {
       }
 
       const backendData = response.data;
-      if (backendData?.success && backendData?.data) {
-        persistPatientSession(backendData.data);
+      const payload = backendData?.data;
+      if (backendData?.success && payload?.token) {
+        persistPatientSession(payload);
         toast.success("Login successful!");
         navigate("/");
+      } else {
+        toast.error("Login failed: token missing");
       }
     } catch {
       toast.error("An unexpected error occurred");
@@ -101,10 +104,13 @@ const Login: React.FC = () => {
       }
 
       const backendData = response.data;
-      if (backendData?.success && backendData?.data) {
-        persistPatientSession(backendData.data);
+      const payload = backendData?.data;
+      if (backendData?.success && payload?.token) {
+        persistPatientSession(payload);
         toast.success("Login successful!");
         navigate("/");
+      } else {
+        toast.error("Login failed: token missing");
       }
     } catch {
       toast.error("Failed to verify OTP");
