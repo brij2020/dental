@@ -1,5 +1,51 @@
 const Remedy = require("../models/remedy.model");
+const Clinic = require("../models/clinic.model");
 const logger = require("../config/logger");
+
+const SYSTEM_CLINIC_IDS = ["system", "SYSTEM", "System"];
+const OBJECT_ID_REGEX = /^[0-9a-fA-F]{24}$/;
+
+const resolveClinicAliases = async (clinicIdRaw) => {
+  const clinicId = typeof clinicIdRaw === "string" ? clinicIdRaw.trim() : "";
+  if (!clinicId) return [];
+
+  const aliases = new Set([clinicId]);
+
+  try {
+    if (OBJECT_ID_REGEX.test(clinicId)) {
+      const clinicByObjectId = await Clinic.findById(clinicId).select("clinic_id").lean();
+      if (clinicByObjectId?.clinic_id) aliases.add(String(clinicByObjectId.clinic_id).trim());
+    } else {
+      const clinicByBusinessId = await Clinic.findOne({ clinic_id: clinicId }).select("_id clinic_id").lean();
+      if (clinicByBusinessId?._id) aliases.add(String(clinicByBusinessId._id));
+      if (clinicByBusinessId?.clinic_id) aliases.add(String(clinicByBusinessId.clinic_id).trim());
+    }
+  } catch (err) {
+    logger.warn("Failed to resolve clinic aliases for remedies", { clinicId, err: err?.message || err });
+  }
+
+  return Array.from(aliases);
+};
+
+const buildClinicScopeQuery = async (clinicIdRaw) => {
+  const inputIds = Array.isArray(clinicIdRaw) ? clinicIdRaw : [clinicIdRaw];
+  const normalizedIds = inputIds
+    .map((id) => (typeof id === "string" ? id.trim() : ""))
+    .filter(Boolean);
+
+  if (normalizedIds.length === 0) return null;
+  if (normalizedIds.some((id) => SYSTEM_CLINIC_IDS.includes(id))) {
+    return { $in: SYSTEM_CLINIC_IDS };
+  }
+
+  const aliases = new Set();
+  for (const id of normalizedIds) {
+    const clinicAliases = await resolveClinicAliases(id);
+    clinicAliases.forEach((alias) => aliases.add(alias));
+  }
+
+  return { $in: [...aliases, ...SYSTEM_CLINIC_IDS] };
+};
 
 // Create a new remedy
 exports.create = async (remedyData) => {
@@ -18,7 +64,8 @@ exports.findAllWithFilters = async (filters = {}) => {
   try {
     const query = {};
     if (filters.clinic_id) {
-      query.clinic_id = filters.clinic_id;
+      const clinicScope = await buildClinicScopeQuery(filters.clinic_id);
+      if (clinicScope) query.clinic_id = clinicScope;
     }
     if (filters.name) {
       // Case-insensitive partial match using regex
@@ -62,9 +109,8 @@ exports.findByClinicAndName = async (clinic_id, name) => {
 exports.findByClinicId = async (clinic_id, filters = {}) => {
   try {
     // Return both global and clinic-specific remedies
-    const query = clinic_id !== 'system'
-      ? { clinic_id: { $in: [clinic_id, 'system'] } }
-      : { clinic_id };
+    const clinicScope = await buildClinicScopeQuery(clinic_id);
+    const query = clinicScope ? { clinic_id: clinicScope } : {};
 
     const hasPagination = filters.page !== undefined || filters.limit !== undefined;
     if (hasPagination) {

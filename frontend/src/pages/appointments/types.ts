@@ -12,6 +12,13 @@ export type AppointmentDetails = {
     full_name: string | null;
   } | null;
   medical_conditions?: string[];
+  report_file?: {
+    url: string | null;
+    original_name?: string | null;
+    mime_type?: string | null;
+    size?: number | null;
+    uploaded_at?: string | null;
+  } | null;
   notes: string | null;
   patient_note?: string | null;
   follow_up_for_consultation_id?: string | null;

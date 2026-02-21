@@ -101,6 +101,7 @@ export default function Appointments() {
       const result = await getAppointments(clinicId, {
         searchTerm: debouncedSearchTerm,
         appointmentType,
+        provisional: false,
         page: currentPage,
         limit: PAGE_SIZE,
       });
@@ -218,6 +219,7 @@ export default function Appointments() {
             onStatusChange={handleStatusChange}
             clinicConditions={clinicConditions}
             onUpdateConditions={handleUpdateConditions}
+            onRefreshAppointments={fetchAppointments}
           />
           {isPageLoading && <TableOverlayLoader />}
         </div>

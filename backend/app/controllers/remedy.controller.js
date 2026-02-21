@@ -44,7 +44,9 @@ exports.create = async (req, res) => {
 exports.findAll = async (req, res) => {
   try {
     const { clinic_id, name, limit } = req.query;
-    const filters = { clinic_id, name, limit };
+    const effectiveClinicIds = [clinic_id, 'system'].filter(Boolean);
+    const filters = { clinic_id: effectiveClinicIds.length > 0 ? effectiveClinicIds : undefined, name, limit };
+    console.log("=====filters", filters)
     const remedies = await remedyService.findAllWithFilters(filters);
     res.status(200).send({ success: true, data: remedies });
   } catch (err) {
@@ -90,7 +92,8 @@ exports.findByClinicId = async (req, res) => {
       });
     }
 
-    const result = await remedyService.findByClinicId(req.params.clinic_id, {
+    const effectiveClinicIds = [req.params.clinic_id, req.user?.clinic_id].filter(Boolean);
+    const result = await remedyService.findByClinicId(effectiveClinicIds, {
       page: page || undefined,
       limit: limit || undefined,
     });

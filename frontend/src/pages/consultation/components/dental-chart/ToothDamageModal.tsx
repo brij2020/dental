@@ -5,6 +5,7 @@ import {
   createTreatmentProcedure,
   createMultipleTreatmentProcedures,
   getProcedures,
+  getTreatmentProceduresByConsultationId,
 } from "../../../../lib/apiClient";
 import type { TreatmentProcedureRow } from "../../types";
 import {
@@ -31,6 +32,14 @@ type ProcedureOption = {
   id: string; // procedure_id
   name: string;
   cost: number | null;
+};
+
+const parseStoredToothIndex = (value: unknown): number | null => {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return null;
+  // treatment_procedures.tooth_number is stored as internal index (1..52)
+  if (numeric >= 1 && numeric <= 52) return numeric;
+  return normalizeToothNumber(numeric);
 };
 
 const ToothDamageModal: React.FC<Props> = ({
@@ -212,17 +221,66 @@ const ToothDamageModal: React.FC<Props> = ({
   const CHILD_LOWER = useMemo(() => [85, 84, 83, 82, 81, 71, 72, 73, 74, 75], []);
 
   const [selectedTeeth, setSelectedTeeth] = useState<Set<number>>(new Set());
+  const [lockedTeeth, setLockedTeeth] = useState<Set<number>>(new Set()); // normalized internal indexes already used in this consultation
+
+  const isToothLocked = (displayToothNumber: number | null | undefined) => {
+    const normalized = normalizeToothNumber(displayToothNumber);
+    if (normalized == null) return false;
+    return lockedTeeth.has(normalized);
+  };
 
   // Seed the clicked tooth into Multiple tab selection
   useEffect(() => {
     if (!isOpen || toothNumber == null) return;
+    if (isToothLocked(toothNumber)) return;
     setSelectedTeeth((prev) => {
       if (prev.has(toothNumber)) return prev;
       const next = new Set(prev);
       next.add(toothNumber);
       return next;
     });
-  }, [isOpen, toothNumber]);
+  }, [isOpen, toothNumber, lockedTeeth]);
+
+  // If locked teeth load after user selection, remove them from current selection.
+  useEffect(() => {
+    if (!isOpen || lockedTeeth.size === 0) return;
+    setSelectedTeeth((prev) => {
+      const next = new Set(
+        Array.from(prev).filter((displayTooth) => {
+          const normalized = normalizeToothNumber(displayTooth);
+          return normalized == null || !lockedTeeth.has(normalized);
+        }),
+      );
+      if (next.size === prev.size) return prev;
+      return next;
+    });
+  }, [isOpen, lockedTeeth]);
+
+  // Lock already-used teeth for the current consultation so they can't be selected again
+  useEffect(() => {
+    if (!isOpen || !consultationId) return;
+    let cancelled = false;
+
+    const loadLockedTeeth = async () => {
+      try {
+        const resp = await getTreatmentProceduresByConsultationId(consultationId);
+        if (cancelled) return;
+        const payload = resp?.data?.data ?? resp?.data ?? [];
+        const list = Array.isArray(payload) ? payload : [payload];
+        const normalizedUsed = list
+          .map((p: any) => parseStoredToothIndex(p?.tooth_number))
+          .filter((v: number | null): v is number => v != null);
+        setLockedTeeth(new Set(normalizedUsed));
+      } catch (err) {
+        if (!cancelled) setLockedTeeth(new Set());
+      }
+    };
+
+    loadLockedTeeth();
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, consultationId]);
 
   // Reset when modal closes/opens
   useEffect(() => {
@@ -232,6 +290,7 @@ const ToothDamageModal: React.FC<Props> = ({
       setSolutions([""]);
       setCost("");
       setSelectedTeeth(new Set());
+      setLockedTeeth(new Set());
       setLoadProceduresError(null);
       setLoadProblemsError(null);
       setToothDamage("");
@@ -399,6 +458,7 @@ const ToothDamageModal: React.FC<Props> = ({
   );
 
   const toggleTooth = (n: number) => {
+    if (isToothLocked(n)) return;
     setSelectedTeeth((prev) => {
       const next = new Set(prev);
       if (next.has(n)) next.delete(n);
@@ -408,14 +468,15 @@ const ToothDamageModal: React.FC<Props> = ({
   };
 
   const toggleToothGroup = (group: number[]) => {
+    const selectable = group.filter((tooth) => !isToothLocked(tooth));
     setSelectedTeeth((prev) => {
       const next = new Set(prev);
-      const areAllSelected = group.every((tooth) => next.has(tooth));
+      const areAllSelected = selectable.length > 0 && selectable.every((tooth) => next.has(tooth));
 
       if (areAllSelected) {
-        group.forEach((tooth) => next.delete(tooth));
+        selectable.forEach((tooth) => next.delete(tooth));
       } else {
-        group.forEach((tooth) => next.add(tooth));
+        selectable.forEach((tooth) => next.add(tooth));
       }
       return next;
     });
@@ -445,6 +506,9 @@ const ToothDamageModal: React.FC<Props> = ({
         cost.trim() === "" ? null : Number(cost);
 
       if (activeTab === "one") {
+        if (isToothLocked(toothNumber)) {
+          throw new Error("This tooth already has a saved damage entry for this consultation");
+        }
         // Single tooth procedure
         const response = await createTreatmentProcedure({
           consultation_id: consultationId,
@@ -468,6 +532,10 @@ const ToothDamageModal: React.FC<Props> = ({
           numericCost != null && selectedTeethList.length > 0
             ? Number((numericCost / selectedTeethList.length).toFixed(2))
             : null;
+
+        if (selectedTeethList.some((tooth) => isToothLocked(tooth))) {
+          throw new Error("One or more selected teeth already have saved damage entries");
+        }
 
         const normalizedTeeth = selectedTeethList.map((tooth) =>
           normalizeToothNumber(tooth),
@@ -510,8 +578,9 @@ const ToothDamageModal: React.FC<Props> = ({
 
   // --- ROW COMPONENT ---
   const Row = ({ title, values }: { title: string; values: number[] }) => {
+    const selectable = values.filter((v) => !isToothLocked(v));
     const areAllSelected =
-      values.length > 0 && values.every((v) => selectedTeeth.has(v));
+      selectable.length > 0 && selectable.every((v) => selectedTeeth.has(v));
 
     return (
       <div className="mb-4">
@@ -523,7 +592,7 @@ const ToothDamageModal: React.FC<Props> = ({
               className="accent-sky-500"
               checked={areAllSelected}
               onChange={() => toggleToothGroup(values)}
-              disabled={isSaving}
+              disabled={isSaving || selectable.length === 0}
             />
             
             <span className="text-sm font-semibold">Select All</span>
@@ -531,23 +600,31 @@ const ToothDamageModal: React.FC<Props> = ({
         </div>
         <div className="flex flex-wrap gap-2">
           {values.map((v) => (
+            (() => {
+              const locked = isToothLocked(v);
+              return (
             <label
               key={`${title}-${v}`}
               className={`inline-flex items-center gap-2 px-2.5 py-1.5 rounded-lg border ${
-                selectedTeeth.has(v)
+                locked
+                  ? "border-slate-200 bg-slate-100 text-slate-400 cursor-not-allowed"
+                  : selectedTeeth.has(v)
                   ? "border-sky-400 bg-sky-50 text-slate-900"
                   : "border-slate-300 bg-white text-slate-700"
-              } cursor-pointer`}
+              } ${locked ? "" : "cursor-pointer"}`}
             >
               <input
                 type="checkbox"
                 className="accent-sky-500"
                 checked={selectedTeeth.has(v)}
                 onChange={() => toggleTooth(v)}
-                disabled={isSaving}
+                disabled={isSaving || locked}
               />
               <span className="text-sm font-semibold">{v}</span>
+              {locked && <span className="text-[10px] font-medium uppercase tracking-wide">Saved</span>}
             </label>
+              );
+            })()
           ))}
         </div>
       </div>
@@ -623,11 +700,16 @@ const ToothDamageModal: React.FC<Props> = ({
                 <label className="block text-sm font-medium text-slate-700 mb-1">
                   Tooth Number
                 </label>
-               <input
+              <input
                 value={toothNumber ?? ""}
                 readOnly
                 className="w-full rounded-xl border border-slate-300 bg-slate-50 pl-[10px] pr-3 py-2.5 text-slate-900 outline-none"
               />
+              {isToothLocked(toothNumber) && (
+                <p className="mt-1 text-xs text-amber-600">
+                  This tooth already has a saved damage entry for this consultation.
+                </p>
+              )}
               </div>
 
               {/* Problems */}
@@ -848,6 +930,7 @@ const ToothDamageModal: React.FC<Props> = ({
             onClick={handleSave}
             disabled={
               isSaving ||
+              (activeTab === "one" && isToothLocked(toothNumber)) ||
               (activeTab === "multi" && selectedTeethList.length === 0)
             }
             className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-sky-500 px-5 py-2 text-white font-medium shadow-sm hover:brightness-105 active:brightness-95 transition disabled:opacity-50"

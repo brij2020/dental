@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react'; // <-- Import useEffect
 import DentalChart from './dental-chart/DentalChart';
 import type { TreatmentProcedureRow } from '../types';
+import { getAdultDisplayNumber, getChildDisplayNumber, normalizeToothNumber } from './dental-chart/toothNumbers';
 
 type TextAreaProps = React.TextareaHTMLAttributes<HTMLTextAreaElement> & {
   label: string;
@@ -48,6 +49,20 @@ export default function ClinicalExamination({
   procedures = [],
   onProcedureCreated,
 }: Props) {
+  const formatToothForDisplay = (toothValue: unknown) => {
+    const numeric = Number(toothValue);
+    if (!Number.isFinite(numeric)) return '—';
+
+    // In treatment_procedures, tooth_number is stored as internal normalized index.
+    // Use it directly to avoid re-normalization collisions (e.g., 27 should render as 43).
+    const normalized = (numeric >= 1 && numeric <= 52) ? numeric : normalizeToothNumber(numeric);
+    if (normalized == null) return String(toothValue);
+
+    return normalized <= 32
+      ? String(getAdultDisplayNumber(normalized))
+      : String(getChildDisplayNumber(normalized));
+  };
+
   const [formData, setFormData] = useState<ClinicalExaminationData>({
     chiefComplaints: '',
     onExamination: '',
@@ -135,7 +150,7 @@ export default function ClinicalExamination({
                       <tbody>
                         {displayProcedures.map((proc) => (
                           <tr key={proc.id} className="border-b border-slate-100 last:border-b-0">
-                            <td className="px-4 py-3 text-slate-800 font-medium text-sm">{proc.tooth_number}</td>
+                            <td className="px-4 py-3 text-slate-800 font-medium text-sm">{formatToothForDisplay(proc.tooth_number)}</td>
                             <td className="px-4 py-3 text-slate-600">{proc.problems?.join(', ') || '—'}</td>
                             <td className="px-4 py-3 text-slate-600">{proc.solutions?.join(', ') || '—'}</td>
                             <td className="px-4 py-3 text-right text-slate-700 font-semibold">₹{typeof proc.cost === 'number' ? proc.cost.toFixed(2) : '0.00'}</td>
@@ -167,51 +182,7 @@ export default function ClinicalExamination({
           />
         </div>
       </div>
-      {/* 
-      START 
-      */}
-
-      {/* Tooth Damage Table: Show after On Examination */}
-      {(() => {
-        if (!displayProcedures || displayProcedures.length === 0) return null;
-        const toothDamageProcedures = displayProcedures.filter((p) => {
-          const hasProblems =
-            Array.isArray(p.problems) && p.problems.some((pr) => typeof pr === 'string' && pr.trim() !== "");
-          const hasSolutions =
-            Array.isArray(p.solutions) && p.solutions.some((sol) => typeof sol === 'string' && sol.trim() !== "");
-          const hasDamageText = !!p.tooth_damage?.trim();
-          return hasProblems || hasSolutions || hasDamageText;
-        });
-        if (!toothDamageProcedures.length) return null;
-        return (
-          <div className="mt-4 overflow-x-auto">
-            <strong className="block mb-1">Tooth Damage</strong>
-            <table className="min-w-full border text-xs">
-              <thead>
-                <tr className="bg-slate-50">
-                  <th className="border px-2 py-1">Tooth</th>
-                  <th className="border px-2 py-1">Problem(s)</th>
-                  <th className="border px-2 py-1">Solution(s)</th>
-                  <th className="border px-2 py-1">Cost</th>
-                  <th className="border px-2 py-1">Damage Notes</th>
-                </tr>
-              </thead>
-              <tbody>
-                {toothDamageProcedures.map((p) => (
-                  <tr key={p.id}>
-                    <td className="border px-2 py-1">{p.tooth_number ?? '-'}</td>
-                    <td className="border px-2 py-1">{Array.isArray(p.problems) ? p.problems.join(', ') : '-'}</td>
-                    <td className="border px-2 py-1">{Array.isArray(p.solutions) ? p.solutions.join(', ') : '-'}</td>
-                    <td className="border px-2 py-1">{p.cost ?? '-'}</td>
-                    <td className="border px-2 py-1">{p.tooth_damage || '-'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        );
-      })()}
-      {/* END */}
+     
       {/* Bottom section: Notes */}
       <div className="bg-white p-6 sm:p-8 rounded-2xl shadow-sm border border-slate-200/80">
         <TextArea 

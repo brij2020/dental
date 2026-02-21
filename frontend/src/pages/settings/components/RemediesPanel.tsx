@@ -52,6 +52,7 @@ const newFormState = (): RemedyFormData => ({
 // --- Main Panel Component ---
 export default function RemediesPanel() {
   const { user } = useAuth();
+  const clinicScopeId = user?.role === 'super_admin' ? 'system' : user?.clinic_id;
   const PAGE_SIZE = 10;
   const [remedies, setRemedies] = useState<Remedy[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -67,7 +68,7 @@ export default function RemediesPanel() {
 
   // Fetch remedies for the user's clinic
   const fetchRemedies = useCallback(async () => {
-    if (!user?.clinic_id) return;
+    if (!clinicScopeId) return;
 
     const useFullPageLoader = !hasFetchedOnceRef.current;
     if (useFullPageLoader) {
@@ -76,7 +77,7 @@ export default function RemediesPanel() {
       setIsPageLoading(true);
     }
     try {
-      const response = await remedyAPI.getByClinic(user.clinic_id, {
+      const response = await remedyAPI.getByClinic(clinicScopeId, {
         page: currentPage,
         limit: PAGE_SIZE,
       });
@@ -99,7 +100,7 @@ export default function RemediesPanel() {
       }
       hasFetchedOnceRef.current = true;
     }
-  }, [PAGE_SIZE, currentPage, user?.clinic_id]);
+  }, [PAGE_SIZE, clinicScopeId, currentPage]);
 
   // Initial data fetch
   useEffect(() => {
@@ -140,12 +141,12 @@ export default function RemediesPanel() {
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!formData || !formData.name || !user?.clinic_id) return;
+    if (!formData || !formData.name || !clinicScopeId) return;
     setIsSaving(true);
 
     try {
       const dataToSave = {
-        clinic_id: user.clinic_id,
+        clinic_id: clinicScopeId,
         name: formData.name,
         times: formData.times || null,
         quantity: formData.quantity || null,

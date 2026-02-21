@@ -16,6 +16,7 @@ exports.book = async (req, res) => {
       appointment_time,
       doctor_id,
       medical_conditions,
+      patient_note,
       clinics,
       appointment_type='in_person'
     } = req.body;
@@ -139,6 +140,7 @@ exports.book = async (req, res) => {
       appointment_time,
       doctor_id,
       medical_conditions: medical_conditions || [],
+      patient_note: patient_note ? String(patient_note).trim() : null,
       status: 'scheduled',
       clinics: clinics || null,
       appointment_type
@@ -250,7 +252,7 @@ exports.getByClinic = async (req, res) => {
     }
 
     // Validate status enum if provided
-    const validStatuses = ['scheduled', 'confirmed', 'cancelled', 'completed'];
+    const validStatuses = ['scheduled', 'confirmed', 'in-progress', 'cancelled', 'completed', 'no-show'];
     if (status && !validStatuses.includes(status)) {
       return res.status(422).json({
         success: false,
@@ -440,7 +442,7 @@ exports.update = async (req, res) => {
 
     // Validate status enum if provided
     if (updateData.status) {
-      const validStatuses = ['scheduled', 'confirmed', 'cancelled', 'completed', 'no-show'];
+      const validStatuses = ['scheduled', 'confirmed', 'in-progress', 'cancelled', 'completed', 'no-show'];
       if (!validStatuses.includes(updateData.status)) {
         return res.status(422).json({
           success: false,
@@ -555,6 +557,60 @@ exports.delete = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: 'Failed to delete appointment. Please try again later.',
+      code: 'INTERNAL_SERVER_ERROR',
+    });
+  }
+};
+
+exports.uploadReport = async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!id || id.trim() === '') {
+      return res.status(400).json({
+        success: false,
+        message: 'Appointment ID is required',
+        code: 'MISSING_APPOINTMENT_ID',
+      });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: 'No report file uploaded',
+        code: 'MISSING_REPORT_FILE',
+      });
+    }
+
+    const reportData = {
+      url: `/uploads/reports/${req.file.filename}`,
+      original_name: req.file.originalname,
+      mime_type: req.file.mimetype,
+      size: req.file.size,
+      uploaded_at: new Date(),
+    };
+
+    const appointment = await AppointmentService.updateAppointment(id, {
+      report_file: reportData,
+    });
+
+    if (!appointment) {
+      return res.status(404).json({
+        success: false,
+        message: 'Appointment not found',
+        code: 'APPOINTMENT_NOT_FOUND',
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: appointment,
+      message: 'Report uploaded successfully',
+    });
+  } catch (error) {
+    console.error('Error uploading appointment report:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to upload report. Please try again later.',
       code: 'INTERNAL_SERVER_ERROR',
     });
   }

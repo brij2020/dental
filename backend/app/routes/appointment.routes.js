@@ -2,6 +2,7 @@ const express = require('express');
 const appointmentController = require('../controllers/appointment.controller');
 const { verifyToken } = require('../middleware/auth.middleware');
 const { throttle } = require('../middleware/throttle.middleware');
+const { uploadAppointmentReport, handleUploadError } = require('../middleware/upload.middleware');
 
 module.exports = (app) => {
 	const router = express.Router();
@@ -26,6 +27,9 @@ module.exports = (app) => {
 
 	// Get a specific appointment by ID (requires auth)
 	router.get('/:id', verifyToken, appointmentController.getById);
+
+	// Upload appointment report (requires auth)
+	router.put('/:id/report', verifyToken, uploadAppointmentReport.single('report'), handleUploadError, appointmentController.uploadReport);
 
 	// Update an appointment (requires auth)
 	router.put('/:id', verifyToken, appointmentController.update);

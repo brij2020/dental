@@ -6,6 +6,8 @@ import AppointmentActions from './AppointmentActions';
 import ConsentModal from './ConsentModal';
 import { IconPlayerPlay } from '@tabler/icons-react';
 import { useNavigate } from 'react-router-dom';
+import { put } from '../../../lib/apiClient';
+import { toast } from 'react-toastify';
 
 // Updated type to include has_value
 type MedicalCondition = { id: string; name: string; has_value: boolean };
@@ -16,6 +18,7 @@ type Props = {
   onStatusChange: (appointmentId: string, newStatus: 'in-progress') => void;
   clinicConditions: MedicalCondition[];
   onUpdateConditions: (appointmentId: string, names: string[]) => Promise<void> | void;
+  onRefreshAppointments: () => void;
 };
 
 const formatTime = (timeStr: string) => {
@@ -54,11 +57,13 @@ export default function AppointmentTable({
   onStatusChange,
   clinicConditions,
   onUpdateConditions,
+  onRefreshAppointments,
 }: Props) {
   const navigate = useNavigate();
   const [editorOpenId, setEditorOpenId] = React.useState<string | null>(null);
   const [noteOpenId, setNoteOpenId] = React.useState<string | null>(null); // State for tracking open notes
   const [consentOpenId, setConsentOpenId] = React.useState<string | null>(null);
+  const [uploadingReportId, setUploadingReportId] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     if (!editorOpenId || typeof document === 'undefined') return;
@@ -180,6 +185,25 @@ export default function AppointmentTable({
 
   const consentAppt = consentOpenId ? (appointments.find(a => a.id === consentOpenId) || null) : null;
 
+  const handleReportUpload = async (appointmentId: string, file?: File | null) => {
+    if (!file) return;
+    try {
+      setUploadingReportId(appointmentId);
+      const formData = new FormData();
+      formData.append('report', file);
+      await put(`/api/appointments/${appointmentId}/report`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      toast.success('Report uploaded successfully.');
+      onRefreshAppointments();
+    } catch (error: any) {
+      const msg = error?.response?.data?.message || 'Failed to upload report.';
+      toast.error(msg);
+    } finally {
+      setUploadingReportId(null);
+    }
+  };
+
   if (loading) {
     return (
       <div className="text-center py-10">
@@ -208,6 +232,7 @@ export default function AppointmentTable({
             <th scope="col" className="px-3 py-2 sm:px-6 sm:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Status</th>
             <th scope="col" className="px-3 py-2 sm:px-6 sm:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Patient Note</th>
             <th scope="col" className="px-3 py-2 sm:px-6 sm:py-3 text-center text-xs font-medium text-slate-500 uppercase tracking-wider">Conditions</th>
+            <th scope="col" className="px-3 py-2 sm:px-6 sm:py-3 text-center text-xs font-medium text-slate-500 uppercase tracking-wider">Report Submission</th>
             <th scope="col" className="relative px-3 py-2 sm:px-6 sm:py-3">
               <span className="sr-only">Actions</span>
             </th>
@@ -243,7 +268,7 @@ export default function AppointmentTable({
 
                       {noteOpenId === appt.id && (
                         <div
-                          className="absolute top-full left-0 mt-2 w-full sm:w-72 bg-white border border-slate-200 shadow-xl rounded-xl z-40 p-4"
+                          className="absolute bottom-full left-0 mb-2 w-full sm:w-72 bg-white border border-slate-200 shadow-xl rounded-xl z-40 p-4"
                         >
                           <div className="flex justify-between items-start mb-2">
                             <h5 className="text-xs font-bold text-slate-500 uppercase tracking-wide">Patient Note</h5>
@@ -374,6 +399,38 @@ export default function AppointmentTable({
                 </div>
               </td>
 
+              <td className="px-3 py-3 sm:px-6 sm:py-4 whitespace-nowrap text-center">
+                <div className="flex flex-col items-center gap-2">
+                  {appt.report_file?.url ? (
+                    <a
+                      href={appt.report_file.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center px-2.5 py-1 text-xs font-medium rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100"
+                    >
+                      View Report
+                    </a>
+                  ) : (
+                    <span className="text-xs text-slate-400">No report</span>
+                  )}
+
+                  <label className="inline-flex items-center px-2.5 py-1 text-xs font-medium rounded-md bg-sky-50 text-sky-700 border border-sky-200 hover:bg-sky-100 cursor-pointer">
+                    {uploadingReportId === appt.id ? 'Uploading...' : (appt.report_file?.url ? 'Replace' : 'Report Submit')}
+                    <input
+                      type="file"
+                      accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx"
+                      className="hidden"
+                      disabled={uploadingReportId === appt.id}
+                      onChange={(e) => {
+                        const file = e.target.files?.[0] || null;
+                        void handleReportUpload(appt.id, file);
+                        e.currentTarget.value = '';
+                      }}
+                    />
+                  </label>
+                </div>
+              </td>
+
               <td className="px-3 py-3 sm:px-6 sm:py-4 whitespace-nowrap">
                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-2">
                   {appt.status === 'scheduled' && (
@@ -394,7 +451,15 @@ export default function AppointmentTable({
                       Continue Consultation
                     </button>
                   )}
-                  <AppointmentActions />
+                  <AppointmentActions
+                    appointmentId={appt.id}
+                    currentDate={appt.appointment_date}
+                    currentTime={appt.appointment_time}
+                    appointmentType={appt.appointment_type}
+                    currentMedicalConditions={appt.medical_conditions || []}
+                    currentPatientNote={appt.patient_note || null}
+                    onRescheduled={onRefreshAppointments}
+                  />
                 </div>
               </td>
             </tr>

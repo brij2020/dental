@@ -147,6 +147,18 @@ export default function Consultation() {
     Partial<ConsultationRow> | null
   >(null);
   const [loadingPrev, setLoadingPrev] = useState(false);
+
+  const extractApiErrorMessage = (err: any, fallback: string) => {
+    const apiMessage =
+      err?.response?.data?.message ||
+      err?.response?.data?.error ||
+      err?.message;
+    if (typeof apiMessage === 'string' && apiMessage.trim().length > 0) {
+      return apiMessage;
+    }
+    return fallback;
+  };
+
   const loadPreviousConsultation = async () => {
     if (!appointment?.follow_up_for_consultation_id) return;
 
@@ -228,16 +240,20 @@ export default function Consultation() {
       }
 
       setLoading(true);
+      setError(null);
       try {
         // 1. Fetch the Appointment from MongoDB via API
         const appointmentResponse = await getAppointmentById(appointmentId);
-
-        if (!appointmentResponse.data || !appointmentResponse.data.success) {
-          throw new Error('Failed to fetch appointment');
+        const responseData = appointmentResponse?.data;
+        if (responseData?.success === false) {
+          throw new Error(responseData?.message || 'Failed to fetch appointment');
         }
+        const apptData =
+          responseData?.data && typeof responseData.data === 'object'
+            ? responseData.data
+            : (responseData && typeof responseData === 'object' ? responseData : null);
 
-        const apptData = appointmentResponse.data.data;
-        if (!apptData) {
+        if (!apptData || !apptData.patient_id) {
           setError('Appointment not found.');
           setLoading(false);
           return;
@@ -351,7 +367,7 @@ export default function Consultation() {
 
       } catch (e: any) {
         console.error('Failed to fetch or create consultation:', e);
-        setError('An error occurred while fetching details.');
+        setError(extractApiErrorMessage(e, 'An error occurred while fetching details.'));
       } finally {
         setLoading(false);
       }

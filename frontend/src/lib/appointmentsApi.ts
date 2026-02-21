@@ -16,6 +16,7 @@ type GetAppointmentsOptions = {
   date?: string;
   searchTerm?: string;
   appointmentType?: 'in_person' | 'video';
+  provisional?: boolean;
   page?: number;
   limit?: number;
 };
@@ -35,7 +36,7 @@ export async function getAppointments(
   options: GetAppointmentsOptions = {}
 ): Promise<AppointmentsListResult> {
   try {
-    const { date, searchTerm = '', appointmentType, page, limit } = options;
+    const { date, searchTerm = '', appointmentType, provisional, page, limit } = options;
     const params = new URLSearchParams();
     params.append('clinic_id', clinicId);
 
@@ -46,6 +47,9 @@ export async function getAppointments(
     }
     if (appointmentType) {
       params.append('appointment_type', appointmentType);
+    }
+    if (provisional !== undefined) {
+      params.append('provisional', String(provisional));
     }
     if (page !== undefined) {
       params.append('page', String(page));
@@ -117,6 +121,7 @@ function mapAppointmentData(appointment: any): AppointmentDetails {
     appointment_time: appointment.appointment_time,
     status: appointment.status || 'scheduled',
     medical_conditions: appointment.medical_conditions || [],
+    report_file: appointment.report_file || null,
     doctor: appointment.doctor_id
       ? typeof appointment.doctor_id === 'object'
         ? { full_name: appointment.doctor_id.full_name }

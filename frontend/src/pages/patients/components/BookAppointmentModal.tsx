@@ -457,12 +457,13 @@ export default function BookAppointmentModal({ open, onClose, onSuccess, patient
     
       
       if (isEditing && appointment) {
-        // Update only doctor/time/date and clear provisional flag. Do not touch status.
+        // Update doctor/time/date and preserve captured medical conditions.
         const upd: any = {
           doctor_id: selectedDoctorId,
           doctor_name: doctorName,
           appointment_time: time,
           appointment_date: date,
+          medical_conditions: finalConditions,
           provisional: false,
         };
         await updateAppointmentAPI(appointment._id || appointment.id, upd);

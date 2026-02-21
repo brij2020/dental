@@ -66,7 +66,7 @@ const appointmentSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ['scheduled', 'confirmed', 'cancelled', 'completed', 'no-show'],
+      enum: ['scheduled', 'confirmed', 'in-progress', 'cancelled', 'completed', 'no-show'],
       default: 'scheduled',
       index: true,
     },
@@ -77,6 +77,13 @@ const appointmentSchema = new mongoose.Schema(
     patient_note: {
       type: String,
       default: null,
+    },
+    report_file: {
+      url: { type: String, default: null },
+      original_name: { type: String, default: null },
+      mime_type: { type: String, default: null },
+      size: { type: Number, default: null },
+      uploaded_at: { type: Date, default: null },
     },
     clinics: {
       type: mongoose.Schema.Types.Mixed,

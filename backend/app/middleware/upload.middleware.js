@@ -16,6 +16,10 @@ const profileUploadDir = path.join(__dirname, '../../uploads/profiles');
 if (!fs.existsSync(profileUploadDir)) {
   fs.mkdirSync(profileUploadDir, { recursive: true });
 }
+const reportUploadDir = path.join(__dirname, '../../uploads/reports');
+if (!fs.existsSync(reportUploadDir)) {
+  fs.mkdirSync(reportUploadDir, { recursive: true });
+}
 
 // Configure storage
 const storage = multer.diskStorage({
@@ -94,6 +98,44 @@ const uploadProfilePic = multer({
   }
 });
 
+const reportStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, reportUploadDir);
+  },
+  filename: (req, file, cb) => {
+    const appointmentId = req.params.id || 'unknown';
+    const timestamp = Date.now();
+    const ext = path.extname(file.originalname);
+    const filename = `${timestamp}-${appointmentId}${ext}`;
+    cb(null, filename);
+  }
+});
+
+const reportFileFilter = (req, file, cb) => {
+  const allowedMimes = [
+    'application/pdf',
+    'image/jpeg',
+    'image/png',
+    'image/webp',
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  ];
+
+  if (allowedMimes.includes(file.mimetype)) {
+    cb(null, true);
+  } else {
+    cb(new Error('Only PDF, image, DOC, and DOCX files are allowed'), false);
+  }
+};
+
+const uploadAppointmentReport = multer({
+  storage: reportStorage,
+  fileFilter: reportFileFilter,
+  limits: {
+    fileSize: 10 * 1024 * 1024 // 10MB max file size
+  }
+});
+
 // Error handling middleware for multer
 const handleUploadError = (err, req, res, next) => {
   if (err instanceof multer.MulterError) {
@@ -122,8 +164,10 @@ module.exports = {
   upload,
   uploadClinicLogo,
   uploadProfilePic,
+  uploadAppointmentReport,
   uploadDir,
   clinicUploadDir,
   profileUploadDir,
+  reportUploadDir,
   handleUploadError
 };
