@@ -29,6 +29,7 @@ export type AvailabilityDay = {
 export type DoctorProfile = {
   id: string;
   full_name: string | null;
+  role?: string | null;
   availability?: AvailabilityDay[] | null;
   slot_duration_minutes?: number | null;
 };
@@ -147,6 +148,9 @@ export default function BookAppointmentModal({ open, onClose, onSuccess, patient
   const [quotaLimit, setQuotaLimit] = useState<number>(0);
   const [usedAppointments, setUsedAppointments] = useState<number>(0);
   const [quotaLoading, setQuotaLoading] = useState(false);
+  const currentAppointmentTime = isEditing && appointment?.appointment_time
+    ? String(appointment.appointment_time).slice(0, 5)
+    : '';
 
   // Clinic info state
   const [clinicInfo, setClinicInfo] = useState<any>(null);
@@ -222,19 +226,31 @@ export default function BookAppointmentModal({ open, onClose, onSuccess, patient
   useEffect(() => {
     if (!selectedDoctorId || !date) {
       setAvailableSlots([]);
-      setTime('');
+      if (!isEditing) setTime('');
       return;
     }
     const doctor = doctors.find(d => d.id === selectedDoctorId);
     if (!doctor) {
       setAvailableSlots([]);
-      setTime('');
+      if (!isEditing) setTime('');
       return;
     }
     const slots = computeDoctorSlotsForDate(doctor, date);
     setAvailableSlots(slots);
-    setTime('');
-  }, [selectedDoctorId, date, doctors]);
+    if (!isEditing) {
+      setTime('');
+      return;
+    }
+
+    // In edit mode keep existing time selected when still available.
+    if (currentAppointmentTime && slots.includes(currentAppointmentTime)) {
+      setTime(currentAppointmentTime);
+    } else if (time && slots.includes(time)) {
+      setTime(time);
+    } else {
+      setTime('');
+    }
+  }, [selectedDoctorId, date, doctors, isEditing, currentAppointmentTime, time]);
 
   useEffect(() => {
     setBookedSlots([]); 
@@ -309,7 +325,19 @@ export default function BookAppointmentModal({ open, onClose, onSuccess, patient
         try {
           const doctorList = await getDoctorsByClinic(clinicId);
           setDoctors(doctorList);
-          setSelectedDoctorId(''); 
+          if (isEditing && appointment) {
+            const appointmentDoctorId =
+              appointment.doctor_id && typeof appointment.doctor_id === 'object'
+                ? (appointment.doctor_id.id || appointment.doctor_id._id || '')
+                : (appointment.doctor_id || '');
+            const adminDoctor = doctorList.find((doc) => doc.role === 'admin');
+            const hasAppointmentDoctor = doctorList.some((doc) => doc.id === appointmentDoctorId);
+            setSelectedDoctorId(
+              adminDoctor?.id || (hasAppointmentDoctor ? appointmentDoctorId : '') || doctorList[0]?.id || ''
+            );
+          } else {
+            setSelectedDoctorId('');
+          }
         } catch (error) {
           toast.error("Could not fetch the list of doctors.");
         } finally {
@@ -318,7 +346,7 @@ export default function BookAppointmentModal({ open, onClose, onSuccess, patient
       };
       fetchDoctors();
     }
-  }, [open, clinicId]);
+  }, [open, clinicId, isEditing, appointment]);
 
   useEffect(() => {
     if (open && clinicId) {
@@ -580,8 +608,13 @@ setBookedSlots(normalized);
           ) : (
             <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
               {availableSlots.map((slot) => {
-                const isBooked = bookedSlots.includes(slot);
-                const isDisabled = isDoctorOnLeave || isBooked;
+                const selectedDoctor = doctors.find((d) => d.id === selectedDoctorId);
+                const isAdminDoctorSelected = selectedDoctor?.role === 'admin';
+                const lockOtherSlotsForAdminDefault = isEditing && isAdminDoctorSelected && !!currentAppointmentTime;
+                const isCurrentAppointmentSlot = slot === currentAppointmentTime;
+                const isAdminLockedSlot = lockOtherSlotsForAdminDefault && !isCurrentAppointmentSlot;
+                const isBooked = bookedSlots.includes(slot) && !(isEditing && isCurrentAppointmentSlot);
+                const isDisabled = isDoctorOnLeave || isBooked || isAdminLockedSlot;
                 return (
                   <button
                     key={slot}
@@ -591,13 +624,23 @@ setBookedSlots(normalized);
                     className={`px-3 py-2 text-sm rounded-lg border transition-colors ${
                       isDoctorOnLeave
                         ? 'bg-gray-100 text-gray-400 border-gray-200 line-through cursor-not-allowed'
+                        : isAdminLockedSlot
+                        ? 'bg-slate-50 text-slate-300 border-slate-200 cursor-not-allowed'
                         : isBooked
                         ? 'bg-red-50 text-red-300 border-red-100 line-through cursor-not-allowed'
                         : time === slot
                         ? 'bg-sky-500 text-white font-semibold border-sky-500'
                         : 'bg-white hover:border-sky-400 border-slate-200'
                     }`}
-                    title={isDoctorOnLeave ? "Doctor is on leave" : isBooked ? "Slot already booked" : ""}
+                    title={
+                      isDoctorOnLeave
+                        ? "Doctor is on leave"
+                        : isAdminLockedSlot
+                        ? "Only current appointment slot is enabled for admin default selection"
+                        : isBooked
+                        ? "Slot already booked"
+                        : ""
+                    }
                   >
                     {slot}
                   </button>

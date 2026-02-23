@@ -38,6 +38,7 @@ type LeavePayload = {
 // --- Main Panel Component ---
 export default function AppointmentTimingsPanel() {
   const { user } = useAuth();
+  const isDoctorUser = user?.role === 'doctor';
   const [doctors, setDoctors] = useState<DoctorProfile[]>([]);
   const [selectedDoctorId, setSelectedDoctorId] = useState('');
   const [clinicLeaves, setClinicLeaves] = useState<any[]>([]);
@@ -70,8 +71,16 @@ export default function AppointmentTimingsPanel() {
               role: doc.role,
             }));
 
-          setDoctors(mappedDoctors);
-          if (mappedDoctors.length > 0) setSelectedDoctorId(mappedDoctors[0]._id);
+          const scopedDoctors = isDoctorUser
+            ? mappedDoctors.filter((d) => String(d._id) === String(user?.id))
+            : mappedDoctors;
+
+          setDoctors(scopedDoctors);
+          if (scopedDoctors.length > 0) {
+            setSelectedDoctorId(scopedDoctors[0]._id);
+          } else if (isDoctorUser && user?.id) {
+            setSelectedDoctorId(String(user.id));
+          }
         }
       } catch (error: any) {
         toast.error('Failed to fetch doctors list.');
@@ -85,8 +94,12 @@ export default function AppointmentTimingsPanel() {
       if (!user?.clinic_id) return;
       try {
         const resp = await getDoctorLeavesByClinic(user.clinic_id);
-        const leaves = resp?.data?.data || resp?.data || [];
-        setClinicLeaves(Array.isArray(leaves) ? leaves : []);
+        const leavesRaw = resp?.data?.data || resp?.data || [];
+        const leaves = Array.isArray(leavesRaw) ? leavesRaw : [];
+        const scopedLeaves = isDoctorUser
+          ? leaves.filter((l: any) => String(l.doctor_id || l.doctorId) === String(user?.id))
+          : leaves;
+        setClinicLeaves(scopedLeaves);
       } catch (err) {
         console.error('Failed to fetch clinic leaves', err);
       }
@@ -94,7 +107,7 @@ export default function AppointmentTimingsPanel() {
 
     fetchDoctors();
     fetchClinicLeaves();
-  }, [user]);
+  }, [isDoctorUser, user]);
 
 
   ;
@@ -111,12 +124,16 @@ export default function AppointmentTimingsPanel() {
   const handleSubmit = async (e: FormEvent) => {
     try {
       e.preventDefault();
-      if (!selectedDoctorId) return;
+      const targetDoctorId = isDoctorUser ? String(user?.id || '') : selectedDoctorId;
+      if (!targetDoctorId) return;
       setSaving(true);
 
-      console.log('Payload to save:', payload, selectedDoctorId);
+      const payloadToSave = {
+        ...payload,
+        doctor_id: targetDoctorId,
+      };
 
-      const response = await updateProfile(selectedDoctorId, payload);
+      const response = await updateProfile(targetDoctorId, payloadToSave);
 
       if (response.status === 200) {
         toast.success('Leave has been updated!');
@@ -133,8 +150,12 @@ export default function AppointmentTimingsPanel() {
     if (!user?.clinic_id) return;
     try {
       const resp = await getDoctorLeavesByClinic(user.clinic_id);
-      const leaves = resp?.data?.data || resp?.data || [];
-      setClinicLeaves(Array.isArray(leaves) ? leaves : []);
+      const leavesRaw = resp?.data?.data || resp?.data || [];
+      const leaves = Array.isArray(leavesRaw) ? leavesRaw : [];
+      const scopedLeaves = isDoctorUser
+        ? leaves.filter((l: any) => String(l.doctor_id || l.doctorId) === String(user?.id))
+        : leaves;
+      setClinicLeaves(scopedLeaves);
     } catch (err) {
       console.error('Failed to refresh leaves', err);
     }
@@ -225,7 +246,7 @@ export default function AppointmentTimingsPanel() {
                   id="doctor-select"
                   value={selectedDoctorId}
                   onChange={(e) => setSelectedDoctorId(e.target.value)}
-                  disabled={isListLoading || doctors.length === 0}
+                  disabled={isDoctorUser || isListLoading || doctors.length === 0}
                   className="w-full rounded-xl border border-slate-300 bg-white pl-10 pr-3 py-2.5 text-slate-900 outline-none 
                              focus:ring-4 focus:ring-sky-300/40 focus:border-sky-400 transition"
                 >
@@ -320,7 +341,7 @@ export default function AppointmentTimingsPanel() {
           <div className="flex justify-end mt-8 pt-4 border-t">
             <button
               type="submit"
-              disabled={saving || isLoading || !selectedDoctorId}
+              disabled={saving || isLoading || !(isDoctorUser ? user?.id : selectedDoctorId)}
               className="inline-flex items-center justify-center gap-2 rounded-xl 
                          bg-gradient-to-r from-indigo-600 to-sky-500 px-5 py-2.5 
                          text-white font-medium shadow-sm hover:brightness-105 

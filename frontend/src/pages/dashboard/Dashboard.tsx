@@ -18,6 +18,7 @@ type Stats = {
 
 export default function Dashboard() {
   const { user } = useAuth();
+  const isDoctor = user?.role === 'doctor';
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
   const [appointmentsTrend, setAppointmentsTrend] = useState<any[]>([]);
@@ -186,7 +187,7 @@ export default function Dashboard() {
 
       <div className="grid gap-4 md:grid-cols-3">
         <NoticeBoard clinicId={user?.clinic_id ?? ''} />
-        <DashboardRevenue clinicId={user?.clinic_id ?? ''} />
+        {!isDoctor && <DashboardRevenue clinicId={user?.clinic_id ?? ''} />}
         <DashboardTrends clinicId={user?.clinic_id ?? ''} />
       </div>
 

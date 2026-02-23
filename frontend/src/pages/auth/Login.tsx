@@ -50,16 +50,16 @@ export default function Login() {
   const onSendOtp = async () => {
     const identifier = otpIdentifier.trim();
     if (!identifier) {
-      toast.error("Enter registered email or mobile number");
+      toast.error("Enter registered email");
       return;
     }
 
     if (!identifier.includes("@")) {
       const digits = identifier.replace(/\D/g, "");
-      if (digits.length !== 10) {
-        toast.error("Enter a valid 10-digit mobile number");
-        return;
-      }
+      // if (digits.length !== 10) {
+      //   toast.error("Enter a valid 10-digit mobile number");
+      //   return;
+      // }
       setOtpIdentifier(digits);
     }
 

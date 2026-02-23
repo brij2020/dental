@@ -10,7 +10,7 @@ export default function ForgotPassword() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!emailOrMobile.trim()) {
-      toast.error('Please enter your registered email or mobile number.');
+      toast.error('Please enter your registered email.');
       return;
     }
     setLoading(true);
@@ -30,7 +30,7 @@ export default function ForgotPassword() {
         <h2 className="text-2xl font-bold mb-6 text-slate-800">Forgot Password</h2>
         <form onSubmit={handleSubmit} className="space-y-5">
           <div>
-            <label htmlFor="emailOrMobile" className="block mb-1 text-sm font-medium text-slate-700">Registered Email or Mobile</label>
+            <label htmlFor="emailOrMobile" className="block mb-1 text-sm font-medium text-slate-700">Registered Email</label>
             <input
               id="emailOrMobile"
               name="emailOrMobile"
@@ -39,7 +39,7 @@ export default function ForgotPassword() {
               onChange={e => setEmailOrMobile(e.target.value)}
               required
               className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-slate-900 outline-none focus:ring-4 focus:ring-sky-300/40 focus:border-sky-400 transition"
-              placeholder="Enter your email or mobile number"
+              placeholder="Enter your email"
             />
           </div>
           <button

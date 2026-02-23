@@ -312,6 +312,8 @@ exports.getByClinic = async (req, res) => {
       });
     }
 
+    const isProvisional = (provisional === true || provisional === 'true');
+
     const filters = {
       status: status || undefined,
       doctorId: doctorId || undefined,
@@ -321,6 +323,7 @@ exports.getByClinic = async (req, res) => {
       date: date || undefined,
       search: search || undefined,
       provisional: provisional || undefined,
+      excludeStatuses: (isProvisional && !status) ? ['cancelled', 'completed'] : undefined,
       appointment_type: appointment_type || undefined,
       page: page || undefined,
       limit: limit || undefined,

@@ -6,9 +6,18 @@ type ModalProps = {
   onClose: () => void;
   title: string;
   children: ReactNode;
+  panelClassName?: string;
+  contentClassName?: string;
 };
 
-export const Modal = ({ isOpen, onClose, title, children }: ModalProps) => {
+export const Modal = ({
+  isOpen,
+  onClose,
+  title,
+  children,
+  panelClassName = '',
+  contentClassName = '',
+}: ModalProps) => {
   useEffect(() => {
     const handleEsc = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
@@ -31,7 +40,9 @@ export const Modal = ({ isOpen, onClose, title, children }: ModalProps) => {
       {/* Clickable overlay to close the modal */}
       <div className="absolute inset-0" onClick={onClose} />
 
-      <div className="relative w-full max-w-xl max-h-[90vh] p-6 mx-4 bg-white border rounded-2xl shadow-xl flex flex-col">
+      <div
+        className={`relative w-full max-w-xl max-h-[90vh] p-6 mx-4 bg-white border rounded-2xl shadow-xl flex flex-col ${panelClassName}`}
+      >
         <div className="flex items-center justify-between pb-4 border-b flex-shrink-0">
           <h2 id="modal-title" className="text-lg font-semibold text-slate-800">
             {title}
@@ -46,7 +57,7 @@ export const Modal = ({ isOpen, onClose, title, children }: ModalProps) => {
         </div>
 
         {/* Scrollable content */}
-        <div className="mt-4 overflow-y-auto pr-1">
+        <div className={`mt-4 overflow-y-auto pr-1 ${contentClassName}`}>
           {children}
         </div>
       </div>

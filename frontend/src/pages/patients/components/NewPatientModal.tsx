@@ -269,12 +269,13 @@ export default function NewPatientModal({ open, onClose, onSuccess }: Props) {
         );
         onSuccess();
         onClose();
-      } catch (e: any) {
-        console.error(e);
-        toast.error(e.message || 'Failed to add patient to clinic.');
-      } finally {
-        setSaving(false);
-      }
+    } catch (e: any) {
+      console.error(e);
+      const apiMessage = e?.response?.data?.message;
+      toast.error(apiMessage || e.message || 'Failed to add patient to clinic.');
+    } finally {
+      setSaving(false);
+    }
       return;
     }
 
@@ -339,7 +340,8 @@ export default function NewPatientModal({ open, onClose, onSuccess }: Props) {
       onClose();
     } catch (e: any) {
       console.error(e);
-      toast.error(e.message || 'An unexpected error occurred.');
+      const apiMessage = e?.response?.data?.message;
+      toast.error(apiMessage || e.message || 'An unexpected error occurred.');
     } finally {
       setSaving(false);
     }

@@ -8,7 +8,7 @@ import AddPatientModal from './components/AddPatientModal';
 import NewPatientModal from './components/NewPatientModal';
 import BookAppointmentModal from './components/BookAppointmentModal';
 
-import { getClinicRelatedPatients, getAllClinicPanels, getClinicAppointments, deleteAppointment } from '../../lib/apiClient';
+import { getClinicRelatedPatients, getAllClinicPanels, getClinicAppointments, updateAppointment } from '../../lib/apiClient';
 import type { ClinicPatientRow } from './types';
 
 export default function Patients() {
@@ -318,14 +318,23 @@ export default function Patients() {
                                     e.stopPropagation();
                                     const btn = e.currentTarget as HTMLElement;
                                     const rect = btn.getBoundingClientRect();
-                                    const menuWidth = 120; // match rendered menu width
-                                    const estimatedHeight = 96;
-                                    let top = rect.top - estimatedHeight - 8;
-                                    if (top < 8) top = rect.bottom + 8;
-                                    // center menu horizontally under the button
+                                    const menuWidth = 200; // keep in sync with rendered width
+                                    const estimatedHeight = 110;
+                                    const viewportPadding = 8;
+
+                                    // Prefer opening below; flip above if no space.
+                                    let top = rect.bottom + 8;
+                                    if (top + estimatedHeight > window.innerHeight - viewportPadding) {
+                                      top = rect.top - estimatedHeight - 8;
+                                    }
+                                    if (top < viewportPadding) top = viewportPadding;
+
+                                    // Center menu to action button and clamp in viewport.
                                     let left = rect.left + rect.width / 2 - menuWidth / 2;
-                                    if (left < 8) left = 8;
-                                    if (left + menuWidth > window.innerWidth - 8) left = window.innerWidth - menuWidth - 8;
+                                    if (left < viewportPadding) left = viewportPadding;
+                                    if (left + menuWidth > window.innerWidth - viewportPadding) {
+                                      left = window.innerWidth - menuWidth - viewportPadding;
+                                    }
                                     setMenuPosition({ left, top });
                                     setMenuOpenId(prev => prev === a._id ? null : a._id);
                                   }}
@@ -341,7 +350,7 @@ export default function Patients() {
                                 {menuOpenId === a._id && menuPosition && (
                                   <>
                                     <div className="fixed inset-0 z-40" onClick={() => setMenuOpenId(null)} />
-                                    <div id={`menu-${a._id}`} data-menu-id={a._id} style={{ left: menuPosition.left, top: menuPosition.top, width: 120 }} className="fixed bg-white border rounded shadow z-[9999] transition ease-out duration-150 opacity-100">
+                                    <div id={`menu-${a._id}`} data-menu-id={a._id} style={{ left: menuPosition.left, top: menuPosition.top, width: 200 }} className="fixed bg-white border border-slate-200 rounded-lg shadow-lg z-[9999] transition ease-out duration-150 opacity-100 p-1">
                                     <button
                                       disabled={a.status === 'confirmed' || !!actionLoading[a._id]}
                                       onClick={(e) => {
@@ -359,36 +368,36 @@ export default function Patients() {
                                         setBookingModalOpen(true);
                                         setMenuOpenId(null);
                                       }}
-                                      className="flex items-center gap-2 px-2 py-1 text-xs hover:bg-emerald-50 disabled:opacity-60 rounded w-[120px] justify-center text-slate-700"
+                                      className="flex items-center gap-2 px-3 py-2 text-xs hover:bg-emerald-50 disabled:opacity-60 rounded w-full justify-start whitespace-nowrap text-slate-700"
                                     >
                                       {actionLoading[a._id] ? '...' : (
                                         <>
                                           <IconCheck size={14} className="text-emerald-600" />
-                                          <span>Confirm</span>
+                                          <span>Confirm Appointment</span>
                                         </>
                                       )}
                                     </button>
                                     <button
                                       onClick={async (e) => {
                                         e.stopPropagation();
-                                        if (!confirm('Delete this provisional appointment?')) return;
+                                        if (!confirm('Cancel this provisional appointment?')) return;
                                         try {
                                           setActionLoading(prev => ({ ...prev, [a._id]: true }));
-                                          await deleteAppointment(a._id);
-                                          toast.success('Appointment deleted');
+                                          await updateAppointment(a._id, { status: 'cancelled' });
+                                          toast.success('Appointment cancelled');
                                           refreshTrigger.current += 1;
                                         } catch (err) {
                                           console.error(err);
-                                          toast.error('Failed to delete appointment');
+                                          toast.error('Failed to cancel appointment');
                                         } finally {
                                           setActionLoading(prev => ({ ...prev, [a._id]: false }));
                                           setMenuOpenId(null);
                                         }
                                       }}
-                                      className="flex items-center gap-2 px-2 py-1 text-xs hover:bg-rose-50 disabled:opacity-60 rounded w-[120px] justify-center text-slate-700"
+                                      className="flex items-center gap-2 px-3 py-2 text-xs hover:bg-rose-50 disabled:opacity-60 rounded w-full justify-start whitespace-nowrap text-slate-700"
                                     >
                                       <IconTrash size={14} className="text-rose-600" />
-                                      <span>Delete</span>
+                                      <span>Cancel Appointment</span>
                                     </button>
                                   </div>
                                   </>

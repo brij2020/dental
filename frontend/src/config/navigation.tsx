@@ -39,7 +39,7 @@ export const NAV_ITEMS: NavItem[] = [
     label: "Appointments",
     to: "/patients",
     icon: (p) => <IconUsers className={`h-4 w-4 ${p.className ?? ""}`} />,
-    roles: [ROLES.ADMIN, ROLES.DOCTOR],
+    roles: [ROLES.ADMIN, ROLES.RECEPTIONIST],
   },
   { 
     label: "Consultations",

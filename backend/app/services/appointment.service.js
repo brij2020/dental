@@ -46,10 +46,14 @@ class AppointmentService {
     
     // Optional filters
     if (filters.status) query.status = filters.status;
+    if (!filters.status && Array.isArray(filters.excludeStatuses) && filters.excludeStatuses.length > 0) {
+      query.status = { $nin: filters.excludeStatuses };
+    }
     if (filters.doctorId) query.doctor_id = filters.doctorId;
     if (filters.appointment_type) query.appointment_type = filters.appointment_type;
     if (filters.provisional !== undefined) {
-      query.provisional = (filters.provisional === true || filters.provisional === 'true');
+      const isProvisional = (filters.provisional === true || filters.provisional === 'true');
+      query.provisional = isProvisional;
     }
     if (filters.startDate || filters.endDate) {
       query.appointment_date = {};

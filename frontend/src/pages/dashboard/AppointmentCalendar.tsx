@@ -21,7 +21,7 @@ import {
 } from "date-fns";
 
 // ⬇️ Supabase (client-side). If you use a different client import, swap this line accordingly.
-import {  getAdminDoctorSlot, getClinicAppointments } from '../../lib/apiClient';
+import { getClinicAppointments, getAllProfiles, getDoctorLeavesByClinic } from '../../lib/apiClient';
 import { useAuth } from '../../state/useAuth';
 
 // --- TYPES (kept minimal to avoid UI changes) ---
@@ -164,8 +164,8 @@ function MiniMonthPicker({
 function Legend() {
   return (
     <div className="flex items-center gap-4 text-xs text-slate-600">
-      <div className="flex items-center gap-2"><span className="h-3 w-3 rounded bg-indigo-200 border border-indigo-300" /> Booked</div>
-      <div className="flex items-center gap-2"><span className="h-3 w-3 rounded bg-slate-200 border border-slate-300" /> Free</div>
+      <div className="flex items-center gap-2"><span className="h-3 w-3 rounded bg-rose-200 border border-rose-300" /> Booked</div>
+      <div className="flex items-center gap-2"><span className="h-3 w-3 rounded bg-emerald-100 border border-emerald-300" /> Free</div>
       <div className="flex items-center gap-2"><span className="h-3 w-3 rounded border border-dashed border-slate-400" /> Current time window</div>
     </div>
   );
@@ -195,9 +195,9 @@ function DoctorSelector({ doctors, selected, onChange }: { doctors: readonly Doc
 
 function TimeSlot({ time, appointment, doctorName }: { time: string; appointment?: Appointment; doctorName: string }) {
   const hasApt = Boolean(appointment);
-  const base = "relative rounded-lg p-3 text-sm text-center cursor-pointer transition-colors";
-  const booked = "bg-indigo-100 text-indigo-800 font-semibold hover:bg-indigo-200";
-  const free = "bg-slate-100 text-slate-700 hover:bg-slate-200";
+  const base = "relative rounded-lg border p-3 text-sm text-center cursor-pointer transition-colors";
+  const booked = "border-rose-300 bg-rose-100 text-rose-800 font-semibold hover:bg-rose-200";
+  const free = "border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100";
 
   return (
     <div className={[base, hasApt ? booked : free, "group"].join(" ")}>
@@ -289,31 +289,61 @@ function DateNavigator({ currentDate, setCurrentDate }: { currentDate: Date; set
 export function AppointmentCalendar() {
 
   const { user } = useAuth();
+  const isDoctorRole = user?.role === 'doctor';
   const [doctors, setDoctors] = useState<Doctor[]>([]);
   const [selectedDoctor, setSelectedDoctor] = useState<Doctor | null>(null);
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [doctorMeta, setDoctorMeta] = useState<Record<string, { availability: Availability | null; slotDuration: number }>>({});
-  const [clinicId, setClinicId] = useState<string | null>(null);
+  const [clinicLeaves, setClinicLeaves] = useState<any[]>([]);
+  const clinicId = user?.clinic_id ?? null;
 
-  // Load doctors and their slot info from backend (Mongo API)
+  // Load all clinic doctors/admin and their slot info from backend
   useEffect(() => {
-    if (!user?.id) return;
-    setClinicId(user.id);
+    if (!user?.clinic_id) return;
+
     (async () => {
       try {
-        const adminSlot = await getAdminDoctorSlot(user.id);
-        // If API returns a single admin, wrap in array for uniformity
-        const doctorArr = Array.isArray(adminSlot) ? adminSlot : [adminSlot];
-        const list = doctorArr.map((d: any) => ({
+        const resp = await getAllProfiles({ clinic_id: user.clinic_id });
+        const raw = resp?.data?.data ?? resp?.data ?? [];
+        const profileArr = Array.isArray(raw) ? raw : [raw];
+        const clinicDoctors = profileArr.filter((d: any) => d && d.role === 'doctor');
+        const clinicAdmins = profileArr.filter((d: any) => d && d.role === 'admin');
+        const currentAdminProfile = clinicAdmins.find(
+          (d: any) => String(d._id || d.id) === String(user?.id),
+        );
+
+        // Role rule:
+        // - doctor login: only own dashboard slots
+        // - admin/reception/super_admin login: all clinic doctors/admin
+        const doctorArr = isDoctorRole
+          ? [...clinicDoctors, ...clinicAdmins].filter((d: any) => String(d._id || d.id) === String(user?.id))
+          : (user?.role === 'admin'
+              ? [...clinicDoctors, ...(currentAdminProfile ? [currentAdminProfile] : [])]
+              : (clinicDoctors.length > 0 ? clinicDoctors : clinicAdmins));
+
+        const effectiveDoctors = doctorArr.length > 0
+          ? doctorArr
+          : (
+            isDoctorRole && user?.id
+              ? [{ _id: user.id, id: user.id, full_name: user.full_name || 'My Slots', role: 'doctor', availability: null, slot_duration_minutes: 15 }]
+              : []
+          );
+
+        const list = effectiveDoctors.map((d: any) => ({
           id: d._id || d.id,
-          name: d.full_name || d.name || 'Admin',
+          name: d.full_name || d.name || 'Doctor',
         }));
         setDoctors(list);
-        if (!selectedDoctor && list.length) setSelectedDoctor(list[0]);
+        setSelectedDoctor((prev) => {
+          if (!list.length) return null;
+          if (prev && list.some((d) => d.id === prev.id)) return prev;
+          return list[0];
+        });
+
         // Stash meta
         const meta: Record<string, { availability: Availability | null; slotDuration: number }> = {};
-        for (const d of doctorArr) {
+        for (const d of effectiveDoctors) {
           meta[d._id || d.id] = {
             availability: d.availability ?? null,
             slotDuration: Number(d.slot_duration_minutes ?? 15),
@@ -322,26 +352,54 @@ export function AppointmentCalendar() {
         setDoctorMeta(meta);
       } catch (err) {
         setDoctors([]);
+        setSelectedDoctor(null);
         setDoctorMeta({});
       }
     })();
-  }, [user?.clinic_id]);
+  }, [isDoctorRole, user?.clinic_id, user?.full_name, user?.id]);
+
+  // Load clinic leave records once clinic is known
+  useEffect(() => {
+    if (!clinicId) return;
+    (async () => {
+      try {
+        const resp = await getDoctorLeavesByClinic(clinicId);
+        const leaves = resp?.data?.data || resp?.data || [];
+        setClinicLeaves(Array.isArray(leaves) ? leaves : []);
+      } catch {
+        setClinicLeaves([]);
+      }
+    })();
+  }, [clinicId]);
 
   // Compute availability for the selected day
+  const dateKey = useMemo(() => format(currentDate, "yyyy-MM-dd"), [currentDate]);
   const dayKey = useMemo(() => format(currentDate, "EEEE"), [currentDate]);
   const selectedMeta = selectedDoctor ? doctorMeta[selectedDoctor.id] : undefined;
+  const activeLeave = useMemo(() => {
+    if (!selectedDoctor) return null;
+    return clinicLeaves.find((l: any) => {
+      const leaveDoctorId = String(l?.doctor_id || l?.doctorId || '');
+      const start = String(l?.leave_start_date || '');
+      const end = String(l?.leave_end_date || '');
+      if (!leaveDoctorId || !start || !end) return false;
+      return leaveDoctorId === String(selectedDoctor.id) && start <= dateKey && end >= dateKey;
+    }) || null;
+  }, [clinicLeaves, dateKey, selectedDoctor]);
 
   const morningWindow = useMemo(() => {
+    if (activeLeave) return null;
     const a = selectedMeta?.availability ?? null;
     const day = a?.find?.((d) => d.day === dayKey);
     return day?.morning && !day.morning.is_off ? { start: day.morning.start, end: day.morning.end } : null;
-  }, [selectedMeta, dayKey]);
+  }, [activeLeave, selectedMeta, dayKey]);
 
   const eveningWindow = useMemo(() => {
+    if (activeLeave) return null;
     const a = selectedMeta?.availability ?? null;
     const day = a?.find?.((d) => d.day === dayKey);
     return day?.evening && !day.evening.is_off ? { start: day.evening.start, end: day.evening.end } : null;
-  }, [selectedMeta, dayKey]);
+  }, [activeLeave, selectedMeta, dayKey]);
 
   const slotInterval = selectedMeta?.slotDuration ?? 15;
 
@@ -362,7 +420,15 @@ export function AppointmentCalendar() {
     (async () => {
       try {
         const dateStr = format(currentDate, "yyyy-MM-dd");
-        const filters = { doctorId: selectedDoctor.id, date: dateStr };
+        // Send both canonical and fallback keys so backend date filtering is always applied.
+        const filters = {
+          doctorId: selectedDoctor.id,
+          doctor_id: selectedDoctor.id,
+          date: dateStr,
+          appointment_date: dateStr,
+          startDate: dateStr,
+          endDate: dateStr,
+        };
         const response = await getClinicAppointments(clinicId, filters);
         const data = response.data?.data || [];
         const mapped: Appointment[] = data.map((row: any) => ({
@@ -392,8 +458,13 @@ export function AppointmentCalendar() {
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <DateNavigator currentDate={currentDate} setCurrentDate={setCurrentDate} />
         <div className="flex items-center gap-4">
-          {selectedDoctor && (
+          {selectedDoctor && !isDoctorRole && (
             <DoctorSelector doctors={doctors} selected={selectedDoctor} onChange={(d) => setSelectedDoctor(d)} />
+          )}
+          {selectedDoctor && isDoctorRole && (
+            <div className="rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-700">
+              Doctor: {selectedDoctor.name}
+            </div>
           )}
         </div>
       </div>
@@ -401,6 +472,13 @@ export function AppointmentCalendar() {
       <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
         <Legend />
       </div>
+
+      {activeLeave && selectedDoctor && (
+        <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+          {selectedDoctor.name} is on leave on {format(currentDate, "dd MMM yyyy")}
+          {activeLeave?.reason ? ` (${activeLeave.reason})` : ""}.
+        </div>
+      )}
 
       {/* Slots */}
       <div className="mt-6 space-y-6">

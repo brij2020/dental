@@ -125,6 +125,7 @@ export async function getDoctorsByClinic(_clinicId: string): Promise<DoctorProfi
       .map((profile: any) => ({
         id: profile._id || profile.id,
         full_name: profile.full_name,
+        role: profile.role || null,
         availability: profile.availability,
         slot_duration_minutes: profile.slot_duration_minutes,
         leave: profile.leave || [],

@@ -21,6 +21,7 @@ const UserManagementPanel = lazy(() => import("../pages/settings/components/User
 const ProfilePanel        = lazy(() => import("../pages/settings/components/ProfilePanel"));
 const SettingsMenu = lazy(() => import("../pages/settings/components/SettingsMenu"));
 const Consultation = lazy(() => import("../pages/consultation/Consultation"));
+const ConsultationPreview = lazy(() => import("../pages/consultation/ConsultationPreview"));
 const ClinicInformationPanel = lazy(() => import("../pages/settings/components/ClinicInformationPanel"));
 const AppointmentTimingsPanel = lazy(() => import("../pages/settings/components/AppointmentTimingsPanel"));
 const LeaveSettingsPanel = lazy(() => import("../pages/settings/components/LeavePanel"));
@@ -63,6 +64,34 @@ const RequireSuperAdmin = ({ children }: { children: ReactNode }) => {
 const withSuperAdmin = (el: ReactNode) =>
   withSuspense(<RequireSuperAdmin>{el}</RequireSuperAdmin>);
 
+const RequireRoles = ({ roles, children }: { roles: string[]; children: ReactNode }) => {
+  const { user } = useAuth();
+
+  if (!user) return null;
+  if (!roles.includes(user.role)) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  return <>{children}</>;
+};
+
+const withRoles = (roles: string[], el: ReactNode) =>
+  withSuspense(<RequireRoles roles={roles}>{el}</RequireRoles>);
+
+const RequireDoctorSettingsAccess = ({ children }: { children: ReactNode }) => {
+  const { user } = useAuth();
+
+  if (!user) return null;
+  if (user.role === "doctor") {
+    return <Navigate to="/settings/profile" replace />;
+  }
+
+  return <>{children}</>;
+};
+
+const withDoctorSettingsGuard = (el: ReactNode) =>
+  withSuspense(<RequireDoctorSettingsAccess>{el}</RequireDoctorSettingsAccess>);
+
 const router = createBrowserRouter([
   { path: "/", element: <Navigate to="/dashboard" replace />, errorElement: <ErrorBoundary /> },
   { path: "/login", element: withSuspense(<Login />), errorElement: <ErrorBoundary /> },
@@ -80,7 +109,7 @@ const router = createBrowserRouter([
           { path: "/clinics",      element: withSuperAdmin(<Clinics />) },
           { path: "/clinics/create", element: withSuperAdmin(<CreateClinic />) },
           { path: "/clinics/:id/edit", element: withSuperAdmin(<EditClinic />) },
-          { path: "/patients",     element: withSuspense(<Patients />) },
+          { path: "/patients",     element: withRoles(["admin", "receptionist"], <Patients />) },
           { path: "/appointments", element: withSuspense(<Appointments />) },
           { path: "/insight-videos",      element: withSuspense(<InsightVideos />) },
           {
@@ -90,23 +119,23 @@ const router = createBrowserRouter([
               { index: true, element: withSuspense(<SettingsMenu />) },
               { path: "users", element: withSuspense(<UserManagementPanel />) },
               { path: "profile", element: withSuspense(<ProfilePanel />) },
-              { path: "clinic", element: withSuspense(<ClinicInformationPanel />) }, 
-              { path: "timings", element: withSuspense(<AppointmentTimingsPanel />) },
-              { path: "leaves", element: withSuspense(<LeaveSettingsPanel />) },
-              { path: "procedures", element: withSuspense(<ProcedurePanel />) },
-              { path: "conditions", element: withSuspense(<MedicalConditionsPanel />) },
-              { path: "chief-complaint", element: withSuspense(<ChiefComplaintsPanel />) },
-              { path: "remedies", element: withSuspense(<RemediesPanel />) },
-              { path: "problems", element: withSuspense(<ProblemsPanel />) },
-              { path: "procedure-problems", element: withSuspense(<ProcedureProblemsPanel />) },
-              { path: "fees", element: withSuspense(<FeesPanel />) },
-              { path: "clinic-panels", element: withSuspense(<ClinicPanelsPanel />) },
-              { path: "patients", element: withSuspense(<PatientPanel />) },
-              { path: "subscriptions", element: withSuspense(<SubscriptionsPanel />) },
-              { path: "subscription-plan", element: withSuspense(<ClinicSubscriptionPanel />) },
+              { path: "clinic", element: withDoctorSettingsGuard(<ClinicInformationPanel />) }, 
+              { path: "timings", element: withDoctorSettingsGuard(<AppointmentTimingsPanel />) },
+              { path: "leaves", element: withRoles(["admin", "doctor"], <LeaveSettingsPanel />) },
+              { path: "procedures", element: withDoctorSettingsGuard(<ProcedurePanel />) },
+              { path: "conditions", element: withDoctorSettingsGuard(<MedicalConditionsPanel />) },
+              { path: "chief-complaint", element: withDoctorSettingsGuard(<ChiefComplaintsPanel />) },
+              { path: "remedies", element: withDoctorSettingsGuard(<RemediesPanel />) },
+              { path: "problems", element: withDoctorSettingsGuard(<ProblemsPanel />) },
+              { path: "procedure-problems", element: withDoctorSettingsGuard(<ProcedureProblemsPanel />) },
+              { path: "fees", element: withDoctorSettingsGuard(<FeesPanel />) },
+              { path: "clinic-panels", element: withDoctorSettingsGuard(<ClinicPanelsPanel />) },
+              { path: "patients", element: withDoctorSettingsGuard(<PatientPanel />) },
+              { path: "subscriptions", element: withDoctorSettingsGuard(<SubscriptionsPanel />) },
+              { path: "subscription-plan", element: withDoctorSettingsGuard(<ClinicSubscriptionPanel />) },
 
-              { path: "video-consultation-timings", element: withSuspense(<VideoConsultationTimingsPanel />) },
-              { path: "consent", element: withSuspense(<ConsentFormPanel />) },
+              { path: "video-consultation-timings", element: withDoctorSettingsGuard(<VideoConsultationTimingsPanel />) },
+              { path: "consent", element: withDoctorSettingsGuard(<ConsentFormPanel />) },
 
             ]
           },
@@ -115,6 +144,10 @@ const router = createBrowserRouter([
       {
         path: "/consultation/:appointmentId",
         element: withSuspense(<Consultation />)
+      },
+      {
+        path: "/consultation/:appointmentId/preview",
+        element: withSuspense(<ConsultationPreview />)
       }
     ],
   },

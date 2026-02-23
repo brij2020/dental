@@ -683,6 +683,10 @@ export default function Consultation() {
             onSaveAndContinue={handleSaveBilling}
             isSaving={isSaving}
             consultationData={consultationData}
+            procedureAmountOverride={(procedures || []).reduce(
+              (sum, item) => sum + Number(item?.cost || 0),
+              0,
+            )}
           />
         );
       case 5:
@@ -752,9 +756,87 @@ export default function Consultation() {
     return age;
   };
 
+  const handlePrintPreview = () => {
+    const source = document.getElementById('consultation-preview');
+    if (!source) return;
+
+    const body = document.body;
+    const className = 'print-consultation';
+    const printRootId = 'consultation-print-root';
+    const existingRoot = document.getElementById(printRootId);
+    if (existingRoot) {
+      existingRoot.remove();
+    }
+
+    const printRoot = document.createElement('div');
+    printRoot.id = printRootId;
+    printRoot.innerHTML = source.innerHTML;
+    body.appendChild(printRoot);
+    body.classList.add(className);
+
+    let cleaned = false;
+    const cleanup = () => {
+      if (cleaned) return;
+      cleaned = true;
+      body.classList.remove(className);
+      const root = document.getElementById(printRootId);
+      if (root) root.remove();
+      window.removeEventListener('afterprint', cleanup);
+    };
+
+    window.addEventListener('afterprint', cleanup);
+    window.print();
+    setTimeout(cleanup, 1200);
+  };
+
 
   return (
     <div className="min-h-screen bg-slate-100 p-4 sm:p-6 lg:p-8">
+      <style>
+        {`
+          @media print {
+            @page {
+              size: A4 portrait;
+              margin: 8mm;
+            }
+            body.print-consultation > * {
+              visibility: hidden !important;
+            }
+            body.print-consultation #consultation-print-root,
+            body.print-consultation #consultation-print-root * {
+              visibility: visible !important;
+            }
+            body.print-consultation #consultation-print-root {
+              position: fixed !important;
+              inset: 0 !important;
+              width: 100% !important;
+              height: auto !important;
+              overflow: visible !important;
+              margin: 0 !important;
+              padding: 8mm !important;
+              background: #ffffff !important;
+            }
+            body.print-consultation #consultation-print-root .rx-page {
+              box-shadow: none !important;
+              border: 1px solid #cbd5e1 !important;
+              border-radius: 0 !important;
+              margin: 0 !important;
+              width: 100% !important;
+              max-width: none !important;
+              page-break-inside: avoid;
+              break-inside: avoid;
+            }
+            body.print-consultation #consultation-print-root .rx-page:not(:last-child) {
+              page-break-after: always;
+              break-after: page;
+            }
+            body.print-consultation #consultation-print-root .rx-page:last-child {
+              page-break-after: auto;
+              break-after: auto;
+            }
+          }
+        `}
+      </style>
       <div className="max-w-7xl mx-auto space-y-6">
         {/* Page Header */}
         <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200">
@@ -797,7 +879,7 @@ export default function Consultation() {
             <div className="flex items-center gap-3">
               <button
                 type="button"
-                onClick={() => setIsPreviewModalOpen(true)}
+                onClick={() => navigate(`/consultation/${appointment.id || appointmentId}/preview`)}
                 className="inline-flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium rounded-xl border border-slate-300 text-slate-700 hover:bg-slate-50 active:bg-slate-100 transition-all w-full sm:w-auto"
               >
                 Preview
@@ -869,131 +951,345 @@ export default function Consultation() {
           isOpen={isPreviewModalOpen}
           onClose={() => setIsPreviewModalOpen(false)}
           title="Preview — Full Consultation"
+          panelClassName="w-[96vw] max-w-[120rem] h-[98vh] mx-1 p-3 sm:p-5"
+          contentClassName="pr-0"
         >
-          <div className="space-y-4">
+          <div className="space-y-4 h-full">
             <div id="consultation-preview" className="max-w-none">
-              <h2 className="text-lg font-semibold mb-2">Consultation Summary</h2>
+              {(() => {
+                const procedureList = Array.isArray(procedures) ? procedures : [];
+                const prescriptionList = Array.isArray(prescriptions) ? prescriptions : [];
+                const paymentCount = Array.isArray(payments) ? payments.length : 0;
 
-              <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-                <div className="p-4 border-b border-dotted border-slate-200 last:border-b-0">
-                  <h3 className="text-sm font-medium text-slate-700 mb-2">Appointment</h3>
-                  <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1">
-                    <div><dt className="text-xs text-slate-500">Appointment ID</dt><dd className="font-medium">{appointment?.appointment_uid || appointment?.id || '—'}</dd></div>
-                    <div><dt className="text-xs text-slate-500">Status</dt><dd className="font-medium">{appointment?.status || '—'}</dd></div>
-                    <div><dt className="text-xs text-slate-500">Date</dt><dd className="font-medium">{appointment?.appointment_date || '—'}</dd></div>
-                    <div><dt className="text-xs text-slate-500">Time</dt><dd className="font-medium">{appointment?.appointment_time || '—'}</dd></div>
-                  </dl>
-                </div>
+                const patientName = patient?.full_name || appointment?.full_name || '-';
+                const doctorName =
+                  (appointment as any)?.doctor_name ||
+                  (appointment as any)?.doctor?.full_name ||
+                  (appointment as any)?.doctor?.name ||
+                  '-';
+                const issueDateRaw = appointment?.appointment_date
+                  ? new Date(appointment.appointment_date)
+                  : null;
+                const issueDate =
+                  issueDateRaw && !Number.isNaN(issueDateRaw.getTime())
+                    ? format(issueDateRaw, 'dd/MM/yyyy')
+                    : '-';
+                const medicalHistory = Array.isArray(consultationData?.medical_history)
+                  ? consultationData.medical_history
+                  : [];
+                const clinicName =
+                  (appointment as any)?.clinic_name ||
+                  (appointment as any)?.clinic?.name ||
+                  'Clinic Name';
+                const pdfLogoUrl = `${window.location.origin}/src/assets/spai.jpeg`;
 
-                <div className="p-4 border-b border-dotted border-slate-200 last:border-b-0">
-                  <h3 className="text-sm font-medium text-slate-700 mb-2">Patient</h3>
-                  <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1">
-                    <div><dt className="text-xs text-slate-500">Name</dt><dd className="font-medium">{patient?.full_name || appointment?.full_name || '—'}</dd></div>
-                    <div><dt className="text-xs text-slate-500">File Number</dt><dd className="font-medium">{patient?.file_number || appointment?.file_number || '—'}</dd></div>
-                    <div><dt className="text-xs text-slate-500">Contact</dt><dd className="font-medium">{patient?.contact_number || (appointment as any)?.contact_number || '—'}</dd></div>
-                    <div><dt className="text-xs text-slate-500">Age</dt><dd className="font-medium">{getAge(patient?.date_of_birth || null)}</dd></div>
-                  </dl>
-                </div>
+                return (
+                  <div className="space-y-5">
+                    <article className="rx-page mx-auto w-full max-w-[850px] border border-slate-400 bg-white text-slate-800">
+                      <div className="border-b border-slate-400 p-3 text-[11px] text-slate-600">Page 1 / 3</div>
+                      <div className="grid grid-cols-1 border-b border-slate-400 sm:grid-cols-2">
+                        <div className="border-b border-slate-400 p-4 sm:border-b-0 sm:border-r">
+                          <div className="flex items-center gap-3">
+                            <img
+                              src={pdfLogoUrl}
+                              alt="Clinic logo"
+                              className="h-12 w-12 rounded-md border border-slate-200 object-contain p-1"
+                              onError={(e) => {
+                                (e.currentTarget as HTMLImageElement).style.display = 'none';
+                              }}
+                            />
+                            <div className="text-sm font-semibold text-slate-900">{clinicName}</div>
+                          </div>
+                        </div>
+                        <div className="p-4 text-sm">
+                          <div className="grid grid-cols-[90px_1fr] gap-y-1">
+                            <div className="text-slate-500">Dr. Name</div><div className="font-medium">{doctorName}</div>
+                            <div className="text-slate-500">Reg. No.</div><div>-</div>
+                            <div className="text-slate-500">Address</div><div>{clinicName}</div>
+                          </div>
+                        </div>
+                      </div>
 
-                <div className="p-4 border-b border-dotted border-slate-200 last:border-b-0">
-                  <h3 className="text-sm font-medium text-slate-700 mb-2">Consultation Notes</h3>
-                  <div className="space-y-3 text-sm text-slate-700">
-                    <div><strong>Chief Complaints</strong><div className="mt-1 whitespace-pre-wrap">{consultationData?.chief_complaints || '—'}</div></div>
-                    <div><strong>On Examination</strong><div className="mt-1 whitespace-pre-wrap">{consultationData?.on_examination || '—'}</div></div>
-                    <div><strong>Advice</strong><div className="mt-1 whitespace-pre-wrap">{consultationData?.advice || '—'}</div></div>
-                    
-                    <div><strong>Notes</strong><div className="mt-1 whitespace-pre-wrap">{consultationData?.notes || '—'}</div></div>
+                      <div className="border-b border-slate-400 p-4 text-sm">
+                        <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-600">Patient Information</div>
+                        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                          <div className="rounded border border-slate-300 px-2 py-1"><span className="text-slate-500">Name:</span> <span className="font-medium">{patientName}</span></div>
+                          <div className="rounded border border-slate-300 px-2 py-1"><span className="text-slate-500">Date:</span> <span className="font-medium">{issueDate}</span></div>
+                          <div className="rounded border border-slate-300 px-2 py-1"><span className="text-slate-500">Age:</span> <span className="font-medium">{getAge(patient?.date_of_birth || null)}</span></div>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 border-b border-slate-400 sm:grid-cols-[1fr_260px]">
+                        <div className="border-b border-slate-400 p-4 sm:border-b-0 sm:border-r">
+                          <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-600">Chief Complaint</div>
+                          <div className="min-h-20 rounded border border-slate-300 bg-slate-50 px-3 py-2 text-sm whitespace-pre-wrap">
+                            {consultationData?.chief_complaints || '-'}
+                          </div>
+                          <div className="mt-3 mb-2 text-xs font-semibold uppercase tracking-wide text-slate-600">Medical History</div>
+                          <div className="min-h-20 rounded border border-slate-300 bg-slate-50 px-3 py-2 text-sm">
+                            {medicalHistory.length > 0 ? medicalHistory.join(', ') : '-'}
+                          </div>
+                        </div>
+                        <div className="p-4">
+                          <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-600">Dental Chart Overview</div>
+                          <div className="min-h-44 rounded border border-slate-300 bg-white p-3">
+                            <div className="text-xs text-slate-500">Affected teeth</div>
+                            <div className="mt-2 flex flex-wrap gap-1">
+                              {procedureList.length > 0 ? (
+                                procedureList.map((p: any) => (
+                                  <span key={`tooth-${p.id || p._id}`} className="rounded bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">
+                                    {p.tooth_number}
+                                  </span>
+                                ))
+                              ) : (
+                                <span className="text-sm text-slate-500">No procedures added</span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="space-y-3 border-b border-slate-400 p-4 text-sm">
+                        <div>
+                          <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-600">Clinical Examination (On Examination)</div>
+                          <div className="min-h-14 rounded border border-slate-300 bg-slate-50 px-3 py-2 whitespace-pre-wrap">{consultationData?.on_examination || '-'}</div>
+                        </div>
+                        <div>
+                          <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-600">Diagnosis</div>
+                          <div className="min-h-14 rounded border border-slate-300 bg-slate-50 px-3 py-2 whitespace-pre-wrap">{consultationData?.on_examination || '-'}</div>
+                        </div>
+                        <div>
+                          <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-600">Advice</div>
+                          <div className="min-h-14 rounded border border-slate-300 bg-slate-50 px-3 py-2 whitespace-pre-wrap">{consultationData?.advice || '-'}</div>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3 p-4 text-xs text-slate-500">
+                        <div className="rounded border border-slate-300 px-3 py-2">Clinic Stamp</div>
+                        <div className="rounded border border-slate-300 px-3 py-2 text-right">Doctor Signature</div>
+                      </div>
+                    </article>
+
+                    <article className="rx-page mx-auto w-full max-w-[850px] border border-slate-400 bg-white text-slate-800">
+                      <div className="border-b border-slate-400 p-3 text-[11px] text-slate-600">Page 2 / 3</div>
+                      <div className="grid grid-cols-1 border-b border-slate-400 sm:grid-cols-2">
+                        <div className="border-b border-slate-400 p-4 sm:border-b-0 sm:border-r">
+                          <div className="flex items-center gap-3">
+                            <img
+                              src={pdfLogoUrl}
+                              alt="Clinic logo"
+                              className="h-12 w-12 rounded-md border border-slate-200 object-contain p-1"
+                              onError={(e) => {
+                                (e.currentTarget as HTMLImageElement).style.display = 'none';
+                              }}
+                            />
+                            <div className="text-sm font-semibold text-slate-900">{clinicName}</div>
+                          </div>
+                        </div>
+                        <div className="p-4 text-sm">
+                          <div className="grid grid-cols-[90px_1fr] gap-y-1">
+                            <div className="text-slate-500">Dr. Name</div><div className="font-medium">{doctorName}</div>
+                            <div className="text-slate-500">Date</div><div>{issueDate}</div>
+                            <div className="text-slate-500">Patient</div><div>{patientName}</div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="border-b border-slate-400 p-4">
+                        <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-600">Prescribed Medicines Per Day</div>
+                        {previewLoading && !prescriptions ? (
+                          <p className="text-sm text-slate-500">Loading prescriptions...</p>
+                        ) : (
+                          <div className="overflow-x-auto border border-slate-300">
+                            <table className="min-w-full text-sm">
+                              <thead className="bg-sky-100">
+                                <tr>
+                                  <th className="border border-slate-300 px-2 py-2 text-left text-xs font-semibold text-slate-700">Medicine</th>
+                                  <th className="border border-slate-300 px-2 py-2 text-left text-xs font-semibold text-slate-700">Per Day</th>
+                                  <th className="border border-slate-300 px-2 py-2 text-left text-xs font-semibold text-slate-700">Quantity</th>
+                                  <th className="border border-slate-300 px-2 py-2 text-left text-xs font-semibold text-slate-700">Days</th>
+                                  <th className="border border-slate-300 px-2 py-2 text-left text-xs font-semibold text-slate-700">Instructions</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {(prescriptionList.length > 0 ? prescriptionList : [{}]).map((rx: any, idx: number) => (
+                                  <tr key={rx.id || rx._id || `empty-rx-${idx}`} className="bg-amber-50">
+                                    <td className="border border-slate-300 px-2 py-2">{rx.medicine_name || '-'}</td>
+                                    <td className="border border-slate-300 px-2 py-2">{rx.times || '-'}</td>
+                                    <td className="border border-slate-300 px-2 py-2">{rx.quantity || '-'}</td>
+                                    <td className="border border-slate-300 px-2 py-2">{rx.days || '-'}</td>
+                                    <td className="border border-slate-300 px-2 py-2">{rx.note || '-'}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="border-b border-slate-400 p-4">
+                        <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-600">Past / Planned Procedures</div>
+                        {previewLoading && !procedures ? (
+                          <p className="text-sm text-slate-500">Loading procedures...</p>
+                        ) : (
+                          <div className="overflow-x-auto border border-slate-300">
+                            <table className="min-w-full text-sm">
+                              <thead className="bg-amber-100">
+                                <tr>
+                                  <th className="border border-slate-300 px-2 py-2 text-left text-xs font-semibold text-slate-700">Procedure</th>
+                                  <th className="border border-slate-300 px-2 py-2 text-left text-xs font-semibold text-slate-700">Symptoms / Problem</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {(procedureList.length > 0 ? procedureList : [{} as any]).map((p: any, idx: number) => (
+                                  <tr key={p.id || p._id || `empty-proc-${idx}`} className="bg-yellow-50">
+                                    <td className="border border-slate-300 px-2 py-2">{p.solutions?.join?.(', ') || '-'}</td>
+                                    <td className="border border-slate-300 px-2 py-2">{p.problems?.join?.(', ') || '-'}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="p-4">
+                        <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-600">Medication Cost Summary</div>
+                        <div className="overflow-x-auto border border-slate-300">
+                          <table className="min-w-full text-sm">
+                            <thead className="bg-emerald-100">
+                              <tr>
+                                <th className="border border-slate-300 px-2 py-2 text-left text-xs font-semibold text-slate-700">Medication Name</th>
+                                <th className="border border-slate-300 px-2 py-2 text-left text-xs font-semibold text-slate-700">Type</th>
+                                <th className="border border-slate-300 px-2 py-2 text-left text-xs font-semibold text-slate-700">Quantity</th>
+                                <th className="border border-slate-300 px-2 py-2 text-left text-xs font-semibold text-slate-700">Cost</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {(prescriptionList.length > 0 ? prescriptionList : [{}]).map((rx: any, idx: number) => (
+                                <tr key={rx.id || rx._id || `sum-rx-${idx}`} className="bg-emerald-50">
+                                  <td className="border border-slate-300 px-2 py-2">{rx.medicine_name || '-'}</td>
+                                  <td className="border border-slate-300 px-2 py-2">Medicine</td>
+                                  <td className="border border-slate-300 px-2 py-2">{rx.quantity || '-'}</td>
+                                  <td className="border border-slate-300 px-2 py-2">-</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    </article>
+
+                    <article className="rx-page mx-auto w-full max-w-[850px] border border-slate-400 bg-white text-slate-800">
+                      <div className="border-b border-slate-400 p-3 text-[11px] text-slate-600">Page 3 / 3</div>
+                      <div className="grid grid-cols-1 border-b border-slate-400 sm:grid-cols-2">
+                        <div className="border-b border-slate-400 p-4 sm:border-b-0 sm:border-r">
+                          <div className="flex items-center gap-3">
+                            <img
+                              src={pdfLogoUrl}
+                              alt="Clinic logo"
+                              className="h-12 w-12 rounded-md border border-slate-200 object-contain p-1"
+                              onError={(e) => {
+                                (e.currentTarget as HTMLImageElement).style.display = 'none';
+                              }}
+                            />
+                            <div className="text-sm font-semibold text-slate-900">{clinicName}</div>
+                          </div>
+                        </div>
+                        <div className="p-4 text-sm">
+                          <div className="grid grid-cols-[100px_1fr] gap-y-1">
+                            <div className="text-slate-500">Dr. Name</div><div className="font-medium">{doctorName}</div>
+                            <div className="text-slate-500">Address</div><div>{clinicName}</div>
+                            <div className="text-slate-500">File Number</div><div>{patient?.file_number || '-'}</div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="border-b border-slate-400 p-4">
+                        <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-600">Advice</div>
+                        <div className="min-h-48 rounded border border-slate-300 bg-slate-50 px-3 py-2 text-sm whitespace-pre-wrap">
+                          {consultationData?.advice || '-'}
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 border-b border-slate-400 sm:grid-cols-2">
+                        <div className="border-b border-slate-400 p-4 sm:border-b-0 sm:border-r">
+                          <div className="grid grid-cols-[120px_1fr] gap-y-1 text-sm">
+                            <div className="text-slate-500">Date</div><div>{issueDate}</div>
+                            <div className="text-slate-500">Appointment ID</div><div>{appointment?.appointment_uid || appointment?.id || '-'}</div>
+                            <div className="text-slate-500">Follow-up Date</div><div>{(appointment as any)?.follow_up_date || '-'}</div>
+                          </div>
+                        </div>
+                        <div className="p-4 text-sm">
+                          <div className="grid grid-cols-[120px_1fr] gap-y-1">
+                            <div className="text-slate-500">Patient Name</div><div>{patientName}</div>
+                            <div className="text-slate-500">Contact</div><div>{patient?.contact_number || '-'}</div>
+                            <div className="text-slate-500">Time</div><div>{appointment?.appointment_time || '-'}</div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3 p-4 text-xs text-slate-500">
+                        <div className="rounded border border-slate-300 px-3 py-2">Clinic Stamp</div>
+                        <div className="rounded border border-slate-300 px-3 py-2 text-right">Doctor Signature</div>
+                      </div>
+                    </article>
+
+                    <article className="rx-page mx-auto w-full max-w-[850px] border border-slate-400 bg-white text-slate-800">
+                      <div className="border-b border-slate-400 p-3 text-[11px] text-slate-600">Consent</div>
+                      <div className="grid grid-cols-1 border-b border-slate-400 sm:grid-cols-2">
+                        <div className="border-b border-slate-400 p-4 sm:border-b-0 sm:border-r">
+                          <div className="flex items-center gap-3">
+                            <img
+                              src={pdfLogoUrl}
+                              alt="Clinic logo"
+                              className="h-12 w-12 rounded-md border border-slate-200 object-contain p-1"
+                              onError={(e) => {
+                                (e.currentTarget as HTMLImageElement).style.display = 'none';
+                              }}
+                            />
+                            <div className="text-sm font-semibold text-slate-900">{clinicName}</div>
+                          </div>
+                        </div>
+                        <div className="p-4 text-sm">
+                          <div className="grid grid-cols-[100px_1fr] gap-y-1">
+                            <div className="text-slate-500">Dr. Name</div><div className="font-medium">{doctorName}</div>
+                            <div className="text-slate-500">Patient</div><div>{patientName}</div>
+                            <div className="text-slate-500">Date</div><div>{issueDate}</div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="p-4">
+                        <div className="mb-2 text-center text-xs font-semibold uppercase tracking-wide text-slate-600">Consent Form</div>
+                        <div className="min-h-56 rounded border border-slate-300 bg-slate-50 px-3 py-2 text-sm leading-6">
+                          I hereby confirm that the treatment plan, procedure options, expected outcomes, and potential risks
+                          were explained to me. I had the opportunity to ask questions and all my questions were answered
+                          satisfactorily. I consent to proceed with the advised treatment and prescription plan.
+                        </div>
+                        <div className="mt-2 text-right text-xs text-slate-500">
+                          Payments recorded for this consultation: {paymentCount}
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 gap-3 border-t border-slate-400 p-4 sm:grid-cols-2">
+                        <div className="min-h-20 rounded border border-slate-300 px-3 py-2 text-sm">
+                          <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Patient / Guardian Signature</div>
+                        </div>
+                        <div className="min-h-20 rounded border border-slate-300 px-3 py-2 text-sm text-right">
+                          <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Doctor Signature</div>
+                        </div>
+                      </div>
+                    </article>
                   </div>
-                </div>
-
-                <div className="p-4 border-b border-dotted border-slate-200 last:border-b-0">
-                  <h3 className="text-sm font-medium text-slate-700 mb-2">Treatment Procedures</h3>
-                  {previewLoading && !procedures ? (
-                    <p className="text-sm text-slate-500">Loading procedures…</p>
-                  ) : procedures && procedures.length > 0 ? (
-                    <ol className="list-decimal list-inside text-sm space-y-2">
-                      {procedures.map((p) => (
-                        <li key={p.id || p._id} className="pb-1">
-                          <div className="font-medium">{p.name || p.procedure_name || 'Procedure'}</div>
-                          <div className="text-xs text-slate-600">{p.problems?.join?.(', ') || ''}{p.tooth_number ? ` • Tooth ${p.tooth_number}` : ''}</div>
-                          <div className="text-xs text-slate-600">Cost: {p.cost ?? p.amount ?? '—'}</div>
-                        </li>
-                      ))}
-                    </ol>
-                  ) : (
-                    <p className="text-sm text-slate-500">No procedures recorded.</p>
-                  )}
-                </div>
-
-                <div className="p-4 border-b border-dotted border-slate-200 last:border-b-0">
-                  <h3 className="text-sm font-medium text-slate-700 mb-2">Prescriptions</h3>
-                  {previewLoading && !prescriptions ? (
-                    <p className="text-sm text-slate-500">Loading prescriptions…</p>
-                  ) : prescriptions && prescriptions.length > 0 ? (
-                    <ul className="text-sm space-y-2">
-                      {prescriptions.map((rx) => (
-                        <li key={rx.id || rx._id} className="pb-1">
-                          <div className="font-medium">{rx.medicine_name}</div>
-                          <div className="text-xs text-slate-600">Times: {rx.times || '—'} • Qty: {rx.quantity || '—'} • Days: {rx.days || '—'}</div>
-                          {rx.note && <div className="text-xs text-slate-600">Note: {rx.note}</div>}
-                        </li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <p className="text-sm text-slate-500">No prescriptions recorded.</p>
-                  )}
-                </div>
-
-                <div className="p-4 last:border-b-0">
-                  <h3 className="text-sm font-medium text-slate-700 mb-2">Billing & Payments</h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
-                    <div>
-                      <div><span className="text-slate-500">Consultation Fee:</span> <span className="font-medium">{consultationData?.consultation_fee ?? '—'}</span></div>
-                      <div><span className="text-slate-500">Procedure Amount:</span> <span className="font-medium">{consultationData?.procedure_amount ?? '—'}</span></div>
-                      <div><span className="text-slate-500">Other Amount:</span> <span className="font-medium">{consultationData?.other_amount ?? '—'}</span></div>
-                      <div><span className="text-slate-500">Discount:</span> <span className="font-medium">{consultationData?.discount ?? '—'}</span></div>
-                    </div>
-                    <div>
-                      <div><span className="text-slate-500">Total Paid:</span> <span className="font-medium">{consultationData?.total_paid ?? '—'}</span></div>
-                      <div><span className="text-slate-500">Amount Due:</span> <span className="font-medium">{consultationData?.amount_due ?? '—'}</span></div>
-                      <div><span className="text-slate-500">Previous Outstanding:</span> <span className="font-medium">{consultationData?.previous_outstanding_balance ?? '—'}</span></div>
-                    </div>
-                  </div>
-
-                  <div className="mt-3">
-                    <h4 className="text-sm font-medium mb-2">Payments</h4>
-                    {previewLoading && payments === null ? (
-                      <p className="text-sm text-slate-500">Loading payments…</p>
-                    ) : payments && payments.length > 0 ? (
-                      <ul className="text-sm space-y-1">
-                        {payments.map((pay) => (
-                          <li key={pay.id || pay.payment_id} className="text-slate-700">{pay.amount} — {pay.payment_mode || pay.mode || '—'} — {new Date(pay.created_at || pay.payment_date || Date.now()).toLocaleString()}</li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <p className="text-sm text-slate-500">No payments recorded.</p>
-                    )}
-                  </div>
-                </div>
-              </div>
+                );
+              })()}
             </div>
 
             <div className="flex justify-end gap-3">
               <button
                 type="button"
-                onClick={() => {
-                  const el = document.getElementById('consultation-preview');
-                  if (!el) return;
-                  const w = window.open('', '_blank');
-                  if (!w) return;
-                  const style = `body{font-family:Inter,ui-sans-serif,system-ui,-apple-system,'Segoe UI',Roboto,'Helvetica Neue',Arial;padding:24px;color:#0f172a;} h2{font-size:20px;} h3{font-size:16px;margin-top:18px;} li{margin-bottom:8px;}`;
-                  const doc = `<!doctype html><html><head><meta charset="utf-8"><title>Consultation Preview</title><style>${style}</style></head><body>${el.innerHTML}</body></html>`;
-                  w.document.open();
-                  w.document.write(doc);
-                  w.document.close();
-                  w.focus();
-                  w.print();
-                }}
+                onClick={handlePrintPreview}
                 className="inline-flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium rounded-xl bg-sky-600 text-white hover:bg-sky-700"
               >
                 Download PDF

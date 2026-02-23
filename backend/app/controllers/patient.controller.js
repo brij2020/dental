@@ -31,6 +31,36 @@ exports.create = async (req, res) => {
       });
     }
 
+    // Normalize and pre-check unique-like fields for clearer client errors
+    const normalizedEmail = typeof patientData.email === "string"
+      ? patientData.email.toLowerCase().trim()
+      : null;
+    const normalizedContact = typeof patientData.contact_number === "string"
+      ? patientData.contact_number.replace(/[\s\-+()]/g, "")
+      : null;
+
+    if (normalizedEmail) {
+      const existingByEmail = await patientService.getPatientByEmail(normalizedEmail);
+      if (existingByEmail) {
+        return res.status(409).send({
+          message: "Email already exists"
+        });
+      }
+      patientData.email = normalizedEmail;
+    }
+
+    if (normalizedContact) {
+      const existingByPhone = await patientService.getPatientsByPhone(normalizedContact);
+      const hasExactPhone = Array.isArray(existingByPhone)
+        && existingByPhone.some((p) => String(p.contact_number || "") === normalizedContact);
+      if (hasExactPhone) {
+        return res.status(409).send({
+          message: "Contact number already exists"
+        });
+      }
+      patientData.contact_number = normalizedContact;
+    }
+
     const newPatient = {
       ...patientData,
       registration_type,
@@ -45,7 +75,29 @@ exports.create = async (req, res) => {
     });
   } catch (err) {
     logger.error(`Error creating patient: ${err.message}`);
-    res.status(500).send({
+    if (err.name === "ValidationError") {
+      return res.status(400).send({
+        message: err.message || "Validation failed",
+        errors: err.errors || undefined
+      });
+    }
+
+    if (err.code === 11000) {
+      const key = Object.keys(err.keyPattern || {})[0] || Object.keys(err.keyValue || {})[0];
+      const friendly = key === "email"
+        ? "Email already exists"
+        : key === "contact_number"
+        ? "Contact number already exists"
+        : key === "uhid"
+        ? "UHID already exists"
+        : "Duplicate value";
+
+      return res.status(409).send({
+        message: friendly
+      });
+    }
+
+    return res.status(500).send({
       message: err.message || "Error creating patient"
     });
   }

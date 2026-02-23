@@ -47,6 +47,7 @@ const MenuItem = ({ title, description, icon: Icon, to }: MenuItemProps) => (
 // Uses a responsive grid layout
 export const SettingsMenu = () => {
   const { user } = useAuth();
+  const isDoctor = user?.role === 'doctor';
   const isAdmin = user?.role === 'admin';
   const isSuperAdmin = user?.role === 'super_admin';
 
@@ -66,7 +67,7 @@ export const SettingsMenu = () => {
         icon={IconLock}
         to="/settings/profile"
       />
-      {!isSuperAdmin && (
+      {!isSuperAdmin && !isDoctor && (
         <MenuItem
           title="Clinic Information"
           description="Manage address & contact details."
@@ -74,7 +75,7 @@ export const SettingsMenu = () => {
           to="/settings/clinic"
         />
       )}
-      {!isSuperAdmin && (
+      {!isSuperAdmin && !isDoctor && (
         <MenuItem
           title="Fees"
           description="Manage consultation & procedure fees."
@@ -82,7 +83,7 @@ export const SettingsMenu = () => {
           to="/settings/fees"
         />
       )}
-      {!isSuperAdmin && (
+      {!isSuperAdmin && !isDoctor && (
         <MenuItem
           title="Clinic Appointment Timing"
           description="Configure available slots."
@@ -98,49 +99,49 @@ export const SettingsMenu = () => {
           to="/settings/leaves"
         />
       )}
-      <MenuItem
+      {!isDoctor && <MenuItem
         title="Consent Forms"
         description="Customize patient consent forms."
         icon={IconFileCheck}
         to="/settings/consent"
-      />
-      <MenuItem
+      />}
+      {!isDoctor && <MenuItem
         title="Clinical Procedures"
         description="Define medical procedures offered."
         icon={IconStethoscope}
         to="/settings/procedures"
-      />
-      <MenuItem
+      />}
+      {!isDoctor && <MenuItem
         title="Medical Conditions"
         description="Manage a list of common conditions."
         icon={IconHeartbeat}
         to="/settings/conditions"
-      />
-      <MenuItem
+      />}
+      {!isDoctor && <MenuItem
         title="Chief Complaints"
         description="Manage common chief complaints."
         icon={IconAlertCircle}
         to="/settings/chief-complaint"
-      />
-      <MenuItem
+      />}
+      {!isDoctor && <MenuItem
         title="Remedies"
         description="Manage prescribed remedies."
         icon={IconPill}
         to="/settings/remedies"
-      />
-      <MenuItem
+      />}
+      {!isDoctor && <MenuItem
         title="Clinical Findings"
         description="Manage procedure-related problems."
         icon={IconPill}
         to="/settings/problems"
-      />
-      {isSuperAdmin && <MenuItem
+      />}
+      {isSuperAdmin && !isDoctor && <MenuItem
         title="Video Consultation Timings"
         description="Configure video call schedules."
         icon={IconVideo}
         to="/settings/video-consultation-timings"
       />}
-      {isSuperAdmin && (
+      {isSuperAdmin && !isDoctor && (
         <MenuItem
           title="Patients"
           description="View and manage registered patients."
@@ -148,7 +149,7 @@ export const SettingsMenu = () => {
           to="/settings/patients"
         />
       )}
-      {isSuperAdmin && (
+      {isSuperAdmin && !isDoctor && (
         <MenuItem
           title="Clinic Panels"
           description="Manage clinic panel associations."
@@ -156,7 +157,7 @@ export const SettingsMenu = () => {
           to="/settings/clinic-panels"
         />
       )}
-      {isSuperAdmin && (
+      {isSuperAdmin && !isDoctor && (
         <MenuItem
           title="Subscriptions"
           description="Create and manage subscription plans."
@@ -164,7 +165,7 @@ export const SettingsMenu = () => {
           to="/settings/subscriptions"
         />
       )}
-      {isAdmin && (
+      {isAdmin && !isDoctor && (
         <MenuItem
           title="Subscription Plan"
           description="Purchase a plan for your clinic."

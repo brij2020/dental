@@ -52,6 +52,7 @@ export type AppointmentConfirmation = {
 export type DoctorProfile = {
   id: string;
   full_name: string | null;
+  role?: string | null;
   availability?: any[] | null;
   slot_duration_minutes?: number | null;
   leave?: Array<{
