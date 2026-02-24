@@ -30,6 +30,13 @@ const formatTime = (timeStr: string) => {
   return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
 };
 
+const formatDate = (dateStr: string) => {
+  if (!dateStr) return '-';
+  const d = new Date(`${dateStr}T00:00:00`);
+  if (Number.isNaN(d.getTime())) return dateStr;
+  return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+};
+
 const StatusBadge = ({ status }: { status: AppointmentDetails['status'] }) => {
   const baseClasses = "px-2.5 py-0.5 text-xs font-medium rounded-full";
   const statusClasses = {
@@ -228,6 +235,7 @@ export default function AppointmentTable({
           <tr>
             <th scope="col" className="px-3 py-2 sm:px-6 sm:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">File Number</th>
             <th scope="col" className="px-3 py-2 sm:px-6 sm:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Patient / Doctor</th>
+            <th scope="col" className="px-3 py-2 sm:px-6 sm:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Date</th>
             <th scope="col" className="px-3 py-2 sm:px-6 sm:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Time</th>
             <th scope="col" className="px-3 py-2 sm:px-6 sm:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Status</th>
             <th scope="col" className="px-3 py-2 sm:px-6 sm:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Patient Note</th>
@@ -246,6 +254,7 @@ export default function AppointmentTable({
                 <div className="text-sm font-medium text-slate-900">{appt.full_name}</div>
                 <div className="text-sm text-slate-500">({appt.doctor_name || appt.doctor?.full_name || '—'})</div>
               </td>
+              <td className="px-3 py-3 sm:px-6 sm:py-4 whitespace-nowrap text-sm text-slate-700">{formatDate(appt.appointment_date)}</td>
               <td className="px-3 py-3 sm:px-6 sm:py-4 whitespace-nowrap text-sm text-slate-700">{formatTime(appt.appointment_time)}</td>
               <td className="px-3 py-3 sm:px-6 sm:py-4 whitespace-nowrap">
                 <StatusBadge status={appt.status} />

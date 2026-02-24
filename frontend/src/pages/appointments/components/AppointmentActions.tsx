@@ -34,6 +34,8 @@ export default function AppointmentActions({
   const [coords, setCoords] = React.useState<{ top: number; left: number } | null>(null);
   const [isRescheduleOpen, setIsRescheduleOpen] = React.useState(false);
   const [isViewOpen, setIsViewOpen] = React.useState(false);
+  const [isCancelConfirmOpen, setIsCancelConfirmOpen] = React.useState(false);
+  const [isCancelling, setIsCancelling] = React.useState(false);
   const [loadingView, setLoadingView] = React.useState(false);
   const [appointmentDetails, setAppointmentDetails] = React.useState<any | null>(null);
   const [loadingDoctorInfo, setLoadingDoctorInfo] = React.useState(false);
@@ -112,10 +114,39 @@ export default function AppointmentActions({
     [appointmentType, currentDate, currentTime, generateSlots]
   );
 
-  const handleAction = (action: string) => {
+  const handleAction = async (action: string) => {
     setOpen(false);
-    console.log(`${action} clicked. This functionality is not yet implemented.`);
+
+    if (action !== 'Delete') {
+      console.log(`${action} clicked. This functionality is not yet implemented.`);
+      return;
+    }
+    setIsCancelConfirmOpen(true);
   };
+
+  const confirmCancelAppointment = async () => {
+    try {
+      setIsCancelling(true);
+      await updateAppointment(appointmentId, { status: 'cancelled' });
+      toast.success('Appointment cancelled.');
+      setIsCancelConfirmOpen(false);
+      onRescheduled?.();
+    } catch (error: any) {
+      const message = error?.response?.data?.message || 'Failed to cancel appointment.';
+      toast.error(message);
+    } finally {
+      setIsCancelling(false);
+    }
+  };
+
+  React.useEffect(() => {
+    if (!isCancelConfirmOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !isCancelling) setIsCancelConfirmOpen(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [isCancelConfirmOpen, isCancelling]);
 
   const openViewModal = async () => {
     setOpen(false);
@@ -360,6 +391,54 @@ export default function AppointmentActions({
           </div>
         )}
       </div>
+
+      {isCancelConfirmOpen && (
+        <div
+          className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/40 p-4"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget && !isCancelling) {
+              setIsCancelConfirmOpen(false);
+            }
+          }}
+        >
+          <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl border border-slate-200">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+              <h3 className="text-base font-semibold text-slate-900">Cancel Appointment</h3>
+              <button
+                type="button"
+                onClick={() => setIsCancelConfirmOpen(false)}
+                disabled={isCancelling}
+                className="text-slate-400 hover:text-slate-600 disabled:opacity-50"
+              >
+                <IconX size={18} />
+              </button>
+            </div>
+            <div className="px-5 py-4">
+              <p className="text-sm text-slate-600">
+                Are you sure you want to cancel this appointment?
+              </p>
+            </div>
+            <div className="px-5 py-4 border-t border-slate-100 flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setIsCancelConfirmOpen(false)}
+                disabled={isCancelling}
+                className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+              >
+                Keep Appointment
+              </button>
+              <button
+                type="button"
+                onClick={confirmCancelAppointment}
+                disabled={isCancelling}
+                className="rounded-lg bg-rose-600 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-700 disabled:opacity-60"
+              >
+                {isCancelling ? 'Cancelling...' : 'Cancel Appointment'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {isRescheduleOpen && (
         <div

@@ -30,7 +30,7 @@ import type { TreatmentProcedureRow } from './types';
 import { Modal } from '../../components/Modal';
 import PatientDetailModal from './PatientDetailModal';
 // --- UPDATED: Imports for icons ---
-import { IconUser, IconClipboardList } from '@tabler/icons-react';
+import { IconUser, IconClipboardList, IconArrowLeft } from '@tabler/icons-react';
 
 // Local shape for patients_clinic row (minimal fields used in UI)
 type PatientClinicRow = {
@@ -48,6 +48,13 @@ type PatientClinicRow = {
   uhid: string;
 };
 
+type ConsultationDraft = {
+  currentStep?: number;
+  consultationId?: string | null;
+  consultationData?: Partial<ConsultationRow> | null;
+  savedAt?: string;
+};
+
 // A simple spinner for loading state
 const LoadingSpinner = () => (
   <div className="flex justify-center items-center h-full">
@@ -61,6 +68,7 @@ const LoadingSpinner = () => (
 export default function Consultation() {
   const { appointmentId } = useParams<{ appointmentId: string }>();
   const navigate = useNavigate();
+  const draftStorageKey = appointmentId ? `consultation:draft:${appointmentId}` : null;
 
   const [appointment, setAppointment] = useState<AppointmentDetails | null>(null);
   const [loading, setLoading] = useState(true);
@@ -158,6 +166,49 @@ export default function Consultation() {
     }
     return fallback;
   };
+
+  const readDraft = (): ConsultationDraft | null => {
+    if (!draftStorageKey || typeof window === 'undefined') return null;
+    try {
+      const raw = window.localStorage.getItem(draftStorageKey);
+      if (!raw) return null;
+      return JSON.parse(raw) as ConsultationDraft;
+    } catch {
+      return null;
+    }
+  };
+
+  const saveDraft = (patch: Partial<ConsultationDraft>) => {
+    if (!draftStorageKey || typeof window === 'undefined') return;
+    try {
+      const prev = readDraft() || {};
+      const next: ConsultationDraft = {
+        ...prev,
+        ...patch,
+        savedAt: new Date().toISOString(),
+      };
+      window.localStorage.setItem(draftStorageKey, JSON.stringify(next));
+    } catch {
+      // Non-blocking: draft persistence should never break consultation flow.
+    }
+  };
+
+  const clearDraft = () => {
+    if (!draftStorageKey || typeof window === 'undefined') return;
+    try {
+      window.localStorage.removeItem(draftStorageKey);
+    } catch {
+      // ignore
+    }
+  };
+
+  useEffect(() => {
+    const draft = readDraft();
+    const step = Number(draft?.currentStep || 1);
+    if (step >= 1 && step <= 5) {
+      setCurrentStep(step);
+    }
+  }, [draftStorageKey]);
 
   const loadPreviousConsultation = async () => {
     if (!appointment?.follow_up_for_consultation_id) return;
@@ -324,8 +375,19 @@ export default function Consultation() {
               ...activeConsultation,
               id: activeConsultation.id || activeConsultation._id,
             };
-            setConsultationData(mappedConsultation as ConsultationRow);
+            const draft = readDraft();
+            const shouldApplyDraft =
+              !draft?.consultationId || String(draft.consultationId) === String(mappedConsultation.id);
+            const mergedConsultation = shouldApplyDraft && draft?.consultationData
+              ? { ...mappedConsultation, ...draft.consultationData }
+              : mappedConsultation;
+
+            setConsultationData(mergedConsultation as ConsultationRow);
             setConsultationId(mappedConsultation.id);
+
+            if (draft?.currentStep && draft.currentStep >= 1 && draft.currentStep <= 5) {
+              setCurrentStep(draft.currentStep);
+            }
           }
         } catch (consultationError: any) {
           console.error('Failed to get or create consultation:', consultationError);
@@ -441,6 +503,11 @@ export default function Consultation() {
         };
         setConsultationData(mappedConsultation as ConsultationRow);
         setCurrentStep(2);
+        saveDraft({
+          currentStep: 2,
+          consultationId,
+          consultationData: mappedConsultation as Partial<ConsultationRow>,
+        });
       }
     } catch (e: any) {
       console.error('Failed to save clinical examination:', e.message);
@@ -463,6 +530,11 @@ export default function Consultation() {
         };
         setConsultationData(mappedConsultation as ConsultationRow);
         setCurrentStep(3);
+        saveDraft({
+          currentStep: 3,
+          consultationId,
+          consultationData: mappedConsultation as Partial<ConsultationRow>,
+        });
       }
       // Refresh procedures list after save
       try {
@@ -502,6 +574,10 @@ export default function Consultation() {
       }
       // Move to next step (Billing)
       setCurrentStep(4);
+      saveDraft({
+        currentStep: 4,
+        consultationId,
+      });
     } catch (e: any) {
       console.error('Failed to save prescription:', e.message);
       // Optionally: show error message
@@ -552,6 +628,11 @@ export default function Consultation() {
             id: fresh.id || fresh._id,
           };
           setConsultationData(mappedConsultation as ConsultationRow);
+          saveDraft({
+            currentStep: 5,
+            consultationId,
+            consultationData: mappedConsultation as Partial<ConsultationRow>,
+          });
         }
         setCurrentStep(5);
       }
@@ -628,6 +709,7 @@ export default function Consultation() {
       }
 
       // 4️⃣ Done → go back to dashboard
+      clearDraft();
       navigate('/appointments');
     } catch (e: any) {
       console.error('Failed to complete consultation:', e.message);
@@ -787,6 +869,17 @@ export default function Consultation() {
     window.addEventListener('afterprint', cleanup);
     window.print();
     setTimeout(cleanup, 1200);
+  };
+
+  const handleGoBackStep = () => {
+    if (currentStep <= 1) return;
+    const prevStep = Math.max(1, currentStep - 1);
+    setCurrentStep(prevStep);
+    saveDraft({
+      currentStep: prevStep,
+      consultationId,
+      consultationData: consultationData || undefined,
+    });
   };
 
 
@@ -1477,6 +1570,18 @@ export default function Consultation() {
         />
 
         {/* Step Content */}
+        {currentStep > 1 && (
+          <div className="mt-4">
+            <button
+              type="button"
+              onClick={handleGoBackStep}
+              className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            >
+              <IconArrowLeft size={16} />
+              Back
+            </button>
+          </div>
+        )}
         <div className="mt-6">{renderStepContent()}</div>
       </div>
     </div>

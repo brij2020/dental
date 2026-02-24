@@ -4,6 +4,7 @@ import {
   format,
   addDays,
   subDays,
+  startOfDay,
   getDaysInMonth,
   startOfMonth,
   endOfMonth,
@@ -38,14 +39,19 @@ const CalendarMonthView = ({ currentDate, onDateSelect, close }: { currentDate: 
   const [viewDate, setViewDate] = useState(currentDate || new Date());
   const start = startOfMonth(viewDate);
   const end = endOfMonth(viewDate);
-  const today = new Date();
+  const today = startOfDay(new Date());
   const daysInMonth = getDaysInMonth(viewDate);
   const startingDay = getDay(start);
+  const canGoPrevMonth = startOfMonth(viewDate).getTime() > startOfMonth(today).getTime();
 
   return (
     <div className="absolute top-full mt-2 z-10 w-80 bg-white border border-slate-200 rounded-2xl shadow-lg p-4">
       <div className="flex items-center justify-between mb-3">
-        <button onClick={() => setViewDate(subDays(start, 1))} className="p-1.5 rounded-full hover:bg-slate-100">
+        <button
+          onClick={() => canGoPrevMonth && setViewDate(subDays(start, 1))}
+          disabled={!canGoPrevMonth}
+          className="p-1.5 rounded-full hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed"
+        >
           <IconChevronLeft size={18} />
         </button>
         <p className="font-semibold text-sm">{format(viewDate, 'MMMM yyyy')}</p>
@@ -109,6 +115,14 @@ export default function FollowUp({ onComplete, isSaving, doctorId }: Props) {
   const [, setSlotDuration] = useState(15);
   const [isDayOff, setIsDayOff] = useState(false);
   const [loadingSlots, setLoadingSlots] = useState(false);
+  const today = startOfDay(new Date());
+
+  useEffect(() => {
+    if (!selectedDate) return;
+    if (isBefore(startOfDay(selectedDate), today)) {
+      setSelectedDate(today);
+    }
+  }, [selectedDate, today]);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -146,7 +160,13 @@ export default function FollowUp({ onComplete, isSaving, doctorId }: Props) {
         const combined: string[] = [];
         if (!dayConfig.morning?.is_off) combined.push(...generateSlots(dayConfig.morning.start, dayConfig.morning.end, slotMins));
         if (!dayConfig.evening?.is_off) combined.push(...generateSlots(dayConfig.evening.start, dayConfig.evening.end, slotMins));
-        setTimeSlots(combined);
+        const now = new Date();
+        const isSelectedToday = isSameDay(selectedDate, now);
+        const currentTime = format(now, 'HH:mm');
+        const filteredSlots = isSelectedToday
+          ? combined.filter((slot) => slot >= currentTime)
+          : combined;
+        setTimeSlots(filteredSlots);
 
         const bookedResp = await getBookedSlotsAPI(doctorId, dateStr);
         const bookedPayload = bookedResp?.data?.data ?? bookedResp?.data ?? bookedResp;
@@ -165,6 +185,13 @@ export default function FollowUp({ onComplete, isSaving, doctorId }: Props) {
     loadData();
   }, [selectedDate, doctorId]);
 
+  useEffect(() => {
+    if (!selectedTime) return;
+    if (!timeSlots.includes(selectedTime)) {
+      setSelectedTime('');
+    }
+  }, [timeSlots, selectedTime]);
+
   const handleComplete = () => onComplete({ followUpDate: selectedDate, followUpTime: selectedTime });
 
   const formatDateText = () => {
@@ -179,7 +206,17 @@ export default function FollowUp({ onComplete, isSaving, doctorId }: Props) {
         <h2 className="text-xl font-semibold text-slate-800">Schedule Follow-up</h2>
 
         <div className="flex items-center gap-3 border rounded-xl p-3">
-          <button onClick={() => setSelectedDate((prev) => subDays(prev || new Date(), 1))} className="p-2 rounded-lg hover:bg-slate-100">
+          <button
+            onClick={() =>
+              setSelectedDate((prev) => {
+                const base = startOfDay(prev || new Date());
+                const next = subDays(base, 1);
+                return isBefore(next, today) ? today : next;
+              })
+            }
+            disabled={!!selectedDate && isSameDay(startOfDay(selectedDate), today)}
+            className="p-2 rounded-lg hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed"
+          >
             <IconChevronLeft size={20} />
           </button>
 

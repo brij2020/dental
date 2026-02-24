@@ -65,38 +65,51 @@ export default function ConsultationPreview() {
         };
         setAppointment(normalizedAppt as AppointmentDetails);
 
-        if (normalizedAppt.patient_id) {
-          try {
-            const patientResponse = await get(`/api/patients/${normalizedAppt.patient_id}`);
-            const p = patientResponse?.data?.data;
-            if (p) {
-              setPatient({
-                id: p._id || p.id,
-                clinic_id: normalizedAppt.clinic_id,
-                file_number: p.file_number || null,
-                full_name: p.full_name,
-                date_of_birth: p.date_of_birth || null,
-                gender: p.gender || null,
-                address: p.address || null,
-                contact_number: p.contact_number || null,
-                uhid: p.uhid || '-',
-              });
-            }
-          } catch {
-            // no-op
-          }
-        }
-
-        const consultationResp = await getOrCreateConsultation(String(normalizedAppt.id), {
+        // Load patient and consultation in parallel to reduce time-to-first-render.
+        const patientPromise = normalizedAppt.patient_id
+          ? get(`/api/patients/${normalizedAppt.patient_id}`)
+          : Promise.resolve(null);
+        const consultationPromise = getOrCreateConsultation(String(normalizedAppt.id), {
           clinic_id: normalizedAppt.clinic_id,
           patient_id: normalizedAppt.patient_id,
           doctor_id: normalizedAppt.doctor_id,
         });
+
+        const [patientSettled, consultationSettled] = await Promise.allSettled([
+          patientPromise,
+          consultationPromise,
+        ]);
+
+        if (patientSettled.status === 'fulfilled' && patientSettled.value) {
+          const p = (patientSettled.value as any)?.data?.data;
+          if (p) {
+            setPatient({
+              id: p._id || p.id,
+              clinic_id: normalizedAppt.clinic_id,
+              file_number: p.file_number || null,
+              full_name: p.full_name,
+              date_of_birth: p.date_of_birth || null,
+              gender: p.gender || null,
+              address: p.address || null,
+              contact_number: p.contact_number || null,
+              uhid: p.uhid || '-',
+            });
+          }
+        }
+
+        if (consultationSettled.status !== 'fulfilled') {
+          throw new Error('Consultation not found for appointment');
+        }
+        const consultationResp: any = consultationSettled.value;
         const c = consultationResp?.data?.data || consultationResp?.data;
         if (!c) throw new Error('Consultation not found for appointment');
         const mappedConsultation = { ...c, id: c.id || c._id };
         setConsultationData(mappedConsultation as ConsultationRow);
 
+        // Show the preview page as soon as core data is ready.
+        setLoading(false);
+
+        // Load heavier secondary data in background.
         const consultationId = String(mappedConsultation.id);
         const [rxSettled, procSettled, paySettled] = await Promise.allSettled([
           prescriptionAPI.getByConsultation(consultationId),
@@ -104,27 +117,15 @@ export default function ConsultationPreview() {
           supabase.from('payments').select('*').eq('consultation_id', consultationId).order('created_at', { ascending: false }),
         ]);
 
-        if (rxSettled.status === 'fulfilled') {
-          const rx = rxSettled.value;
-          setPrescriptions(Array.isArray(rx) ? rx : (rx?.data || rx || []));
-        } else {
-          setPrescriptions([]);
-        }
+        const rx = rxSettled.status === 'fulfilled' ? rxSettled.value : [];
+        setPrescriptions(Array.isArray(rx) ? rx : ((rx as any)?.data || rx || []));
 
-        if (procSettled.status === 'fulfilled') {
-          const procResp = procSettled.value as any;
-          const procData = procResp?.data?.data || procResp?.data || procResp;
-          setProcedures(Array.isArray(procData) ? procData : (procData ? [procData] : []));
-        } else {
-          setProcedures([]);
-        }
+        const procResp = procSettled.status === 'fulfilled' ? (procSettled.value as any) : [];
+        const procData = procResp?.data?.data || procResp?.data || procResp;
+        setProcedures(Array.isArray(procData) ? procData : (procData ? [procData] : []));
 
-        if (paySettled.status === 'fulfilled') {
-          const pay = paySettled.value;
-          setPayments(pay?.data || []);
-        } else {
-          setPayments([]);
-        }
+        const pay = paySettled.status === 'fulfilled' ? paySettled.value : { data: [] };
+        setPayments((pay as any)?.data || []);
       } catch (e: any) {
         setError(e?.message || 'Failed to load preview');
       } finally {
@@ -196,7 +197,19 @@ export default function ConsultationPreview() {
   }, [procedureList]);
 
   if (loading) {
-    return <div className="min-h-screen bg-slate-100 p-8 text-slate-600">Loading preview...</div>;
+    return (
+      <div className="min-h-screen bg-slate-100 flex items-center justify-center p-6">
+        <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
+          <div className="flex flex-col items-center gap-4">
+            <div className="h-10 w-10 animate-spin rounded-full border-2 border-slate-200 border-t-sky-500" />
+            <div className="text-center">
+              <p className="text-base font-semibold text-slate-800">Loading preview</p>
+              <p className="text-sm text-slate-500">Preparing consultation details...</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   if (error || !appointment || !consultationData) {

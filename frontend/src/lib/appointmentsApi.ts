@@ -14,9 +14,12 @@ const APPOINTMENTS_API = {
  */
 type GetAppointmentsOptions = {
   date?: string;
+  startDate?: string;
+  endDate?: string;
   searchTerm?: string;
   appointmentType?: 'in_person' | 'video';
   provisional?: boolean;
+  doctorId?: string;
   page?: number;
   limit?: number;
 };
@@ -36,7 +39,7 @@ export async function getAppointments(
   options: GetAppointmentsOptions = {}
 ): Promise<AppointmentsListResult> {
   try {
-    const { date, searchTerm = '', appointmentType, provisional, page, limit } = options;
+    const { date, startDate, endDate, searchTerm = '', appointmentType, provisional, doctorId, page, limit } = options;
     const params = new URLSearchParams();
     params.append('clinic_id', clinicId);
 
@@ -45,11 +48,20 @@ export async function getAppointments(
     } else if (date) {
       params.append('date', date);
     }
+    if (startDate) {
+      params.append('startDate', startDate);
+    }
+    if (endDate) {
+      params.append('endDate', endDate);
+    }
     if (appointmentType) {
       params.append('appointment_type', appointmentType);
     }
     if (provisional !== undefined) {
       params.append('provisional', String(provisional));
+    }
+    if (doctorId) {
+      params.append('doctorId', doctorId);
     }
     if (page !== undefined) {
       params.append('page', String(page));

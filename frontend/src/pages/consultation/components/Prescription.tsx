@@ -2,8 +2,8 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { IconPlus, IconTrash } from "@tabler/icons-react";
-import { supabase } from "../../../lib/supabaseClient";
 import { remedyAPI } from "../../../lib/remedyAPI";
+import { prescriptionAPI } from "../../../lib/prescriptionAPI";
 import type { PrescriptionRowDb, RemedyRow } from "../types";
 
 // --- TYPES ---
@@ -135,13 +135,7 @@ export default function Prescription({
 
       setLoading(true);
       try {
-        const { data, error } = await supabase
-          .from("prescriptions")
-          .select("*")
-          .eq("consultation_id", consultationId)
-          .order("created_at", { ascending: true });
-
-        if (error) throw error;
+        const data = await prescriptionAPI.getByConsultation(consultationId);
 
         if (data && data.length > 0) {
           const fetchedRows = data.map((row: PrescriptionRowDb) => ({

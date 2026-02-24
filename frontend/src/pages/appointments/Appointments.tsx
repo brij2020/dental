@@ -57,6 +57,8 @@ export default function Appointments() {
   const PAGE_SIZE = 10;
   const { user } = useAuth();
   const clinicId = user?.clinic_id ?? null;
+  const isDoctorRole = user?.role === 'doctor';
+  const today = new Date().toISOString().slice(0, 10);
   const [appointmentType, setAppointmentType] = useState<'in_person' | 'video'>('in_person');
 
   const [appointments, setAppointments] = useState<AppointmentDetails[]>([]);
@@ -102,6 +104,9 @@ export default function Appointments() {
         searchTerm: debouncedSearchTerm,
         appointmentType,
         provisional: false,
+        startDate: isDoctorRole ? today : undefined,
+        endDate: isDoctorRole ? today : undefined,
+        doctorId: isDoctorRole ? user?.id : undefined,
         page: currentPage,
         limit: PAGE_SIZE,
       });
@@ -123,7 +128,7 @@ export default function Appointments() {
       }
       hasFetchedOnceRef.current = true;
     }
-  }, [PAGE_SIZE, appointmentType, clinicId, currentPage, debouncedSearchTerm]);
+  }, [PAGE_SIZE, appointmentType, clinicId, currentPage, debouncedSearchTerm, isDoctorRole, today, user?.id]);
 
   const handleUpdateConditions = async (appointmentId: string, names: string[]) => {
     // optimistic UI

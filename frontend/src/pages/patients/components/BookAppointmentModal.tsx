@@ -245,12 +245,10 @@ export default function BookAppointmentModal({ open, onClose, onSuccess, patient
     // In edit mode keep existing time selected when still available.
     if (currentAppointmentTime && slots.includes(currentAppointmentTime)) {
       setTime(currentAppointmentTime);
-    } else if (time && slots.includes(time)) {
-      setTime(time);
     } else {
       setTime('');
     }
-  }, [selectedDoctorId, date, doctors, isEditing, currentAppointmentTime, time]);
+  }, [selectedDoctorId, date, doctors, isEditing, currentAppointmentTime]);
 
   useEffect(() => {
     setBookedSlots([]); 
