@@ -20,7 +20,12 @@ import { getProfileSlots, getBookedSlotsAPI } from '../../../lib/apiClient';
 
 export type FollowUpData = { followUpDate: Date | null; followUpTime: string };
 
-type Props = { onComplete: (data: FollowUpData) => void; isSaving: boolean; doctorId: string };
+type Props = {
+  onComplete: (data: FollowUpData) => void;
+  onSelectionChange?: (data: FollowUpData) => void;
+  isSaving: boolean;
+  doctorId: string;
+};
 
 const generateSlots = (start: string | null, end: string | null, interval = 15) => {
   if (!start || !end) return [] as string[];
@@ -104,11 +109,12 @@ const CalendarMonthView = ({ currentDate, onDateSelect, close }: { currentDate: 
   );
 };
 
-export default function FollowUp({ onComplete, isSaving, doctorId }: Props) {
+export default function FollowUp({ onComplete, onSelectionChange, isSaving, doctorId }: Props) {
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [selectedTime, setSelectedTime] = useState('');
   const [isCalendarOpen, setCalendarOpen] = useState(false);
   const calendarRef = useRef<HTMLDivElement>(null);
+  const selectionChangeRef = useRef<Props['onSelectionChange']>(onSelectionChange);
 
   const [timeSlots, setTimeSlots] = useState<string[]>([]);
   const [bookedSlots, setBookedSlots] = useState<string[]>([]);
@@ -191,6 +197,14 @@ export default function FollowUp({ onComplete, isSaving, doctorId }: Props) {
       setSelectedTime('');
     }
   }, [timeSlots, selectedTime]);
+
+  useEffect(() => {
+    selectionChangeRef.current = onSelectionChange;
+  }, [onSelectionChange]);
+
+  useEffect(() => {
+    selectionChangeRef.current?.({ followUpDate: selectedDate, followUpTime: selectedTime });
+  }, [selectedDate, selectedTime]);
 
   const handleComplete = () => onComplete({ followUpDate: selectedDate, followUpTime: selectedTime });
 

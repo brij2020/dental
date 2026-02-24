@@ -101,8 +101,67 @@ const consultationSchema = new mongoose.Schema(
       default: 0,
       min: 0
     },
+    follow_up_date: {
+      type: String,
+      trim: true,
+      default: null
+    },
+    follow_up_time: {
+      type: String,
+      trim: true,
+      default: null
+    },
     medical_history: {
       type: [String],
+      default: []
+    },
+    post_procedure: {
+      diagnosed_tooth_no: {
+        type: String,
+        trim: true,
+        default: null
+      },
+      diagnosed_procedure: {
+        type: String,
+        trim: true,
+        default: null
+      },
+      status: {
+        type: String,
+        enum: ["Completed", "Scheduled"],
+        default: "Scheduled"
+      },
+      instruction: {
+        type: String,
+        trim: true,
+        default: null
+      }
+    },
+    post_procedure_items: {
+      type: [
+        {
+          diagnosed_tooth_no: {
+            type: String,
+            trim: true,
+            default: null
+          },
+          diagnosed_procedure: {
+            type: String,
+            trim: true,
+            default: null
+          },
+          status: {
+            type: String,
+            enum: ["Completed", "Scheduled"],
+            default: "Scheduled"
+          },
+          instruction: {
+            type: String,
+            trim: true,
+            default: null
+          }
+        }
+      ],
       default: []
     },
     status: {

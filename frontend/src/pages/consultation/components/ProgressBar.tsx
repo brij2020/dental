@@ -5,6 +5,7 @@ import React from 'react';
 const STEPS = [
   "Clinical Examination",
   "Procedure",
+  "Post Procedure",
   "Prescription",
   "Billing",
   "Schedule follow up / Refer",

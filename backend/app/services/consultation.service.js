@@ -24,7 +24,16 @@ const createConsultation = async (consultationData) => {
       total_paid: consultationData.total_paid || 0,
       amount_due: consultationData.amount_due || 0,
       previous_outstanding_balance: consultationData.previous_outstanding_balance || 0,
+      follow_up_date: consultationData.follow_up_date || null,
+      follow_up_time: consultationData.follow_up_time || null,
       medical_history: consultationData.medical_history || [],
+      post_procedure: consultationData.post_procedure || {
+        diagnosed_tooth_no: null,
+        diagnosed_procedure: null,
+        status: "Scheduled",
+        instruction: null
+      },
+      post_procedure_items: consultationData.post_procedure_items || [],
       status: consultationData.status || "Draft"
     });
 
@@ -113,7 +122,16 @@ const getOrCreateConsultation = async (appointmentId, consultationData) => {
       total_paid: 0,
       amount_due: 0,
       previous_outstanding_balance: 0,
-      medical_history: []
+      follow_up_date: null,
+      follow_up_time: null,
+      medical_history: [],
+      post_procedure: {
+        diagnosed_tooth_no: null,
+        diagnosed_procedure: null,
+        status: "Scheduled",
+        instruction: null
+      },
+      post_procedure_items: []
     });
 
     const savedConsultation = await newConsultation.save();

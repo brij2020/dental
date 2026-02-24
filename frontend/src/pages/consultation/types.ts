@@ -3,6 +3,14 @@
 // Custom enums from your SQL schema
 export type PaymentModeEnum = 'Cash' | 'Card' | 'UPI' | 'Bank Transfer';
 export type ConsultationStatusEnum = 'Draft' | 'Completed' | 'Cancelled';
+export type PostProcedureStatusEnum = 'Completed' | 'Scheduled';
+
+export type PostProcedureRow = {
+  diagnosed_tooth_no: string | null;
+  diagnosed_procedure: string | null;
+  status: PostProcedureStatusEnum;
+  instruction: string | null;
+};
 
 // Type for the main 'consultations' table
 export type ConsultationRow = {
@@ -24,7 +32,11 @@ export type ConsultationRow = {
   total_paid: number; // Calculated by trigger
   amount_due: number; // Calculated by trigger
   previous_outstanding_balance: number;
+  follow_up_date?: string | null;
+  follow_up_time?: string | null;
   medical_history: string[] | null;
+  post_procedure?: PostProcedureRow | null;
+  post_procedure_items?: PostProcedureRow[] | null;
   status: ConsultationStatusEnum;
   created_at: string; // ISO timestamp
   updated_at: string; // ISO timestamp

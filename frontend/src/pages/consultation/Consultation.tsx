@@ -18,6 +18,7 @@ import type { AppointmentDetails } from '../appointments/types';
 import ProgressBar from './components/ProgressBar';
 import ClinicalExamination from './components/ClinicalExamination';
 import Procedure from './components/Procedure';
+import PostProcedure, { type PostProcedureData } from './components/PostProcedure';
 import Prescription from './components/Prescription';
 import Billing from './components/Billing';
 import type { ClinicalExaminationData } from './components/ClinicalExamination';
@@ -52,6 +53,9 @@ type ConsultationDraft = {
   currentStep?: number;
   consultationId?: string | null;
   consultationData?: Partial<ConsultationRow> | null;
+  procedures?: TreatmentProcedureRow[] | null;
+  followUpDate?: string | null;
+  followUpTime?: string | null;
   savedAt?: string;
 };
 
@@ -85,6 +89,7 @@ export default function Consultation() {
   const [procedures, setProcedures] = useState<TreatmentProcedureRow[] | null>(null);
   const [payments, setPayments] = useState<any[] | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
+  const [followUpSelection, setFollowUpSelection] = useState<FollowUpData>({ followUpDate: null, followUpTime: '' });
   // Track if a procedure was just saved so preview can refresh
   const [procedureJustSaved, setProcedureJustSaved] = useState(false);
 
@@ -205,10 +210,25 @@ export default function Consultation() {
   useEffect(() => {
     const draft = readDraft();
     const step = Number(draft?.currentStep || 1);
-    if (step >= 1 && step <= 5) {
+    if (step >= 1 && step <= 6) {
       setCurrentStep(step);
     }
+    if (draft?.followUpDate) {
+      const parsedDate = new Date(draft.followUpDate);
+      setFollowUpSelection({
+        followUpDate: Number.isNaN(parsedDate.getTime()) ? null : parsedDate,
+        followUpTime: draft.followUpTime || '',
+      });
+    }
   }, [draftStorageKey]);
+
+  const handleFollowUpSelectionChange = (data: FollowUpData) => {
+    setFollowUpSelection(data);
+    saveDraft({
+      followUpDate: data.followUpDate ? format(data.followUpDate, 'yyyy-MM-dd') : null,
+      followUpTime: data.followUpTime || null,
+    });
+  };
 
   const loadPreviousConsultation = async () => {
     if (!appointment?.follow_up_for_consultation_id) return;
@@ -257,10 +277,19 @@ export default function Consultation() {
       });
 
       if (response.data && response.data.success) {
+        const nextConsultationData = consultationData
+          ? ({ ...consultationData, medical_history: selectedMedicalHistory } as Partial<ConsultationRow>)
+          : ({ medical_history: selectedMedicalHistory } as Partial<ConsultationRow>);
         // Update local state to reflect the change
         setConsultationData(prev =>
           prev ? { ...prev, medical_history: selectedMedicalHistory } : prev
         );
+        saveDraft({
+          consultationId,
+          currentStep,
+          consultationData: nextConsultationData,
+          procedures: procedures || undefined,
+        });
 
         // Optional: Close modal on success
         // setIsMedicalModalOpen(false); 
@@ -385,7 +414,7 @@ export default function Consultation() {
             setConsultationData(mergedConsultation as ConsultationRow);
             setConsultationId(mappedConsultation.id);
 
-            if (draft?.currentStep && draft.currentStep >= 1 && draft.currentStep <= 5) {
+            if (draft?.currentStep && draft.currentStep >= 1 && draft.currentStep <= 6) {
               setCurrentStep(draft.currentStep);
             }
           }
@@ -551,6 +580,51 @@ export default function Consultation() {
     }
   };
 
+  const handleSavePostProcedure = async (data: PostProcedureData[]) => {
+    if (!consultationId) return;
+    setIsSaving(true);
+    try {
+      const normalizedItems = (data || []).map((item) => ({
+        diagnosed_tooth_no: item.diagnosedToothNo || null,
+        diagnosed_procedure: item.diagnosedProcedure || null,
+        status: item.status || 'Scheduled',
+        instruction: item.instruction || null,
+      }));
+
+      const primaryItem = normalizedItems[0] || {
+        diagnosed_tooth_no: null,
+        diagnosed_procedure: null,
+        status: 'Scheduled',
+        instruction: null,
+      };
+
+      await updateConsultation(consultationId, {
+        post_procedure: primaryItem,
+        post_procedure_items: normalizedItems,
+      });
+
+      const freshResponse = await getConsultationById(consultationId);
+      if (freshResponse.data && freshResponse.data.success && freshResponse.data.data) {
+        const fresh = freshResponse.data.data;
+        const mappedConsultation = {
+          ...fresh,
+          id: fresh.id || fresh._id,
+        };
+        setConsultationData(mappedConsultation as ConsultationRow);
+        saveDraft({
+          currentStep: 4,
+          consultationId,
+          consultationData: mappedConsultation as Partial<ConsultationRow>,
+        });
+      }
+      setCurrentStep(4);
+    } catch (e: any) {
+      console.error('Failed to save post procedure:', e.message);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const handleSavePrescription = async (data: PrescriptionRow[]) => {
     if (!consultationId || !consultationData?.clinic_id) return;
     setIsSaving(true);
@@ -573,9 +647,9 @@ export default function Consultation() {
         await prescriptionAPI.saveForConsultation(consultationId, validRows);
       }
       // Move to next step (Billing)
-      setCurrentStep(4);
+      setCurrentStep(5);
       saveDraft({
-        currentStep: 4,
+        currentStep: 5,
         consultationId,
       });
     } catch (e: any) {
@@ -629,12 +703,12 @@ export default function Consultation() {
           };
           setConsultationData(mappedConsultation as ConsultationRow);
           saveDraft({
-            currentStep: 5,
+            currentStep: 6,
             consultationId,
             consultationData: mappedConsultation as Partial<ConsultationRow>,
           });
         }
-        setCurrentStep(5);
+        setCurrentStep(6);
       }
     } catch (e: any) {
       console.error('Failed to save billing:', e.message);
@@ -652,10 +726,24 @@ export default function Consultation() {
     setIsSaving(true);
 
     try {
+      const selectedFollowUpDate = data.followUpDate ? format(data.followUpDate, 'yyyy-MM-dd') : null;
+      const selectedFollowUpTime = data.followUpDate ? (data.followUpTime ? data.followUpTime : '09:00') : null;
+
       // 1️⃣ Mark the consultation itself as completed via MongoDB API
-      const statusResponse = await updateConsultation(consultationId, { status: 'Completed' });
+      const statusResponse = await updateConsultation(consultationId, {
+        status: 'Completed',
+        follow_up_date: selectedFollowUpDate,
+        follow_up_time: selectedFollowUpTime,
+      });
       if (!statusResponse.data || !statusResponse.data.success) {
         console.error('Failed to update consultation status');
+      } else if (statusResponse.data.data) {
+        const updated = statusResponse.data.data;
+        setConsultationData((prev) => ({
+          ...(prev || {}),
+          ...(updated || {}),
+          id: updated.id || updated._id || prev?.id || '',
+        } as ConsultationRow));
       }
 
       // 2️⃣ Mark the *appointment* as completed
@@ -681,19 +769,41 @@ export default function Consultation() {
 
       // 3️⃣ Create follow-up appointment via backend API if user picked a date
       if (data.followUpDate) {
+        const existingFileNumber =
+          patient?.file_number ||
+          (consultationData as any)?.file_number ||
+          (appointment as any)?.file_number ||
+          null;
+        const existingPatientId =
+          consultationData?.patient_id ||
+          appointment?.patient_id ||
+          (appointment as any)?.patient?.id ||
+          null;
+        const existingUhid =
+          patient?.uhid ||
+          (appointment as any)?.uhid ||
+          null;
+
         const payload = {
           clinic_id: consultationData.clinic_id,
-          patient_id: consultationData.patient_id,
+          patient_id: existingPatientId,
+          file_number: existingFileNumber,
+          uhid: existingUhid,
           doctor_id:
             consultationData.doctor_id ||
             (appointment as any)?.doctor_id ||
             (appointment as any)?.doctor?.profile_id ||
             (appointment as any)?.doctor?.id ||
             null,
+          doctor_name:
+            (appointment as any)?.doctor_name ||
+            (appointment as any)?.doctor?.full_name ||
+            (appointment as any)?.doctor?.name ||
+            null,
           full_name: appointment.full_name,
-          appointment_date: format(data.followUpDate, 'yyyy-MM-dd'),
+          appointment_date: selectedFollowUpDate,
           // backend expects HH:mm (no seconds)
-          appointment_time: data.followUpTime ? data.followUpTime : '09:00',
+          appointment_time: selectedFollowUpTime,
           status: 'scheduled',
           follow_up_for_consultation_id: consultationId,
         };
@@ -752,6 +862,33 @@ export default function Consultation() {
         );
       case 3:
         return (
+          <PostProcedure
+            onSaveAndContinue={handleSavePostProcedure}
+            isSaving={isSaving}
+            procedures={procedures || []}
+            initialData={
+              consultationData?.post_procedure_items && consultationData.post_procedure_items.length > 0
+                ? consultationData.post_procedure_items.map((item) => ({
+                    diagnosedToothNo: item?.diagnosed_tooth_no || '',
+                    diagnosedProcedure: item?.diagnosed_procedure || '',
+                    status: item?.status || 'Scheduled',
+                    instruction: item?.instruction || '',
+                  }))
+                : consultationData?.post_procedure?.diagnosed_tooth_no
+                  ? [
+                      {
+                        diagnosedToothNo: consultationData.post_procedure.diagnosed_tooth_no || '',
+                        diagnosedProcedure: consultationData.post_procedure.diagnosed_procedure || '',
+                        status: consultationData.post_procedure.status || 'Scheduled',
+                        instruction: consultationData.post_procedure.instruction || '',
+                      },
+                    ]
+                  : []
+            }
+          />
+        );
+      case 4:
+        return (
           <Prescription
             onSaveAndContinue={handleSavePrescription}
             isSaving={isSaving}
@@ -759,7 +896,7 @@ export default function Consultation() {
             clinicId={consultationData.clinic_id}
           />
         );
-      case 4:
+      case 5:
         return (
           <Billing
             onSaveAndContinue={handleSaveBilling}
@@ -771,7 +908,7 @@ export default function Consultation() {
             )}
           />
         );
-      case 5:
+      case 6:
         return (
           (() => {
             const followUpDoctorId = resolvedDoctorProfileId || (
@@ -782,7 +919,7 @@ export default function Consultation() {
               (appointment as any)?.doctor_profile_id ||
               ''
             );
-            console.debug('Consultation: Step-5 FollowUp using doctorId', followUpDoctorId, { consultationData, appointment, resolvedDoctorProfileId });
+            console.debug('Consultation: Step-6 FollowUp using doctorId', followUpDoctorId, { consultationData, appointment, resolvedDoctorProfileId });
 
             return (
               <div>
@@ -791,6 +928,7 @@ export default function Consultation() {
                 )}
                 <FollowUp
                   onComplete={handleCompleteConsultation}
+                  onSelectionChange={handleFollowUpSelectionChange}
                   isSaving={isSaving}
                   doctorId={followUpDoctorId}
                 />
@@ -803,6 +941,16 @@ export default function Consultation() {
     }
   };
 
+  useEffect(() => {
+    if (!consultationId) return;
+    saveDraft({
+      consultationId,
+      currentStep,
+      consultationData: consultationData || undefined,
+      procedures: procedures || undefined,
+    });
+  }, [consultationId, currentStep, consultationData, procedures]);
+
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
@@ -810,6 +958,13 @@ export default function Consultation() {
       </div>
     );
   }
+
+  const previewFollowUpDate = followUpSelection.followUpDate
+    ? format(followUpSelection.followUpDate, 'yyyy-MM-dd')
+    : consultationData?.follow_up_date || (appointment as any)?.follow_up_date || '-';
+  const previewFollowUpTime = followUpSelection.followUpDate
+    ? (followUpSelection.followUpTime || '-')
+    : consultationData?.follow_up_time || appointment?.appointment_time || '-';
 
   if (error || !appointment) {
     return (
@@ -1030,9 +1185,11 @@ export default function Consultation() {
             return (
               <FollowUp
                 onComplete={(data) => {
+                  setFollowUpSelection(data);
                   setIsFollowUpModalOpen(false);
                   handleCompleteConsultation(data);
                 }}
+                onSelectionChange={setFollowUpSelection}
                 isSaving={isSaving}
                 doctorId={followUpDoctorId}
               />
@@ -1246,6 +1403,44 @@ export default function Consultation() {
                         )}
                       </div>
 
+                      <div className="border-b border-slate-400 p-4">
+                        <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-600">Post Procedure Status</div>
+                        <div className="overflow-x-auto border border-slate-300">
+                          <table className="min-w-full text-sm">
+                            <thead className="bg-indigo-100">
+                              <tr>
+                                <th className="border border-slate-300 px-2 py-2 text-left text-xs font-semibold text-slate-700">Tooth No.</th>
+                                <th className="border border-slate-300 px-2 py-2 text-left text-xs font-semibold text-slate-700">Procedure Name</th>
+                                <th className="border border-slate-300 px-2 py-2 text-left text-xs font-semibold text-slate-700">Status</th>
+                                <th className="border border-slate-300 px-2 py-2 text-left text-xs font-semibold text-slate-700">Instruction</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {(
+                                consultationData?.post_procedure_items && consultationData.post_procedure_items.length > 0
+                                  ? consultationData.post_procedure_items
+                                  : consultationData?.post_procedure?.diagnosed_tooth_no
+                                    ? [consultationData.post_procedure]
+                                    : []
+                              ).map((item: any, idx: number) => (
+                                <tr className="bg-indigo-50" key={`post-procedure-${idx}`}>
+                                  <td className="border border-slate-300 px-2 py-2">{item?.diagnosed_tooth_no || '-'}</td>
+                                  <td className="border border-slate-300 px-2 py-2">{item?.diagnosed_procedure || '-'}</td>
+                                  <td className="border border-slate-300 px-2 py-2">{item?.status || '-'}</td>
+                                  <td className="border border-slate-300 px-2 py-2">{item?.instruction || '-'}</td>
+                                </tr>
+                              ))}
+                              {(!consultationData?.post_procedure_items || consultationData.post_procedure_items.length === 0) &&
+                                !consultationData?.post_procedure?.diagnosed_tooth_no && (
+                                  <tr className="bg-indigo-50">
+                                    <td className="border border-slate-300 px-2 py-2" colSpan={4}>-</td>
+                                  </tr>
+                                )}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+
                       <div className="p-4">
                         <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-600">Medication Cost Summary</div>
                         <div className="overflow-x-auto border border-slate-300">
@@ -1310,14 +1505,14 @@ export default function Consultation() {
                           <div className="grid grid-cols-[120px_1fr] gap-y-1 text-sm">
                             <div className="text-slate-500">Date</div><div>{issueDate}</div>
                             <div className="text-slate-500">Appointment ID</div><div>{appointment?.appointment_uid || appointment?.id || '-'}</div>
-                            <div className="text-slate-500">Follow-up Date</div><div>{(appointment as any)?.follow_up_date || '-'}</div>
+                            <div className="text-slate-500">Follow-up Date</div><div>{previewFollowUpDate}</div>
                           </div>
                         </div>
                         <div className="p-4 text-sm">
                           <div className="grid grid-cols-[120px_1fr] gap-y-1">
                             <div className="text-slate-500">Patient Name</div><div>{patientName}</div>
                             <div className="text-slate-500">Contact</div><div>{patient?.contact_number || '-'}</div>
-                            <div className="text-slate-500">Time</div><div>{appointment?.appointment_time || '-'}</div>
+                            <div className="text-slate-500">Time</div><div>{previewFollowUpTime}</div>
                           </div>
                         </div>
                       </div>

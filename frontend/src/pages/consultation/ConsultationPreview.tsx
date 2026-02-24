@@ -29,12 +29,23 @@ type PatientClinicRow = {
   uhid: string;
 };
 
+type ConsultationDraft = {
+  currentStep?: number;
+  consultationId?: string | null;
+  consultationData?: Partial<ConsultationRow> | null;
+  procedures?: TreatmentProcedureRow[] | null;
+  followUpDate?: string | null;
+  followUpTime?: string | null;
+  savedAt?: string;
+};
+
 const TOTAL_ADULT = ADULT_TOOTH_COUNT_PER_JAW * 2;
 const TOTAL_CHILD = CHILD_TOOTH_COUNT_PER_JAW * 2;
 
 export default function ConsultationPreview() {
   const { appointmentId } = useParams<{ appointmentId: string }>();
   const navigate = useNavigate();
+  const draftStorageKey = appointmentId ? `consultation:draft:${appointmentId}` : null;
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -44,6 +55,51 @@ export default function ConsultationPreview() {
   const [prescriptions, setPrescriptions] = useState<any[] | null>(null);
   const [procedures, setProcedures] = useState<TreatmentProcedureRow[] | null>(null);
   const [payments, setPayments] = useState<any[] | null>(null);
+  const [draftFollowUpDate, setDraftFollowUpDate] = useState<string | null>(null);
+  const [draftFollowUpTime, setDraftFollowUpTime] = useState<string | null>(null);
+  const [draftConsultationData, setDraftConsultationData] = useState<Partial<ConsultationRow> | null>(null);
+  const [draftProcedures, setDraftProcedures] = useState<TreatmentProcedureRow[] | null>(null);
+
+  useEffect(() => {
+    if (!draftStorageKey || typeof window === 'undefined') return;
+    try {
+      const raw = window.localStorage.getItem(draftStorageKey);
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as ConsultationDraft;
+      setDraftConsultationData(parsed?.consultationData || null);
+      setDraftProcedures(parsed?.procedures || null);
+      setDraftFollowUpDate(
+        parsed?.followUpDate ||
+          parsed?.consultationData?.follow_up_date ||
+          null,
+      );
+      setDraftFollowUpTime(
+        parsed?.followUpTime ||
+          parsed?.consultationData?.follow_up_time ||
+          null,
+      );
+    } catch {
+      setDraftConsultationData(null);
+      setDraftProcedures(null);
+      setDraftFollowUpDate(null);
+      setDraftFollowUpTime(null);
+    }
+  }, [draftStorageKey]);
+
+  useEffect(() => {
+    if (!draftConsultationData) return;
+    setConsultationData((prev) => {
+      if (!prev) return prev;
+      const pickId = (raw: { id?: unknown; _id?: unknown } | null | undefined) =>
+        raw?.id ?? raw?._id ?? null;
+      const prevId = pickId(prev as { id?: unknown; _id?: unknown });
+      const draftId = pickId(draftConsultationData as { id?: unknown; _id?: unknown });
+      if (prevId && draftId && String(prevId) !== String(draftId)) {
+        return prev;
+      }
+      return { ...prev, ...draftConsultationData } as ConsultationRow;
+    });
+  }, [draftConsultationData]);
 
   useEffect(() => {
     async function fetchAll() {
@@ -69,11 +125,13 @@ export default function ConsultationPreview() {
         const patientPromise = normalizedAppt.patient_id
           ? get(`/api/patients/${normalizedAppt.patient_id}`)
           : Promise.resolve(null);
-        const consultationPromise = getOrCreateConsultation(String(normalizedAppt.id), {
-          clinic_id: normalizedAppt.clinic_id,
-          patient_id: normalizedAppt.patient_id,
-          doctor_id: normalizedAppt.doctor_id,
-        });
+        const consultationPromise = draftConsultationData
+          ? Promise.resolve({ data: { data: draftConsultationData } })
+          : getOrCreateConsultation(String(normalizedAppt.id), {
+              clinic_id: normalizedAppt.clinic_id,
+              patient_id: normalizedAppt.patient_id,
+              doctor_id: normalizedAppt.doctor_id,
+            });
 
         const [patientSettled, consultationSettled] = await Promise.allSettled([
           patientPromise,
@@ -104,28 +162,46 @@ export default function ConsultationPreview() {
         const c = consultationResp?.data?.data || consultationResp?.data;
         if (!c) throw new Error('Consultation not found for appointment');
         const mappedConsultation = { ...c, id: c.id || c._id };
-        setConsultationData(mappedConsultation as ConsultationRow);
+        const pickId = (raw: { id?: unknown; _id?: unknown } | null | undefined) =>
+          raw?.id ?? raw?._id ?? null;
+        const shouldApplyDraft =
+          !draftConsultationData ||
+          !pickId(mappedConsultation) ||
+          !pickId(draftConsultationData as { id?: unknown; _id?: unknown }) ||
+          String(pickId(mappedConsultation)) ===
+            String(
+              pickId(draftConsultationData as { id?: unknown; _id?: unknown }),
+            );
+        const mergedConsultation =
+          shouldApplyDraft && draftConsultationData
+            ? { ...mappedConsultation, ...draftConsultationData }
+            : mappedConsultation;
+        setConsultationData(mergedConsultation as ConsultationRow);
 
         // Show the preview page as soon as core data is ready.
         setLoading(false);
 
-        // Load heavier secondary data in background.
-        const consultationId = String(mappedConsultation.id);
-        const [rxSettled, procSettled, paySettled] = await Promise.allSettled([
-          prescriptionAPI.getByConsultation(consultationId),
-          getTreatmentProceduresByConsultationId(consultationId),
-          supabase.from('payments').select('*').eq('consultation_id', consultationId).order('created_at', { ascending: false }),
-        ]);
+        // Load heavier secondary data in background only when draft is not present.
+        if (!draftConsultationData) {
+          const consultationId = String(mappedConsultation.id);
+          const [rxSettled, procSettled, paySettled] = await Promise.allSettled([
+            prescriptionAPI.getByConsultation(consultationId),
+            getTreatmentProceduresByConsultationId(consultationId),
+            supabase.from('payments').select('*').eq('consultation_id', consultationId).order('created_at', { ascending: false }),
+          ]);
 
-        const rx = rxSettled.status === 'fulfilled' ? rxSettled.value : [];
-        setPrescriptions(Array.isArray(rx) ? rx : ((rx as any)?.data || rx || []));
+          const rx = rxSettled.status === 'fulfilled' ? rxSettled.value : [];
+          setPrescriptions(Array.isArray(rx) ? rx : ((rx as any)?.data || rx || []));
 
-        const procResp = procSettled.status === 'fulfilled' ? (procSettled.value as any) : [];
-        const procData = procResp?.data?.data || procResp?.data || procResp;
-        setProcedures(Array.isArray(procData) ? procData : (procData ? [procData] : []));
+          const procResp = procSettled.status === 'fulfilled' ? (procSettled.value as any) : [];
+          const procData = procResp?.data?.data || procResp?.data || procResp;
+          setProcedures(Array.isArray(procData) ? procData : (procData ? [procData] : []));
 
-        const pay = paySettled.status === 'fulfilled' ? paySettled.value : { data: [] };
-        setPayments((pay as any)?.data || []);
+          const pay = paySettled.status === 'fulfilled' ? paySettled.value : { data: [] };
+          setPayments((pay as any)?.data || []);
+        } else if (Array.isArray(draftProcedures)) {
+          setProcedures(draftProcedures);
+        }
       } catch (e: any) {
         setError(e?.message || 'Failed to load preview');
       } finally {
@@ -133,7 +209,7 @@ export default function ConsultationPreview() {
       }
     }
     fetchAll();
-  }, [appointmentId]);
+  }, [appointmentId, draftConsultationData, draftProcedures]);
 
   const getAge = (dob: string | null) => {
     if (!dob) return '-';
@@ -175,7 +251,12 @@ export default function ConsultationPreview() {
     setTimeout(cleanup, 1200);
   };
 
-  const procedureList = Array.isArray(procedures) ? procedures : [];
+  const procedureList =
+    Array.isArray(procedures) && procedures.length > 0
+      ? procedures
+      : Array.isArray(draftProcedures)
+        ? draftProcedures
+        : [];
   const selectedFDISet = useMemo(() => {
     const set = new Set<number>();
     procedureList.forEach((p: any) => {
@@ -222,6 +303,10 @@ export default function ConsultationPreview() {
     );
   }
 
+  const effectiveConsultationData = ({
+    ...(consultationData || {}),
+    ...(draftConsultationData || {}),
+  } as ConsultationRow);
   const prescriptionList = Array.isArray(prescriptions) ? prescriptions : [];
   const paymentCount = Array.isArray(payments) ? payments.length : 0;
   const patientName = patient?.full_name || appointment.full_name || (appointment as any)?.patient_name || '-';
@@ -233,11 +318,11 @@ export default function ConsultationPreview() {
   const issueDateRaw = appointment?.appointment_date ? new Date(appointment.appointment_date) : null;
   const issueDate =
     issueDateRaw && !Number.isNaN(issueDateRaw.getTime()) ? format(issueDateRaw, 'dd/MM/yyyy') : '-';
-  const medicalHistory = Array.isArray(consultationData?.medical_history) ? consultationData.medical_history : [];
+  const medicalHistory = Array.isArray(effectiveConsultationData?.medical_history) ? effectiveConsultationData.medical_history : [];
   const clinicName =
     (appointment as any)?.clinic_name ||
     (appointment as any)?.clinic?.name ||
-    (consultationData as any)?.clinic_name ||
+    (effectiveConsultationData as any)?.clinic_name ||
     'Clinic Name';
   const renderAdultStripTooth = (toothNumber: number) => {
     const upperIndex =
@@ -251,16 +336,18 @@ export default function ConsultationPreview() {
     const isSelected = selectedFDISet.has(displayNumber);
 
     return (
-      <div key={`adult-strip-${toothNumber}`} className="flex w-8 flex-col items-center gap-0.5 sm:w-9">
-        <div className="text-[10px] font-semibold text-slate-700">{displayNumber}</div>
-        <div className="relative h-7 w-7 sm:h-8 sm:w-8">
+      <div key={`adult-strip-${toothNumber}`} className="flex w-9 flex-col items-center gap-1 sm:w-10">
+        <div className="text-[11px] font-semibold text-slate-700">{displayNumber}</div>
+        <div className="relative h-8 w-8 sm:h-9 sm:w-9">
           <img
             src={svgSrc}
             alt={`Tooth ${displayNumber}`}
             className={`h-full w-full ${isLower ? '-scale-y-100' : ''}`}
           />
           {isSelected && (
-            <span className="absolute -right-1 -top-2 text-[11px] font-extrabold leading-none text-rose-600">**</span>
+            <span className="absolute -right-2 -top-3 rounded-full border border-rose-300 bg-white px-1.5 py-0.5 text-[12px] font-black leading-none text-rose-600 shadow-sm">
+              **
+            </span>
           )}
         </div>
       </div>
@@ -279,16 +366,18 @@ export default function ConsultationPreview() {
     const isSelected = selectedFDISet.has(displayNumber);
 
     return (
-      <div key={`child-strip-${childToothNumber}`} className="flex w-7 flex-col items-center gap-0.5 sm:w-8">
-        <div className="text-[10px] font-semibold text-slate-700">{displayNumber}</div>
-        <div className="relative h-6 w-6 sm:h-7 sm:w-7">
+      <div key={`child-strip-${childToothNumber}`} className="flex w-8 flex-col items-center gap-1 sm:w-9">
+        <div className="text-[11px] font-semibold text-slate-700">{displayNumber}</div>
+        <div className="relative h-7 w-7 sm:h-8 sm:w-8">
           <img
             src={svgSrc}
             alt={`Tooth ${displayNumber}`}
             className={`h-full w-full ${isLower ? '-scale-y-100' : ''}`}
           />
           {isSelected && (
-            <span className="absolute -right-1 -top-2 text-[11px] font-extrabold leading-none text-rose-600">**</span>
+            <span className="absolute -right-2 -top-3 rounded-full border border-rose-300 bg-white px-1.5 py-0.5 text-[12px] font-black leading-none text-rose-600 shadow-sm">
+              **
+            </span>
           )}
         </div>
       </div>
@@ -401,14 +490,16 @@ export default function ConsultationPreview() {
           <div className="border-b border-slate-400 p-4">
             <div className="grid grid-cols-1 gap-3">
               <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-600">Chief Complaint</div>
-              <div className="min-h-20 rounded border border-slate-300 bg-slate-50 px-3 py-2 text-sm whitespace-pre-wrap">{consultationData?.chief_complaints || '-'}</div>
+              <div className="min-h-20 rounded border border-slate-300 bg-slate-50 px-3 py-2 text-sm whitespace-pre-wrap">{effectiveConsultationData?.chief_complaints || '-'}</div>
               <div className="mt-3 mb-2 text-xs font-semibold uppercase tracking-wide text-slate-600">Medical History</div>
               <div className="min-h-20 rounded border border-slate-300 bg-slate-50 px-3 py-2 text-sm">{medicalHistory.length > 0 ? medicalHistory.join(', ') : '-'}</div>
             </div>
             <div>
               <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-600">Dental Chart Overview</div>
               <div className="rounded border border-slate-300 bg-white p-3">
-                <div className="mb-2 text-[11px] text-slate-500">Selected teeth are marked with **</div>
+                <div className="mb-2 text-xs text-slate-600">
+                  Selected teeth are marked with <span className="rounded-full border border-rose-300 bg-white px-1.5 py-0.5 text-[11px] font-black text-rose-600">**</span>
+                </div>
                 <div className="space-y-3">
                   <div>
                     <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500">Adult Upper</div>
@@ -450,19 +541,19 @@ export default function ConsultationPreview() {
             <div className="space-y-3 border-b border-slate-400 p-4 text-sm">
             <div>
               <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-600">Clinical Examination (On Examination)</div>
-              <div className="min-h-14 rounded border border-slate-300 bg-slate-50 px-3 py-2 whitespace-pre-wrap">{consultationData?.on_examination || '-'}</div>
+              <div className="min-h-14 rounded border border-slate-300 bg-slate-50 px-3 py-2 whitespace-pre-wrap">{effectiveConsultationData?.on_examination || '-'}</div>
             </div>
             <div>
               <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-600">Diagnosis</div>
-              <div className="min-h-14 rounded border border-slate-300 bg-slate-50 px-3 py-2 whitespace-pre-wrap">{consultationData?.on_examination || '-'}</div>
+              <div className="min-h-14 rounded border border-slate-300 bg-slate-50 px-3 py-2 whitespace-pre-wrap">{effectiveConsultationData?.on_examination || '-'}</div>
             </div>
             <div>
               <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-600">Advice</div>
-              <div className="min-h-14 rounded border border-slate-300 bg-slate-50 px-3 py-2 whitespace-pre-wrap">{consultationData?.advice || '-'}</div>
+              <div className="min-h-14 rounded border border-slate-300 bg-slate-50 px-3 py-2 whitespace-pre-wrap">{effectiveConsultationData?.advice || '-'}</div>
             </div>
             <div>
               <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-600">Notes</div>
-              <div className="min-h-14 rounded border border-slate-300 bg-slate-50 px-3 py-2 whitespace-pre-wrap">{consultationData?.notes || '-'}</div>
+              <div className="min-h-14 rounded border border-slate-300 bg-slate-50 px-3 py-2 whitespace-pre-wrap">{effectiveConsultationData?.notes || '-'}</div>
             </div>
           </div>
 
@@ -525,6 +616,44 @@ export default function ConsultationPreview() {
             </div>
           </div>
 
+          <div className="border-b border-slate-400 p-4">
+            <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-600">Post Procedure Status</div>
+            <div className="overflow-x-auto border border-slate-300">
+              <table className="min-w-full text-sm">
+                <thead className="bg-indigo-100">
+                  <tr>
+                    <th className="border border-slate-300 px-2 py-2 text-left text-xs font-semibold text-slate-700">Tooth No.</th>
+                    <th className="border border-slate-300 px-2 py-2 text-left text-xs font-semibold text-slate-700">Procedure Name</th>
+                    <th className="border border-slate-300 px-2 py-2 text-left text-xs font-semibold text-slate-700">Status</th>
+                    <th className="border border-slate-300 px-2 py-2 text-left text-xs font-semibold text-slate-700">Instruction</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(
+                    effectiveConsultationData?.post_procedure_items && effectiveConsultationData.post_procedure_items.length > 0
+                      ? effectiveConsultationData.post_procedure_items
+                      : effectiveConsultationData?.post_procedure?.diagnosed_tooth_no
+                        ? [effectiveConsultationData.post_procedure]
+                        : []
+                  ).map((item: any, idx: number) => (
+                    <tr className="bg-indigo-50" key={`post-procedure-preview-${idx}`}>
+                      <td className="border border-slate-300 px-2 py-2">{item?.diagnosed_tooth_no || '-'}</td>
+                      <td className="border border-slate-300 px-2 py-2">{item?.diagnosed_procedure || '-'}</td>
+                      <td className="border border-slate-300 px-2 py-2">{item?.status || '-'}</td>
+                      <td className="border border-slate-300 px-2 py-2">{item?.instruction || '-'}</td>
+                    </tr>
+                  ))}
+                  {(!effectiveConsultationData?.post_procedure_items || effectiveConsultationData.post_procedure_items.length === 0) &&
+                    !effectiveConsultationData?.post_procedure?.diagnosed_tooth_no && (
+                      <tr className="bg-indigo-50">
+                        <td className="border border-slate-300 px-2 py-2" colSpan={4}>-</td>
+                      </tr>
+                    )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
           <div className="p-4">
             <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-600">Medication Cost Summary</div>
             <div className="overflow-x-auto border border-slate-300">
@@ -557,7 +686,7 @@ export default function ConsultationPreview() {
 
           <div className="advice-block border-b border-slate-400 p-4">
             <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-600">Advice</div>
-            <div className="min-h-48 rounded border border-slate-300 bg-slate-50 px-3 py-2 text-sm whitespace-pre-wrap">{consultationData?.advice || '-'}</div>
+            <div className="min-h-48 rounded border border-slate-300 bg-slate-50 px-3 py-2 text-sm whitespace-pre-wrap">{effectiveConsultationData?.advice || '-'}</div>
           </div>
 
           <div className="grid grid-cols-1 border-b border-slate-400 sm:grid-cols-2">
@@ -565,14 +694,14 @@ export default function ConsultationPreview() {
               <div className="grid grid-cols-[120px_1fr] gap-y-1 text-sm">
                 <div className="text-slate-500">Date</div><div>{issueDate}</div>
                 <div className="text-slate-500">Appointment ID</div><div>{appointment?.appointment_uid || appointment?.id || '-'}</div>
-                <div className="text-slate-500">Follow-up Date</div><div>{(appointment as any)?.follow_up_date || '-'}</div>
+                <div className="text-slate-500">Follow-up Date</div><div>{draftFollowUpDate || effectiveConsultationData?.follow_up_date || (appointment as any)?.follow_up_date || '-'}</div>
               </div>
             </div>
             <div className="p-4 text-sm">
               <div className="grid grid-cols-[120px_1fr] gap-y-1">
                 <div className="text-slate-500">Patient Name</div><div>{patientName}</div>
                 <div className="text-slate-500">Contact</div><div>{patient?.contact_number || '-'}</div>
-                <div className="text-slate-500">Time</div><div>{appointment?.appointment_time || '-'}</div>
+                <div className="text-slate-500">Time</div><div>{draftFollowUpTime || effectiveConsultationData?.follow_up_time || appointment?.appointment_time || '-'}</div>
               </div>
             </div>
           </div>
