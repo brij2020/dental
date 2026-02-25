@@ -6,8 +6,13 @@ const clinicPanelService = require("../services/clinicPanel.service");
  */
 exports.create = async (req, res) => {
   try {
+    const isSuperAdmin = req.user?.role === "super_admin";
+    const resolvedClinicId = isSuperAdmin
+      ? "system"
+      : (req.user?.clinic_id || req.body.clinic_id);
+
     // Validate required fields
-    if (!req.body.name || !req.body.code || !req.body.clinic_id) {
+    if (!req.body.name || !req.body.code || !resolvedClinicId) {
       return res.status(400).send({
         message: "name, code, and clinic_id are required"
       });
@@ -15,7 +20,7 @@ exports.create = async (req, res) => {
 
     // Check if panel code already exists for this clinic
     const existsPanel = await clinicPanelService.checkPanelExists(
-      req.body.clinic_id,
+      resolvedClinicId,
       req.body.code
     );
 
@@ -28,7 +33,7 @@ exports.create = async (req, res) => {
     const panelData = {
       name: req.body.name,
       code: req.body.code,
-      clinic_id: req.body.clinic_id,
+      clinic_id: resolvedClinicId,
       description: req.body.description,
       specialization: req.body.specialization,
       is_active: req.body.is_active !== undefined ? req.body.is_active : true,
@@ -96,6 +101,36 @@ exports.findAll = async (req, res) => {
     logger.error(`Error retrieving panels: ${err.message}`);
     res.status(500).send({
       message: err.message || "Error retrieving panels"
+    });
+  }
+};
+
+/**
+ * Get all panels for clinic + system scope
+ */
+exports.findAllClinicAndSystem = async (req, res) => {
+  try {
+    const clinic_id = req.query.clinic_id || req.user?.clinic_id;
+    if (!clinic_id) {
+      return res.status(400).send({
+        message: "clinic_id is required",
+      });
+    }
+
+    const filters = {
+      is_active: req.query.is_active === "true" ? true : req.query.is_active === "false" ? false : undefined,
+      status: req.query.status,
+      search: req.query.search,
+      page: parseInt(req.query.page, 10) || 1,
+      limit: parseInt(req.query.limit, 10) || 10,
+    };
+
+    const result = await clinicPanelService.getPanelsForClinicAndSystem(clinic_id, filters);
+    res.send(result);
+  } catch (err) {
+    logger.error(`Error retrieving clinic+system panels: ${err.message}`);
+    res.status(500).send({
+      message: err.message || "Error retrieving clinic+system panels",
     });
   }
 };

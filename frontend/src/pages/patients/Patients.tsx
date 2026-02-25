@@ -2,6 +2,7 @@ import  { useEffect, useState, useRef } from 'react';
 import { useAuth } from '../../state/useAuth';
 import { toast } from 'react-toastify';
 import { IconUserCircle, IconCheck, IconTrash } from '@tabler/icons-react';
+import { useNavigate } from 'react-router-dom';
 import SearchBar from './components/SearchBar';
 import PatientList from './components/PatientList';
 import AddPatientModal from './components/AddPatientModal';
@@ -13,6 +14,7 @@ import type { ClinicPatientRow } from './types';
 
 export default function Patients() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const clinicId = user?.clinic_id ?? null;
 
   const [searchTerm, setSearchTerm] = useState('');
@@ -237,6 +239,11 @@ export default function Patients() {
               <>
                 <PatientList 
                   onBookAppointment={handleOpenBookAppointmentModal} 
+                  onViewHistory={(patient) => {
+                    const historyPatientId = patient.patient_id || patient.id;
+                    if (!historyPatientId) return;
+                    navigate(`/patients/${historyPatientId}/history`);
+                  }}
                   searchTerm={searchTerm} 
                   loading={loading} 
                   error={error} 

@@ -61,15 +61,7 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({ appointment, appointm
         scheduled: "bg-sky-50 text-sky-700 border border-sky-100",
     };
 
-    const statusTextClasses = {
-        completed: "text-emerald-700",
-        cancelled: "text-rose-700",
-        missed: "text-amber-700",
-        scheduled: "text-sky-700",
-    };
-
     const badgeClass = statusBadgeClasses[appointment?.status as keyof typeof statusBadgeClasses] || "bg-slate-50 text-slate-700 border border-slate-100";
-    const textClass = statusTextClasses[appointment?.status as keyof typeof statusTextClasses] || "text-slate-900";
 
     return (
         <div className={`flex items-center border border-gray-300 bg-white ${appointmentType === "missed" ? "opacity-65" : ""} rounded-sm py-4 px-4 relative ${className}`}>
@@ -134,6 +126,15 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({ appointment, appointm
                                     <span className="material-symbols-sharp text-[16px]">info</span>
                                     <p className='text-[13px]'>View Details</p>
                                 </div>
+                                {(appointmentType === "previous" && String(appointment?.status || "").toLowerCase() === "completed") && (
+                                  <div
+                                    onClick={() => navigate(`/consultation-history/${appointment?.id || appointment?._id}`)}
+                                    className='flex items-center gap-3 rounded-sm p-1.5 cursor-pointer text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900'
+                                  >
+                                      <span className="material-symbols-sharp text-[16px]">clinical_notes</span>
+                                      <p className='text-[13px]'>View Consultation Summary</p>
+                                  </div>
+                                )}
                                 {
                                     appointmentType === "missed" && (
                                         <div

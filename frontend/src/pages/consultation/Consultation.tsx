@@ -32,7 +32,7 @@ import type { TreatmentProcedureRow } from './types';
 import { Modal } from '../../components/Modal';
 import PatientDetailModal from './PatientDetailModal';
 // --- UPDATED: Imports for icons ---
-import { IconUser, IconClipboardList, IconArrowLeft } from '@tabler/icons-react';
+import { IconUser, IconClipboardList, IconArrowLeft, IconDownload, IconFileText } from '@tabler/icons-react';
 
 // Local shape for patients_clinic row (minimal fields used in UI)
 type PatientClinicRow = {
@@ -76,6 +76,9 @@ export default function Consultation() {
   const { appointmentId } = useParams<{ appointmentId: string }>();
   const navigate = useNavigate();
   const draftStorageKey = appointmentId ? `consultation:draft:${appointmentId}` : null;
+  const consentStorageKey = appointmentId ? `consultation:consent:ack:v2:${appointmentId}` : null;
+  const consentDocUrl = '/docs/Consent_form.docx';
+  const consentPreviewUrl = '/docs/Consent_form.html';
 
   const [appointment, setAppointment] = useState<AppointmentDetails | null>(null);
   const [loading, setLoading] = useState(true);
@@ -87,6 +90,7 @@ export default function Consultation() {
   const [isMedicalModalOpen, setIsMedicalModalOpen] = useState(false);
   const [isPatientModalOpen, setIsPatientModalOpen] = useState(false);
   const [isFollowUpModalOpen, setIsFollowUpModalOpen] = useState(false);
+  const [isConsentStartModalOpen, setIsConsentStartModalOpen] = useState(false);
   const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
   const [prescriptions, setPrescriptions] = useState<any[] | null>(null);
   const [procedures, setProcedures] = useState<TreatmentProcedureRow[] | null>(null);
@@ -164,6 +168,8 @@ export default function Consultation() {
     Partial<ConsultationRow> | null
   >(null);
   const [loadingPrev, setLoadingPrev] = useState(false);
+  const [consentAcknowledged, setConsentAcknowledged] = useState(false);
+  const [consentCheckedAtStart, setConsentCheckedAtStart] = useState(false);
   const normalizedRole = String(user?.role || '').toLowerCase();
   const isDoctorRole = normalizedRole === 'doctor';
   const isAdminRole = normalizedRole === 'admin';
@@ -195,6 +201,7 @@ export default function Consultation() {
   };
 
   const canEditStep = (step: number) => {
+    if (!consentAcknowledged) return false;
     if (isDoctorRole || isAdminRole) return step >= 1 && step <= 4;
     if (isReceptionistRole) return step >= 5 && step <= 6 && allFirst4Complete;
     return true;
@@ -1083,6 +1090,46 @@ export default function Consultation() {
     });
   }, [consultationId, currentStep, consultationData, procedures]);
 
+  useEffect(() => {
+    if (!consentStorageKey || typeof window === 'undefined') return;
+    try {
+      const alreadyAccepted = window.localStorage.getItem(consentStorageKey) === 'accepted';
+      setConsentAcknowledged(alreadyAccepted);
+      if (!alreadyAccepted) {
+        setIsConsentStartModalOpen(true);
+      } else {
+        setConsentCheckedAtStart(true);
+      }
+    } catch {
+      setConsentAcknowledged(false);
+      setIsConsentStartModalOpen(true);
+    }
+  }, [consentStorageKey]);
+
+  const handleAcceptConsentAtStart = () => {
+    if (!consentCheckedAtStart) return;
+    if (!consentStorageKey || typeof window === 'undefined') {
+      setConsentAcknowledged(true);
+      setIsConsentStartModalOpen(false);
+      return;
+    }
+    try {
+      window.localStorage.setItem(consentStorageKey, 'accepted');
+    } catch {
+      // non-blocking
+    }
+    setConsentAcknowledged(true);
+    setIsConsentStartModalOpen(false);
+  };
+
+  const handleCloseConsentModal = () => {
+    if (!consentAcknowledged) {
+      setStepAccessMessage('Confirm Patient Consent before starting consultation.');
+      return;
+    }
+    setIsConsentStartModalOpen(false);
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
@@ -1240,7 +1287,6 @@ export default function Consultation() {
     navigate('/appointments');
   };
 
-
   return (
     <div className="min-h-screen bg-slate-100 p-4 sm:p-6 lg:p-8">
       <style>
@@ -1379,6 +1425,67 @@ export default function Consultation() {
             </div>
           </div>
         </div>
+
+        <Modal
+          isOpen={isConsentStartModalOpen}
+          onClose={handleCloseConsentModal}
+          title="Consent Required"
+          panelClassName="max-w-2xl"
+        >
+          <div className="space-y-4">
+            <div className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900">
+              Please review the consent form before starting this consultation.
+            </div>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <a
+                href={consentPreviewUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+              >
+                <IconFileText className="h-4 w-4" />
+                View Consent Document
+              </a>
+              <a
+                href={consentDocUrl}
+                download="Consent_form.docx"
+                className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+              >
+                <IconDownload className="h-4 w-4" />
+                Download Consent Form
+              </a>
+            </div>
+            <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-600">
+              This acknowledgment is saved per consultation and will not ask again for this appointment.
+            </div>
+            <label className="flex items-start gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
+              <input
+                type="checkbox"
+                className="mt-0.5 h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
+                checked={consentCheckedAtStart}
+                onChange={(e) => setConsentCheckedAtStart(e.target.checked)}
+              />
+              <span>I confirm that patient consent has been reviewed and acknowledged.</span>
+            </label>
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={handleCloseConsentModal}
+                className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+              >
+                Later
+              </button>
+              <button
+                type="button"
+                onClick={handleAcceptConsentAtStart}
+                disabled={!consentCheckedAtStart}
+                className="rounded-xl bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                Confirm Patient Consent
+              </button>
+            </div>
+          </div>
+        </Modal>
 
         <Modal
           isOpen={isFollowUpModalOpen}
@@ -2006,6 +2113,11 @@ export default function Consultation() {
         <div className={`mt-6 ${isCurrentStepReadOnly ? 'pointer-events-none opacity-80' : ''}`}>
           {renderStepContent()}
         </div>
+        {!consentAcknowledged && (
+          <div className="mt-3 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-800">
+            Consent form pending. Please review from the consent prompt for this consultation.
+          </div>
+        )}
         {isCurrentStepReadOnly && (
           <div className="mt-3 rounded-lg border border-orange-200 bg-orange-50 px-3 py-2 text-xs text-orange-800">
             {isDoctorRole

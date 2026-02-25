@@ -13,9 +13,10 @@ type Props = {
   patients: ClinicPatientRow[];
   totalCount?: number;
   onBookAppointment: (patient: ClinicPatientRow) => void;
+  onViewHistory?: (patient: ClinicPatientRow) => void;
 };
 
-export default function PatientList({ searchTerm, loading, error, patients, totalCount, onBookAppointment }: Props) {
+export default function PatientList({ searchTerm, loading, error, patients, totalCount, onBookAppointment, onViewHistory }: Props) {
   const [sortBy, setSortBy] = useState<SortBy>('name');
   const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
   const [sortedPatients, setSortedPatients] = useState<ClinicPatientRow[]>([]);
@@ -183,14 +184,25 @@ export default function PatientList({ searchTerm, loading, error, patients, tota
                           {computeAge(p.date_of_birth) || '—'}
                         </td>
                         <td className="px-6 py-4 text-center">
-                          <button
-                            onClick={() => onBookAppointment(p)}
-                            className="inline-flex items-center justify-center gap-2 px-4 py-2 text-xs font-semibold text-white transition bg-gradient-to-r from-sky-500 to-cyan-400 rounded-lg shadow-sm hover:brightness-110 active:brightness-95"
-                            title="Book an appointment"
-                          >
-                            <IconCalendarPlus size={16} />
-                            <span>Book</span>
-                          </button>
+                          <div className="flex items-center justify-center gap-2">
+                            <button
+                              onClick={() => onBookAppointment(p)}
+                              className="inline-flex items-center justify-center gap-2 px-4 py-2 text-xs font-semibold text-white transition bg-gradient-to-r from-sky-500 to-cyan-400 rounded-lg shadow-sm hover:brightness-110 active:brightness-95"
+                              title="Book an appointment"
+                            >
+                              <IconCalendarPlus size={16} />
+                              <span>Book</span>
+                            </button>
+                            {onViewHistory && (
+                              <button
+                                onClick={() => onViewHistory(p)}
+                                className="inline-flex items-center justify-center gap-2 px-3 py-2 text-xs font-semibold rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50"
+                                title="View consultation history"
+                              >
+                                <span>History</span>
+                              </button>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     ))}

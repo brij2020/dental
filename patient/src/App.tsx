@@ -17,6 +17,7 @@ import UserProfileSetting from "./pages/UserProfileSetting";
 import MissedAppointments from "./pages/MissedAppointments";
 import RecentAppointments from "./pages/RecentAppointments";
 import ProtectedRoute from "./Components/ProtectedRoute";
+import ConsultationHistory from "./pages/ConsultationHistory";
 
 function App() {
   return (
@@ -57,6 +58,14 @@ function App() {
           <Route
             path="recent-appointments"
             element={<RecentAppointments />}
+          />
+          <Route
+            path="consultation-history"
+            element={<ConsultationHistory />}
+          />
+          <Route
+            path="consultation-history/:appointmentId"
+            element={<ConsultationHistory />}
           />
           <Route path="user-info/:userId" element={<UserInfo />} />
           <Route

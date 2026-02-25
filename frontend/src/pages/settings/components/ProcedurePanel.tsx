@@ -18,7 +18,7 @@ import {
 } from '@tabler/icons-react';
 import {
   getProcedures,
-  getAllClinicPanels,
+  getCombinedClinicPanels,
   createProcedure,
   updateProcedure,
   deleteProcedure,
@@ -49,7 +49,7 @@ type ProcedureFormData = {
   name: string;
   procedure_type: string;
   description: string;
-  cost: number;
+  cost: string;
   note: string;
 };
 type ClinicPanelOption = {
@@ -78,7 +78,7 @@ const newFormState = (): ProcedureFormData => ({
   name: '',
   procedure_type: 'General',
   description: '',
-  cost: 0,
+  cost: '',
   note: '',
 });
 
@@ -144,19 +144,19 @@ export default function ProcedurePanel() {
     fetchProcedures();
   }, [fetchProcedures]);
 
-  useEffect(() => {
-    const fetchClinicPanels = async () => {
-      if (!user?.clinic_id) return;
-      try {
-        const response = await getAllClinicPanels(user.clinic_id, { limit: 200 });
-        setClinicPanels(response.data?.data || []);
-      } catch (error) {
-        console.error('Error fetching clinic panels for procedures:', error);
-      }
-    };
-
-    fetchClinicPanels();
+  const fetchClinicPanels = useCallback(async () => {
+    if (!user?.clinic_id) return;
+    try {
+      const response = await getCombinedClinicPanels(user.clinic_id, { limit: 200 });
+      setClinicPanels(response.data?.data || []);
+    } catch (error) {
+      console.error('Error fetching clinic panels for procedures:', error);
+    }
   }, [user?.clinic_id]);
+
+  useEffect(() => {
+    fetchClinicPanels();
+  }, [fetchClinicPanels]);
 
   // --- Sorting Handler ---
   const handleSort = (column: 'name' | 'procedure_type' | 'cost' | 'description' | 'note') => {
@@ -202,6 +202,7 @@ export default function ProcedurePanel() {
     setFormData(newFormState());
     setModalMode('add');
     setIsModalOpen(true);
+    void fetchClinicPanels();
   };
 
   const handleOpenEditModal = (proc: Procedure) => {
@@ -211,7 +212,7 @@ export default function ProcedurePanel() {
       name: proc.name,
       procedure_type: proc.procedure_type,
       description: proc.description || '',
-      cost: proc.cost,
+      cost: String(proc.cost ?? ''),
       note: proc.note || '',
     });
     setModalMode('edit');
@@ -229,15 +230,28 @@ export default function ProcedurePanel() {
     const { name, value } = e.target;
     if (!formData) return;
 
+    if (name === 'cost') {
+      // Text field that accepts only positive decimal values.
+      if (value !== '' && !/^\d*\.?\d*$/.test(value)) {
+        return;
+      }
+    }
+
     setFormData(prev => ({
       ...prev!,
-      [name]: name === 'cost' ? Number(value) : value,
+      [name]: value,
     }));
   };
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!formData || !user?.clinic_id) return;
+
+    const parsedCost = Number(formData.cost);
+    if (!Number.isFinite(parsedCost) || parsedCost <= 0) {
+      toast.error('Cost must be a positive number.');
+      return;
+    }
 
     setIsSaving(true);
 
@@ -248,7 +262,7 @@ export default function ProcedurePanel() {
         name: formData.name.trim(),
         procedure_type: formData.procedure_type,
         description: formData.description.trim() || null,
-        cost: formData.cost,
+        cost: parsedCost,
         note: formData.note.trim() || null,
       };
 
@@ -448,19 +462,22 @@ export default function ProcedurePanel() {
       {/* --- Add/Edit Modal --- */}
       {isModalOpen && formData && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+          className="fixed inset-0 z-50 flex items-start justify-center p-3 sm:items-center sm:p-4 bg-black/50 backdrop-blur-sm overflow-y-auto"
           aria-labelledby="modal-title"
           role="dialog"
           aria-modal="true"
         >
-          <div className="w-full max-w-lg max-h-[90vh] p-6 bg-white border shadow-xl rounded-2xl overflow-hidden">
-            <form onSubmit={handleSubmit} className="flex h-full flex-col">
+          <div className="w-full max-w-2xl max-h-[88vh] my-6 bg-white border shadow-xl rounded-2xl overflow-hidden">
+            <form onSubmit={handleSubmit} className="flex h-full max-h-[88vh] flex-col">
               {/* Modal Header */}
-              <div className="flex items-start justify-between">
+              <div className="flex items-start justify-between border-b border-slate-200 px-6 py-4 bg-white">
                 <div>
                   <h3 id="modal-title" className="text-lg font-semibold text-slate-800">
                     {modalMode === 'add' ? 'Add Procedure' : 'Edit Procedure'}
                   </h3>
+                  <p className="mt-0.5 text-sm text-slate-500">
+                    Keep this concise so staff can select and bill quickly.
+                  </p>
                 </div>
                 <button
                   type="button"
@@ -472,7 +489,7 @@ export default function ProcedurePanel() {
               </div>
 
               {/* Modal Body */}
-              <div className="mt-6 space-y-4 overflow-y-auto pr-1">
+              <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-6 py-4 pr-4">
                 {/* Panel */}
                 <div>
                   <label
@@ -569,13 +586,12 @@ export default function ProcedurePanel() {
                       <IconCash className="w-5 h-5 text-slate-400" />
                     </span>
                     <input
-                      type="number"
+                      type="text"
+                      inputMode="decimal"
                       id="cost"
                       name="cost"
                       value={formData.cost}
                       onChange={handleFormChange}
-                      min="0"
-                      step="0.01"
                       required
                       className="w-full py-2.5 pl-10 pr-3 text-slate-900 bg-white border border-slate-300 rounded-xl outline-none focus:ring-4 focus:ring-sky-300/40 focus:border-sky-400 transition"
                       placeholder="e.g., 500"
@@ -633,7 +649,7 @@ export default function ProcedurePanel() {
               </div>
 
               {/* Modal Footer */}
-              <div className="flex justify-end gap-3 mt-8 pt-4 border-t">
+              <div className="flex justify-end gap-3 border-t border-slate-200 px-6 py-4 bg-white">
                 <button
                   type="button"
                   onClick={handleCloseModal}

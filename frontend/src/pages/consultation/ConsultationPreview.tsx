@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { format } from 'date-fns';
 import spaiLogo from '../../assets/spai.jpeg';
-import { get, getAppointmentById, getOrCreateConsultation, getTreatmentProceduresByConsultationId } from '../../lib/apiClient';
+import { get, getAppointmentById, getConsultationById, getOrCreateConsultation, getTreatmentProceduresByConsultationId } from '../../lib/apiClient';
 import { prescriptionAPI } from '../../lib/prescriptionAPI';
 import { supabase } from '../../lib/supabaseClient';
 import type { AppointmentDetails } from '../appointments/types';
@@ -116,8 +116,29 @@ export default function ConsultationPreview() {
       setLoading(true);
       setError(null);
       try {
-        const apptResp = await getAppointmentById(appointmentId);
-        const apptDataRaw = apptResp?.data?.data || apptResp?.data;
+        let apptDataRaw: any = null;
+        let preloadedConsultation: any = null;
+        let resolvedAppointmentId = appointmentId;
+
+        try {
+          const apptResp = await getAppointmentById(appointmentId);
+          apptDataRaw = apptResp?.data?.data || apptResp?.data;
+        } catch {
+          // Fallback: route param may be a consultation ID instead of appointment ID.
+          const consultationResp = await getConsultationById(appointmentId);
+          const consultationRaw = consultationResp?.data?.data || consultationResp?.data;
+          if (!consultationRaw?.appointment_id) {
+            throw new Error('Appointment not found');
+          }
+          preloadedConsultation = {
+            ...consultationRaw,
+            id: consultationRaw.id || consultationRaw._id,
+          };
+          resolvedAppointmentId = String(consultationRaw.appointment_id);
+          const apptRespFromConsultation = await getAppointmentById(resolvedAppointmentId);
+          apptDataRaw = apptRespFromConsultation?.data?.data || apptRespFromConsultation?.data;
+        }
+
         if (!apptDataRaw) throw new Error('Appointment not found');
         const normalizedAppt = {
           ...apptDataRaw,
@@ -129,11 +150,13 @@ export default function ConsultationPreview() {
         const patientPromise = normalizedAppt.patient_id
           ? get(`/api/patients/${normalizedAppt.patient_id}`)
           : Promise.resolve(null);
-        const consultationPromise = getOrCreateConsultation(String(normalizedAppt.id), {
-          clinic_id: normalizedAppt.clinic_id,
-          patient_id: normalizedAppt.patient_id,
-          doctor_id: normalizedAppt.doctor_id,
-        });
+        const consultationPromise = preloadedConsultation
+          ? Promise.resolve({ data: { data: preloadedConsultation } })
+          : getOrCreateConsultation(String(normalizedAppt.id || resolvedAppointmentId), {
+              clinic_id: normalizedAppt.clinic_id,
+              patient_id: normalizedAppt.patient_id,
+              doctor_id: normalizedAppt.doctor_id,
+            });
 
         const [patientSettled, consultationSettled] = await Promise.allSettled([
           patientPromise,

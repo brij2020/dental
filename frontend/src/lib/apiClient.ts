@@ -221,6 +221,13 @@ export const getAllClinicPanels = async (clinicId: string, params?: any): Promis
 };
 
 /**
+ * Get clinic + system panels (combined scope)
+ */
+export const getCombinedClinicPanels = async (clinicId: string, params?: any): Promise<AxiosResponse<any>> => {
+  return get(`/api/clinic-panels/combined?clinic_id=${clinicId}`, { params });
+};
+
+/**
  * Get all clinic panels
  */
 export const getClinicPanels = async (clinicId: string): Promise<AxiosResponse<any>> => {

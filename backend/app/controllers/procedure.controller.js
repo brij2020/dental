@@ -104,7 +104,9 @@ exports.createProcedure = async (req, res) => {
 
     if (panel_id) {
       const panel = await ClinicPanel.findById(panel_id);
-      if (!panel || panel.clinic_id !== clinic_id) {
+      const isAllowedPanel =
+        !!panel && (panel.clinic_id === clinic_id || panel.clinic_id === "system");
+      if (!isAllowedPanel) {
         return res.status(400).send({ message: "Invalid panel_id for this clinic" });
       }
     }
@@ -157,7 +159,10 @@ exports.updateProcedure = async (req, res) => {
           return res.status(404).send({ message: "Procedure not found" });
         }
         const panel = await ClinicPanel.findById(panel_id);
-        if (!panel || panel.clinic_id !== existingProcedure.clinic_id) {
+        const isAllowedPanel =
+          !!panel &&
+          (panel.clinic_id === existingProcedure.clinic_id || panel.clinic_id === "system");
+        if (!isAllowedPanel) {
           return res.status(400).send({ message: "Invalid panel_id for this clinic" });
         }
         updateData.panel_id = panel_id;

@@ -11,6 +11,7 @@ const ForgotPassword = lazy(() => import("../pages/auth/ForgotPassword"));
 const ResetPassword = lazy(() => import("../pages/auth/ResetPassword"));
 const Dashboard     = lazy(() => import("../pages/dashboard/Dashboard"));
 const Patients      = lazy(() => import("../pages/patients/Patients"));
+const PatientConsultationHistory = lazy(() => import("../pages/patients/PatientConsultationHistory"));
 const Appointments  = lazy(() => import("../pages/appointments/Appointments"));
 const InsightVideos  = lazy(() => import("../pages/insightVideos/InsightVideos"));
 const Settings      = lazy(() => import("../pages/settings/Settings"));
@@ -110,6 +111,7 @@ const router = createBrowserRouter([
           { path: "/clinics/create", element: withSuperAdmin(<CreateClinic />) },
           { path: "/clinics/:id/edit", element: withSuperAdmin(<EditClinic />) },
           { path: "/patients",     element: withRoles(["admin", "receptionist"], <Patients />) },
+          { path: "/patients/:patientId/history", element: withRoles(["admin", "receptionist"], <PatientConsultationHistory />) },
           { path: "/appointments", element: withSuspense(<Appointments />) },
           { path: "/insight-videos",      element: withSuspense(<InsightVideos />) },
           {

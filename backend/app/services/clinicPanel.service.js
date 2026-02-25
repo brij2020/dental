@@ -270,3 +270,52 @@ exports.checkPanelExists = async (clinic_id, code) => {
     throw error;
   }
 };
+
+/**
+ * Get panels for clinic + system scope
+ */
+exports.getPanelsForClinicAndSystem = async (clinic_id, filters = {}) => {
+  try {
+    const query = {
+      clinic_id: clinic_id === "system" ? "system" : { $in: [clinic_id, "system"] },
+    };
+
+    if (filters.is_active !== undefined) {
+      query.is_active = filters.is_active;
+    }
+
+    if (filters.status) {
+      query.status = filters.status;
+    }
+
+    if (filters.search) {
+      query.$or = [
+        { name: { $regex: filters.search, $options: "i" } },
+        { code: { $regex: filters.search, $options: "i" } },
+        { description: { $regex: filters.search, $options: "i" } },
+      ];
+    }
+
+    const page = parseInt(filters.page, 10) || 1;
+    const limit = parseInt(filters.limit, 10) || 10;
+    const skip = (page - 1) * limit;
+
+    const [panels, total] = await Promise.all([
+      ClinicPanel.find(query).skip(skip).limit(limit).sort({ createdAt: -1 }),
+      ClinicPanel.countDocuments(query),
+    ]);
+
+    return {
+      data: panels,
+      pagination: {
+        total,
+        page,
+        limit,
+        pages: Math.ceil(total / limit),
+      },
+    };
+  } catch (error) {
+    logger.error(`Error retrieving clinic+system panels: ${error.message}`);
+    throw error;
+  }
+};

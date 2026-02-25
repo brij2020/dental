@@ -10,6 +10,9 @@ module.exports = app => {
   // Get all panels for a clinic with filters
   router.get("/", verifyToken, clinicPanel.findAll);
 
+  // Get panels for clinic + system scope
+  router.get("/combined", verifyToken, clinicPanel.findAllClinicAndSystem);
+
   // Get all active panels for a clinic
   router.get("/active", verifyToken, clinicPanel.findActive);
 

@@ -22,8 +22,8 @@ const DoctorProfile: React.FC<{ doctor: Doctor | null; clinic: Clinic | null }> 
           </div>
         </div>
         <div className="flex-grow flex flex-col">
-          <h3 className="font-semibold text-[16px] text-cyan-800">{displayName}|||||</h3>
-          <p className="text-[13px] text-gray-500 -mt-0.5">{displaySpecialty}||</p>
+          <h3 className="font-semibold text-[16px] text-cyan-800">{displayName}</h3>
+          <p className="text-[13px] text-gray-500 -mt-0.5">{displaySpecialty}</p>
         </div>
       </div>
     </div>

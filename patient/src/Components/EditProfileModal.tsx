@@ -94,7 +94,7 @@ const EditProfileModal: React.FC<Props> = ({ onClose, profile, onSave, scope }) 
     try {
       const s = State.getStatesOfCountry('IN') || [];
       setStatesList(s);
-    } catch (e) {
+    } catch {
       setStatesList([]);
     }
   }, []);
@@ -149,7 +149,7 @@ const EditProfileModal: React.FC<Props> = ({ onClose, profile, onSave, scope }) 
     try {
       const c = City.getCitiesOfState('IN', watchedState) || [];
       setCitiesList(c);
-    } catch (e) {
+    } catch {
       setCitiesList([]);
     }
   }, [watchedState]);
@@ -196,9 +196,9 @@ const EditProfileModal: React.FC<Props> = ({ onClose, profile, onSave, scope }) 
               <input {...register("address")} className="w-full px-3 py-2 border rounded" />
             </div>
 
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               <div>
-                <label className="sr-only">State</label>
+                <label className="block text-sm font-semibold mb-1">State</label>
                 <select {...register("state")} className="w-full px-3 py-2 border rounded">
                   <option value="">Select state</option>
                   {statesList.map((s) => (
@@ -208,16 +208,27 @@ const EditProfileModal: React.FC<Props> = ({ onClose, profile, onSave, scope }) 
               </div>
 
               <div>
-                <label className="sr-only">City</label>
-                <select {...register("city")} className="w-full px-3 py-2 border rounded">
-                  <option value="">Select city</option>
-                  {citiesList.map((c) => (
-                    <option key={c.name} value={c.name}>{c.name}</option>
-                  ))}
-                </select>
+                <label className="block text-sm font-semibold mb-1">City</label>
+                {citiesList.length > 0 ? (
+                  <select {...register("city")} className="w-full px-3 py-2 border rounded">
+                    <option value="">Select city</option>
+                    {citiesList.map((c) => (
+                      <option key={c.name} value={c.name}>{c.name}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    {...register("city")}
+                    placeholder="Enter city"
+                    className="w-full px-3 py-2 border rounded"
+                  />
+                )}
               </div>
 
-              <input {...register("pincode")} placeholder="Pincode" className="px-3 py-2 border rounded" />
+              <div>
+                <label className="block text-sm font-semibold mb-1">Pincode</label>
+                <input {...register("pincode")} placeholder="Pincode" className="w-full px-3 py-2 border rounded" />
+              </div>
             </div>
           </>
         )}
