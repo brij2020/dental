@@ -1,5 +1,4 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { supabase } from "../../../../lib/supabaseClient"; // backend (for procedure_problems)
 import { getProblems } from "../../../../lib/apiClient";
 import {
   createTreatmentProcedure,
@@ -79,36 +78,14 @@ const ToothDamageModal: React.FC<Props> = ({
       setLoadProblemsError(null);
 
       try {
-        // 1. First, find the patient's panel via the consultation
-        // We join the 'patients' table to get the panel column directly
-        const { data: consultData, error: consultError } = await supabase
-          .from("consultations")
-          .select(`
-            patient_id,
-            patients (
-              panel
-            )
-          `)
-          .eq("id", consultationId)
-          .single();
-
-        if (consultError) throw consultError;
-
-        // Extract the panel safely
-        // Note: Supabase returns joined data as an object or array based on relationship
-        const patientData = consultData?.patients as any; 
-        const patientPanel = patientData?.panel || null;
-
-        console.log("Patient Panel detected:", patientPanel);
-
-        // 2. Fetch procedures from backend API for this clinic
+        // Fetch procedures from backend API for this clinic
         try {
           const procResp = await getProcedures(clinicId);
           const procData = procResp.data?.data || [];
           const options: ProcedureOption[] = procData
             .map((p: any) => ({
               id: p._id ?? p.id,
-              name: p.name,
+              name: p.name || p.procedure_name || p.procedure_type || p._id,
               cost: p.cost ?? p.amount ?? null,
             }))
             .filter((item: any) => item && item.name);
@@ -120,11 +97,13 @@ const ToothDamageModal: React.FC<Props> = ({
           setProcedureOptions([]);
         }
 
-        // 5. Fetch Problems from backend API (requires auth token)
+        // Fetch Problems from backend API (requires auth token)
         try {
           const resp = await getProblems();
           const problemsData = resp.data?.data || [];
-          const probOptions: string[] = problemsData.map((p: any) => p.brief_description || p.clinical_findings || p._id);
+          const probOptions: string[] = problemsData
+            .map((p: any) => p.name || p.clinical_findings || p.brief_description || p._id)
+            .filter(Boolean);
           console.log("Fetched problem options:", probOptions);
           setProblemOptions(probOptions);
         } catch (err) {
@@ -155,7 +134,9 @@ const ToothDamageModal: React.FC<Props> = ({
         const resp = await getProblems();
         if (cancelled) return;
         const problemsData = resp.data?.data || [];
-        const probOptions: string[] = problemsData.map((p: any) =>  p.clinical_findings || p._id);
+        const probOptions: string[] = problemsData
+          .map((p: any) => p.name || p.clinical_findings || p.brief_description || p._id)
+          .filter(Boolean);
         setProblemOptions(probOptions);
       } catch (err) {
         if (cancelled) return;
@@ -187,7 +168,11 @@ const ToothDamageModal: React.FC<Props> = ({
         if (cancelled) return;
         const procData = resp.data?.data || [];
         const options: ProcedureOption[] = procData
-          .map((p: any) => ({ id: p._id ?? p.id, name: p.name, cost: p.cost ?? p.amount ?? null }))
+          .map((p: any) => ({
+            id: p._id ?? p.id,
+            name: p.name || p.procedure_name || p.procedure_type || p._id,
+            cost: p.cost ?? p.amount ?? null
+          }))
           .filter((item: any) => item && item.name);
 
         setProcedureOptions(options as ProcedureOption[]);
@@ -716,7 +701,7 @@ const ToothDamageModal: React.FC<Props> = ({
               <div>
                 <div className="flex items-center justify-between mb-1.5">
                   <label className="block text-sm font-medium text-slate-700">
-                  Enter Clinical Finding
+                  Name
                   </label>
                   <button
                     type="button"
@@ -743,7 +728,7 @@ const ToothDamageModal: React.FC<Props> = ({
               <div>
                 <div className="flex items-center justify-between mb-1.5">
                   <label className="block text-sm font-medium text-slate-700">
-                   Enter Clinical Procedure
+                   Name
                   </label>
                   <button
                     type="button"
@@ -854,7 +839,7 @@ const ToothDamageModal: React.FC<Props> = ({
               <div>
                 <div className="flex items-center justify-between mb-1.5">
                   <label className="block text-sm font-medium text-slate-700">
-                   Enter Clinical Procedure
+                   Name
                   </label>
                   <button
                     type="button"

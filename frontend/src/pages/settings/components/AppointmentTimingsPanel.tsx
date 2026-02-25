@@ -300,7 +300,7 @@ export default function AppointmentTimingsPanel() {
       const response = await updateProfile(doc_id, {
         [availabilityKey]: schedule,
         slot_duration_minutes: slotDuration,
-        capacity: isAdmin ? capacity : undefined,
+        capacity: isAdmin && consultationType !== 'video' ? capacity : undefined,
       });
 
       if (response.status === 200) {
@@ -423,7 +423,15 @@ export default function AppointmentTimingsPanel() {
             </div>
 
             {/* Capacity (Admin Only) */}
-            <div className={selectedDoctorId && doctors.find(d => d._id === selectedDoctorId)?.role === 'admin' ? '' : 'hidden'}>
+            <div
+              className={
+                selectedDoctorId &&
+                doctors.find((d) => d._id === selectedDoctorId)?.role === 'admin' &&
+                consultationType !== 'video'
+                  ? ''
+                  : 'hidden'
+              }
+            >
               <label
                 htmlFor="capacity"
                 className="block text-sm font-medium text-slate-700 mb-1"

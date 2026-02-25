@@ -28,7 +28,12 @@ exports.getAllProcedures = async (req, res) => {
       });
     }
 
-    const query = { clinic_id };
+    // For clinic requests, return both clinic-specific and shared "system" procedures.
+    // If clinic_id itself is "system", keep it scoped to system only.
+    const query =
+      clinic_id === "system"
+        ? { clinic_id: "system" }
+        : { clinic_id: { $in: [clinic_id, "system"] } };
     const hasPagination = page !== undefined || limit !== undefined;
 
     if (hasPagination) {

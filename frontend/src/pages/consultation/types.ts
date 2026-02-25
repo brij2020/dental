@@ -37,6 +37,7 @@ export type ConsultationRow = {
   medical_history: string[] | null;
   post_procedure?: PostProcedureRow | null;
   post_procedure_items?: PostProcedureRow[] | null;
+  current_step?: number;
   status: ConsultationStatusEnum;
   created_at: string; // ISO timestamp
   updated_at: string; // ISO timestamp

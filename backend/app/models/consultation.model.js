@@ -169,6 +169,12 @@ const consultationSchema = new mongoose.Schema(
       enum: ["Draft", "Completed", "Cancelled"],
       default: "Draft",
       index: true
+    },
+    current_step: {
+      type: Number,
+      min: 1,
+      max: 6,
+      default: 1
     }
   },
   {

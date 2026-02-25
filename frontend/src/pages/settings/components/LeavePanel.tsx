@@ -1,4 +1,4 @@
-import { useState, useEffect, type FormEvent } from 'react';
+import { useState, useEffect, useMemo, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import {
@@ -10,6 +10,7 @@ import dayjs, { type Dayjs } from "dayjs";
 import {getAllProfiles, updateProfile, getDoctorLeavesByClinic} from '../../../lib/apiClient';
 import { useAuth } from '../../../state/useAuth';
 import { DatePicker, Space } from 'antd';
+import TablePagination from '../../../components/TablePagination';
 // --- Types ---
 type DoctorProfile = {
   _id: string;
@@ -37,11 +38,13 @@ type LeavePayload = {
 
 // --- Main Panel Component ---
 export default function AppointmentTimingsPanel() {
+  const PAGE_SIZE = 9;
   const { user } = useAuth();
   const isDoctorUser = user?.role === 'doctor';
   const [doctors, setDoctors] = useState<DoctorProfile[]>([]);
   const [selectedDoctorId, setSelectedDoctorId] = useState('');
   const [clinicLeaves, setClinicLeaves] = useState<any[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
 
   
   const { RangePicker } = DatePicker;
@@ -100,6 +103,7 @@ export default function AppointmentTimingsPanel() {
           ? leaves.filter((l: any) => String(l.doctor_id || l.doctorId) === String(user?.id))
           : leaves;
         setClinicLeaves(scopedLeaves);
+        setCurrentPage(1);
       } catch (err) {
         console.error('Failed to fetch clinic leaves', err);
       }
@@ -136,10 +140,12 @@ export default function AppointmentTimingsPanel() {
       const response = await updateProfile(targetDoctorId, payloadToSave);
 
       if (response.status === 200) {
+        await refreshLeaves();
         toast.success('Leave has been updated!');
       }
     } catch (error: any) {
-      toast.error('Failed to save leave. Please try again.');
+      const message = error?.response?.data?.message || 'Failed to save leave. Please try again.';
+      toast.error(message);
       console.error('Error in handleSubmit:', error?.response?.data || error.message);
     } finally {
       setSaving(false);
@@ -156,12 +162,24 @@ export default function AppointmentTimingsPanel() {
         ? leaves.filter((l: any) => String(l.doctor_id || l.doctorId) === String(user?.id))
         : leaves;
       setClinicLeaves(scopedLeaves);
+      setCurrentPage(1);
     } catch (err) {
       console.error('Failed to refresh leaves', err);
     }
   };
 
   const isLoading = isListLoading;
+  const totalPages = Math.max(1, Math.ceil(clinicLeaves.length / PAGE_SIZE));
+  const paginatedLeaves = useMemo(() => {
+    const start = (currentPage - 1) * PAGE_SIZE;
+    return clinicLeaves.slice(start, start + PAGE_SIZE);
+  }, [clinicLeaves, currentPage]);
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
   
   type LeaveItem = {
     day: Day;
@@ -302,8 +320,9 @@ export default function AppointmentTimingsPanel() {
                   <div className="mt-2 text-xs text-slate-400">Click refresh after adding leaves.</div>
                 </div>
               ) : (
+                <>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 max-h-72 overflow-y-auto pr-2">
-                  {clinicLeaves.map((l: any) => {
+                  {paginatedLeaves.map((l: any) => {
                     const staff = doctors.find(d => d._id === (l.doctor_id || l.doctorId));
                     const name = staff?.full_name || l.doctor_name || l.doctor_id || 'Staff';
                     const role = staff?.role;
@@ -333,6 +352,17 @@ export default function AppointmentTimingsPanel() {
                     );
                   })}
                 </div>
+                <div className="mt-4">
+                  <TablePagination
+                    currentPage={currentPage}
+                    totalPages={totalPages}
+                    totalItems={clinicLeaves.length}
+                    pageSize={PAGE_SIZE}
+                    onPageChange={setCurrentPage}
+                    isLoading={false}
+                  />
+                </div>
+                </>
               )}
             </div>
           </div>

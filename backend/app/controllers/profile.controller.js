@@ -121,6 +121,9 @@ exports.update = async (req, res) => {
       data: updated
     });
   } catch (err) {
+    if (err.statusCode) {
+      return res.status(err.statusCode).send({ message: err.message });
+    }
     if (err.name === 'ValidationError') {
       return res.status(400).send({ message: err.message, errors: err.errors });
     }

@@ -1,6 +1,7 @@
 const db = require("../models");
 const Profile = db.profiles;
 const ProfileArchive = db.profileArchives;
+const DoctorLeave = require("../models/doctor-leave.model");
 const { logger } = require("../config/logger");
 const clinicSubscriptionService = require("./clinicSubscription.service");
 
@@ -133,6 +134,71 @@ const updateProfile = async (id, updateData) => {
     // Ensure specialization matches schema type (string). If client sent an array, join it.
     if (updateData.specialization && Array.isArray(updateData.specialization)) {
       updateData.specialization = updateData.specialization.join(', ');
+    }
+
+    // Validate leave overlap for the same doctor.
+    if (Array.isArray(updateData.leave)) {
+      const currentProfile = await Profile.findById(id).select('clinic_id leave');
+      if (!currentProfile) {
+        throw new Error(`Cannot update Doctor with id=${id}`);
+      }
+
+      const isValidDate = (value) =>
+        typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value);
+
+      const incomingDates = updateData.leave
+        .map((item) => item?.date)
+        .filter((date) => isValidDate(date));
+      const incomingDateSet = new Set(incomingDates);
+
+      const existingProfileDates = (Array.isArray(currentProfile.leave) ? currentProfile.leave : [])
+        .map((item) => item?.date)
+        .filter((date) => isValidDate(date));
+      const existingProfileDateSet = new Set(existingProfileDates);
+
+      const sameAsExistingProfileLeave =
+        incomingDateSet.size === existingProfileDateSet.size &&
+        Array.from(incomingDateSet).every((date) => existingProfileDateSet.has(date));
+
+      if (!sameAsExistingProfileLeave) {
+        const overlapWithProfile = Array.from(incomingDateSet).find((date) =>
+          existingProfileDateSet.has(date)
+        );
+        if (overlapWithProfile) {
+          const conflictError = new Error(
+            `Leave overlap detected: doctor already has leave on ${overlapWithProfile}.`
+          );
+          conflictError.statusCode = 409;
+          throw conflictError;
+        }
+      }
+
+      // Also guard against overlap with explicit leave ranges in DoctorLeave collection.
+      const explicitLeaves = await DoctorLeave.find({
+        doctor_id: String(id),
+        clinic_id: currentProfile.clinic_id,
+        is_active: true,
+      })
+        .select('leave_start_date leave_end_date')
+        .lean();
+
+      const overlapWithExplicit = Array.from(incomingDateSet).find((date) =>
+        explicitLeaves.some(
+          (leave) =>
+            isValidDate(leave.leave_start_date) &&
+            isValidDate(leave.leave_end_date) &&
+            leave.leave_start_date <= date &&
+            leave.leave_end_date >= date
+        )
+      );
+
+      if (overlapWithExplicit) {
+        const conflictError = new Error(
+          `Leave overlap detected: doctor already has leave on ${overlapWithExplicit}.`
+        );
+        conflictError.statusCode = 409;
+        throw conflictError;
+      }
     }
 
     const updated = await Profile.findByIdAndUpdate(

@@ -34,6 +34,7 @@ type ConsultationDraft = {
   consultationId?: string | null;
   consultationData?: Partial<ConsultationRow> | null;
   procedures?: TreatmentProcedureRow[] | null;
+  prescriptions?: any[] | null;
   followUpDate?: string | null;
   followUpTime?: string | null;
   savedAt?: string;
@@ -59,6 +60,7 @@ export default function ConsultationPreview() {
   const [draftFollowUpTime, setDraftFollowUpTime] = useState<string | null>(null);
   const [draftConsultationData, setDraftConsultationData] = useState<Partial<ConsultationRow> | null>(null);
   const [draftProcedures, setDraftProcedures] = useState<TreatmentProcedureRow[] | null>(null);
+  const [draftPrescriptions, setDraftPrescriptions] = useState<any[] | null>(null);
 
   useEffect(() => {
     if (!draftStorageKey || typeof window === 'undefined') return;
@@ -68,6 +70,7 @@ export default function ConsultationPreview() {
       const parsed = JSON.parse(raw) as ConsultationDraft;
       setDraftConsultationData(parsed?.consultationData || null);
       setDraftProcedures(parsed?.procedures || null);
+      setDraftPrescriptions(Array.isArray(parsed?.prescriptions) ? parsed.prescriptions : null);
       setDraftFollowUpDate(
         parsed?.followUpDate ||
           parsed?.consultationData?.follow_up_date ||
@@ -81,6 +84,7 @@ export default function ConsultationPreview() {
     } catch {
       setDraftConsultationData(null);
       setDraftProcedures(null);
+      setDraftPrescriptions(null);
       setDraftFollowUpDate(null);
       setDraftFollowUpTime(null);
     }
@@ -125,13 +129,11 @@ export default function ConsultationPreview() {
         const patientPromise = normalizedAppt.patient_id
           ? get(`/api/patients/${normalizedAppt.patient_id}`)
           : Promise.resolve(null);
-        const consultationPromise = draftConsultationData
-          ? Promise.resolve({ data: { data: draftConsultationData } })
-          : getOrCreateConsultation(String(normalizedAppt.id), {
-              clinic_id: normalizedAppt.clinic_id,
-              patient_id: normalizedAppt.patient_id,
-              doctor_id: normalizedAppt.doctor_id,
-            });
+        const consultationPromise = getOrCreateConsultation(String(normalizedAppt.id), {
+          clinic_id: normalizedAppt.clinic_id,
+          patient_id: normalizedAppt.patient_id,
+          doctor_id: normalizedAppt.doctor_id,
+        });
 
         const [patientSettled, consultationSettled] = await Promise.allSettled([
           patientPromise,
@@ -181,9 +183,16 @@ export default function ConsultationPreview() {
         // Show the preview page as soon as core data is ready.
         setLoading(false);
 
-        // Load heavier secondary data in background only when draft is not present.
-        if (!draftConsultationData) {
-          const consultationId = String(mappedConsultation.id);
+        // Always load secondary data from DB so preview reflects saved records.
+        const consultationId = String(mappedConsultation.id || mergedConsultation.id || '');
+        const normalizeList = (raw: any): any[] => {
+          if (Array.isArray(raw)) return raw;
+          if (Array.isArray(raw?.data)) return raw.data;
+          if (Array.isArray(raw?.data?.data)) return raw.data.data;
+          return [];
+        };
+
+        if (consultationId) {
           const [rxSettled, procSettled, paySettled] = await Promise.allSettled([
             prescriptionAPI.getByConsultation(consultationId),
             getTreatmentProceduresByConsultationId(consultationId),
@@ -191,16 +200,28 @@ export default function ConsultationPreview() {
           ]);
 
           const rx = rxSettled.status === 'fulfilled' ? rxSettled.value : [];
-          setPrescriptions(Array.isArray(rx) ? rx : ((rx as any)?.data || rx || []));
+          const normalizedRx = normalizeList(rx);
+          setPrescriptions(
+            normalizedRx.length > 0
+              ? normalizedRx
+              : (Array.isArray(draftPrescriptions) ? draftPrescriptions : []),
+          );
 
           const procResp = procSettled.status === 'fulfilled' ? (procSettled.value as any) : [];
           const procData = procResp?.data?.data || procResp?.data || procResp;
-          setProcedures(Array.isArray(procData) ? procData : (procData ? [procData] : []));
+          const normalizedProcedures = Array.isArray(procData) ? procData : (procData ? [procData] : []);
+          setProcedures(
+            normalizedProcedures.length > 0
+              ? normalizedProcedures
+              : (Array.isArray(draftProcedures) ? draftProcedures : []),
+          );
 
           const pay = paySettled.status === 'fulfilled' ? paySettled.value : { data: [] };
           setPayments((pay as any)?.data || []);
-        } else if (Array.isArray(draftProcedures)) {
-          setProcedures(draftProcedures);
+        } else {
+          setPrescriptions(Array.isArray(draftPrescriptions) ? draftPrescriptions : []);
+          setPayments([]);
+          setProcedures(Array.isArray(draftProcedures) ? draftProcedures : []);
         }
       } catch (e: any) {
         setError(e?.message || 'Failed to load preview');
@@ -209,7 +230,7 @@ export default function ConsultationPreview() {
       }
     }
     fetchAll();
-  }, [appointmentId, draftConsultationData, draftProcedures]);
+  }, [appointmentId, draftConsultationData, draftProcedures, draftPrescriptions]);
 
   const getAge = (dob: string | null) => {
     if (!dob) return '-';
@@ -321,9 +342,17 @@ export default function ConsultationPreview() {
   const medicalHistory = Array.isArray(effectiveConsultationData?.medical_history) ? effectiveConsultationData.medical_history : [];
   const clinicName =
     (appointment as any)?.clinic_name ||
+    (appointment as any)?.clinics?.name ||
+    (appointment as any)?.clinics?.clinic_name ||
     (appointment as any)?.clinic?.name ||
     (effectiveConsultationData as any)?.clinic_name ||
     'Clinic Name';
+  const clinicId =
+    (appointment as any)?.clinic_id ||
+    patient?.clinic_id ||
+    (effectiveConsultationData as any)?.clinic_id ||
+    '-';
+  const showMedicationCostSummary = false;
   const renderAdultStripTooth = (toothNumber: number) => {
     const upperIndex =
       toothNumber <= ADULT_TOOTH_COUNT_PER_JAW
@@ -398,7 +427,10 @@ export default function ConsultationPreview() {
                 (e.currentTarget as HTMLImageElement).style.display = 'none';
               }}
             />
-            <div className="text-sm font-semibold text-slate-900">{clinicName}</div>
+            <div>
+              <div className="text-sm font-semibold text-slate-900">{clinicName}</div>
+              <div className="text-xs text-slate-500">Clinic ID: {clinicId}</div>
+            </div>
           </div>
         </div>
         <div className="p-4 text-sm">
@@ -555,6 +587,10 @@ export default function ConsultationPreview() {
               <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-600">Notes</div>
               <div className="min-h-14 rounded border border-slate-300 bg-slate-50 px-3 py-2 whitespace-pre-wrap">{effectiveConsultationData?.notes || '-'}</div>
             </div>
+            <div>
+              <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-600">Appointment Notes</div>
+              <div className="min-h-14 rounded border border-slate-300 bg-slate-50 px-3 py-2 whitespace-pre-wrap">{(appointment as any)?.notes || '-'}</div>
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-3 p-4 text-xs text-slate-500">
@@ -654,31 +690,33 @@ export default function ConsultationPreview() {
             </div>
           </div>
 
-          <div className="p-4">
-            <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-600">Medication Cost Summary</div>
-            <div className="overflow-x-auto border border-slate-300">
-              <table className="min-w-full text-sm">
-                <thead className="bg-emerald-100">
-                  <tr>
-                    <th className="border border-slate-300 px-2 py-2 text-left text-xs font-semibold text-slate-700">Medication Name</th>
-                    <th className="border border-slate-300 px-2 py-2 text-left text-xs font-semibold text-slate-700">Type</th>
-                    <th className="border border-slate-300 px-2 py-2 text-left text-xs font-semibold text-slate-700">Quantity</th>
-                    <th className="border border-slate-300 px-2 py-2 text-left text-xs font-semibold text-slate-700">Cost</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(prescriptionList.length > 0 ? prescriptionList : [{}]).map((rx: any, idx: number) => (
-                    <tr key={rx.id || rx._id || `sum-rx-${idx}`} className="bg-emerald-50">
-                      <td className="border border-slate-300 px-2 py-2">{rx.medicine_name || '-'}</td>
-                      <td className="border border-slate-300 px-2 py-2">Medicine</td>
-                      <td className="border border-slate-300 px-2 py-2">{rx.quantity || '-'}</td>
-                      <td className="border border-slate-300 px-2 py-2">-</td>
+          {showMedicationCostSummary && (
+            <div className="p-4">
+              <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-600">Medication Cost Summary</div>
+              <div className="overflow-x-auto border border-slate-300">
+                <table className="min-w-full text-sm">
+                  <thead className="bg-emerald-100">
+                    <tr>
+                      <th className="border border-slate-300 px-2 py-2 text-left text-xs font-semibold text-slate-700">Medication Name</th>
+                      <th className="border border-slate-300 px-2 py-2 text-left text-xs font-semibold text-slate-700">Type</th>
+                      <th className="border border-slate-300 px-2 py-2 text-left text-xs font-semibold text-slate-700">Quantity</th>
+                      <th className="border border-slate-300 px-2 py-2 text-left text-xs font-semibold text-slate-700">Cost</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {(prescriptionList.length > 0 ? prescriptionList : [{}]).map((rx: any, idx: number) => (
+                      <tr key={rx.id || rx._id || `sum-rx-${idx}`} className="bg-emerald-50">
+                        <td className="border border-slate-300 px-2 py-2">{rx.medicine_name || '-'}</td>
+                        <td className="border border-slate-300 px-2 py-2">Medicine</td>
+                        <td className="border border-slate-300 px-2 py-2">{rx.quantity || '-'}</td>
+                        <td className="border border-slate-300 px-2 py-2">-</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
-          </div>
+          )}
         </article>
 
         <article className="rx-page mx-auto w-full max-w-[850px] border border-slate-400 bg-white text-slate-800">

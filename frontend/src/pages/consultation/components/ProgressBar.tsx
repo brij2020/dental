@@ -14,40 +14,71 @@ const STEPS = [
 // 1. Update the props type to accept the new function
 type ProgressBarProps = {
   currentStep: number;
-  onStepChange: (step: number) => void; // <-- ADD THIS
+  onStepChange: (step: number) => void;
+  getStepState?: (step: number) => 'active' | 'complete' | 'available' | 'readonly' | 'locked';
 };
 
-// 2. Destructure the new onStepChange prop
-export default function ProgressBar({ currentStep, onStepChange }: ProgressBarProps) {
+export default function ProgressBar({ currentStep, onStepChange, getStepState }: ProgressBarProps) {
   return (
-    <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200/80">
-      <div className="flex items-center">
+    <div className="rounded-xl border border-slate-200/80 bg-white p-3 shadow-sm">
+      <div className="flex items-center gap-2 overflow-x-auto pb-1">
         {STEPS.map((step, index) => {
           const stepNumber = index + 1;
-          const isActive = stepNumber === currentStep;
-          const isCompleted = stepNumber < currentStep;
+          const fallbackState =
+            stepNumber < currentStep
+              ? 'complete'
+              : stepNumber === currentStep
+                ? 'active'
+                : 'available';
+          const state = getStepState ? getStepState(stepNumber) : fallbackState;
+          const isActive = state === 'active';
+          const isCompleted = state === 'complete';
+          const isLocked = state === 'locked';
+          const isReadonly = state === 'readonly';
 
-          // Helper function to handle the click
           const handleStepClick = () => {
+            if (isLocked) return;
             onStepChange(stepNumber);
           };
 
+          const circleClass = isCompleted
+            ? 'bg-emerald-600 text-white border-emerald-600'
+            : isActive
+              ? 'bg-sky-100 text-sky-700 border-sky-300'
+              : isReadonly
+                ? 'bg-amber-50 text-amber-700 border-amber-300'
+                : isLocked
+                  ? 'bg-slate-100 text-slate-400 border-slate-200'
+                  : 'bg-white text-slate-600 border-slate-300';
+
+          const labelClass = isCompleted
+            ? 'text-emerald-700'
+            : isActive
+              ? 'text-slate-900'
+              : isReadonly
+                ? 'text-amber-700'
+                : isLocked
+                  ? 'text-slate-400'
+                  : 'text-slate-600';
+
           return (
             <React.Fragment key={step}>
-              {/* Step */}
-              {/* 3. Add onClick and cursor-pointer to this wrapper div */}
               <div
-                className="flex items-center gap-3 cursor-pointer" // <-- ADDED cursor-pointer
-                onClick={handleStepClick} // <-- ADDED onClick
+                className={`flex min-w-[132px] items-center gap-2 rounded-lg border px-2 py-2 transition ${
+                  isActive
+                    ? 'border-sky-200 bg-sky-50/70'
+                    : isCompleted
+                      ? 'border-emerald-200 bg-emerald-50/60'
+                      : isReadonly
+                        ? 'border-amber-200 bg-amber-50/50'
+                        : isLocked
+                          ? 'border-slate-200 bg-slate-50'
+                          : 'border-slate-200 bg-white hover:bg-slate-50'
+                } ${isLocked ? 'cursor-not-allowed' : 'cursor-pointer'}`}
+                onClick={handleStepClick}
               >
                 <div
-                  className={`flex h-8 w-8 items-center justify-center rounded-full font-bold transition-all duration-300 ${
-                    isCompleted
-                      ? 'bg-sky-500 text-white'
-                      : isActive
-                      ? 'bg-sky-100 text-sky-600'
-                      : 'bg-slate-100 text-slate-500'
-                  }`}
+                  className={`flex h-7 w-7 items-center justify-center rounded-full border text-xs font-bold ${circleClass}`}
                 >
                   {isCompleted ? (
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
@@ -57,23 +88,16 @@ export default function ProgressBar({ currentStep, onStepChange }: ProgressBarPr
                     stepNumber
                   )}
                 </div>
-                <div>
-                  <p
-                    className={`font-semibold transition-colors duration-300 ${
-                      isActive ? 'text-slate-800' : 'text-slate-500'
-                    }`}
-                  >
-                    {step}
-                  </p>
-                  <p className="text-xs text-slate-400">Step {stepNumber}</p>
+                <div className="leading-tight">
+                  <p className={`text-xs font-semibold ${labelClass}`}>{step}</p>
+                  <p className="text-[11px] text-slate-400">Step {stepNumber}</p>
                 </div>
               </div>
 
-              {/* Connector */}
               {index < STEPS.length - 1 && (
-                <div className="flex-1 mx-4 h-1 rounded-full bg-slate-100">
+                <div className="h-px w-4 shrink-0 bg-slate-200">
                   <div
-                    className="h-1 rounded-full bg-sky-500 transition-all duration-500"
+                    className="h-px rounded-full bg-emerald-500 transition-all duration-500"
                     style={{ width: isCompleted ? '100%' : '0%' }}
                   />
                 </div>

@@ -15,6 +15,7 @@ import {
 import { format } from 'date-fns';
 import { prescriptionAPI } from '../../lib/prescriptionAPI';
 import type { AppointmentDetails } from '../appointments/types';
+import { useAuth } from '../../state/useAuth';
 import ProgressBar from './components/ProgressBar';
 import ClinicalExamination from './components/ClinicalExamination';
 import Procedure from './components/Procedure';
@@ -54,6 +55,7 @@ type ConsultationDraft = {
   consultationId?: string | null;
   consultationData?: Partial<ConsultationRow> | null;
   procedures?: TreatmentProcedureRow[] | null;
+  prescriptions?: any[] | null;
   followUpDate?: string | null;
   followUpTime?: string | null;
   savedAt?: string;
@@ -70,6 +72,7 @@ const LoadingSpinner = () => (
 
 
 export default function Consultation() {
+  const { user } = useAuth();
   const { appointmentId } = useParams<{ appointmentId: string }>();
   const navigate = useNavigate();
   const draftStorageKey = appointmentId ? `consultation:draft:${appointmentId}` : null;
@@ -90,6 +93,7 @@ export default function Consultation() {
   const [payments, setPayments] = useState<any[] | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [followUpSelection, setFollowUpSelection] = useState<FollowUpData>({ followUpDate: null, followUpTime: '' });
+  const [stepAccessMessage, setStepAccessMessage] = useState<string | null>(null);
   // Track if a procedure was just saved so preview can refresh
   const [procedureJustSaved, setProcedureJustSaved] = useState(false);
 
@@ -160,6 +164,114 @@ export default function Consultation() {
     Partial<ConsultationRow> | null
   >(null);
   const [loadingPrev, setLoadingPrev] = useState(false);
+  const normalizedRole = String(user?.role || '').toLowerCase();
+  const isDoctorRole = normalizedRole === 'doctor';
+  const isAdminRole = normalizedRole === 'admin';
+  const isReceptionistRole = normalizedRole === 'receptionist';
+  const step1Complete = Boolean(
+    consultationData?.chief_complaints ||
+      consultationData?.on_examination ||
+      consultationData?.advice ||
+      consultationData?.notes,
+  );
+  const step2Complete = Array.isArray(procedures) && procedures.length > 0;
+  const step3Complete = Boolean(
+    (consultationData?.post_procedure_items && consultationData.post_procedure_items.length > 0) ||
+      consultationData?.post_procedure?.diagnosed_tooth_no,
+  );
+  const step4Complete = Array.isArray(prescriptions) && prescriptions.length > 0;
+  const step5Complete = Boolean(
+    consultationData?.consultation_fee !== null &&
+      consultationData?.consultation_fee !== undefined,
+  );
+  const allFirst4Complete = step1Complete && step2Complete && step3Complete && step4Complete;
+  const stepCompletionMap: Record<number, boolean> = {
+    1: step1Complete,
+    2: step2Complete,
+    3: step3Complete,
+    4: step4Complete,
+    5: step5Complete,
+    6: false,
+  };
+
+  const canEditStep = (step: number) => {
+    if (isDoctorRole || isAdminRole) return step >= 1 && step <= 4;
+    if (isReceptionistRole) return step >= 5 && step <= 6 && allFirst4Complete;
+    return true;
+  };
+
+  const isCurrentStepReadOnly = !canEditStep(currentStep);
+
+  const getStepState = (step: number): 'active' | 'complete' | 'available' | 'readonly' | 'locked' => {
+    if (step === currentStep) return 'active';
+    if (stepCompletionMap[step]) return 'complete';
+
+    if (isReceptionistRole) {
+      if (step <= 4) return 'readonly';
+      if (step === 5 && !allFirst4Complete) return 'locked';
+      if (step === 6 && (!allFirst4Complete || !step5Complete)) return 'locked';
+      return 'available';
+    }
+
+    if (isDoctorRole || isAdminRole) {
+      if (step > 4) return 'readonly';
+      return 'available';
+    }
+
+    return 'available';
+  };
+
+  useEffect(() => {
+    if (!consultationId) return;
+    let mounted = true;
+    (async () => {
+      try {
+        const [rxResp, procResp] = await Promise.allSettled([
+          prescriptionAPI.getByConsultation(consultationId),
+          getTreatmentProceduresByConsultationId(consultationId),
+        ]);
+        if (!mounted) return;
+
+        if (rxResp.status === 'fulfilled') {
+          const rx = rxResp.value;
+          setPrescriptions(Array.isArray(rx) ? rx : (rx?.data || rx || []));
+        }
+
+        if (procResp.status === 'fulfilled') {
+          const procData = procResp.value?.data?.data || procResp.value?.data || procResp.value;
+          setProcedures(Array.isArray(procData) ? procData : (procData ? [procData] : []));
+        }
+      } catch {
+        // non-blocking
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, [consultationId]);
+
+  useEffect(() => {
+    if (!isReceptionistRole) return;
+    if (!allFirst4Complete) {
+      setStepAccessMessage('Receptionist can move to Step 5 only after Steps 1-4 are completed by doctor/admin.');
+      return;
+    }
+    setStepAccessMessage(null);
+    if (currentStep < 5) {
+      setCurrentStep(5);
+      saveDraft({
+        currentStep: 5,
+        consultationId,
+        consultationData: consultationData || undefined,
+        procedures: procedures || undefined,
+      });
+      if (consultationId) {
+        updateConsultation(consultationId, { current_step: 5 }).catch(() => {
+          // non-blocking: local state already saved
+        });
+      }
+    }
+  }, [isReceptionistRole, allFirst4Complete, currentStep, consultationId, consultationData, procedures]);
 
   const extractApiErrorMessage = (err: any, fallback: string) => {
     const apiMessage =
@@ -219,6 +331,9 @@ export default function Consultation() {
         followUpDate: Number.isNaN(parsedDate.getTime()) ? null : parsedDate,
         followUpTime: draft.followUpTime || '',
       });
+    }
+    if (Array.isArray(draft?.prescriptions)) {
+      setPrescriptions(draft.prescriptions);
     }
   }, [draftStorageKey]);
 
@@ -414,7 +529,10 @@ export default function Consultation() {
             setConsultationData(mergedConsultation as ConsultationRow);
             setConsultationId(mappedConsultation.id);
 
-            if (draft?.currentStep && draft.currentStep >= 1 && draft.currentStep <= 6) {
+            const serverStep = Number((mappedConsultation as any)?.current_step);
+            if (Number.isInteger(serverStep) && serverStep >= 1 && serverStep <= 6) {
+              setCurrentStep(serverStep);
+            } else if (draft?.currentStep && draft.currentStep >= 1 && draft.currentStep <= 6) {
               setCurrentStep(draft.currentStep);
             }
           }
@@ -513,6 +631,7 @@ export default function Consultation() {
   const handleSaveClinicalExamination = async (
     data: ClinicalExaminationData,
   ) => {
+    if (!canEditStep(1)) return;
     if (!consultationId) return;
     setIsSaving(true);
     const updates = {
@@ -520,6 +639,7 @@ export default function Consultation() {
       on_examination: data.onExamination || null,
       advice: data.advice || null,
       notes: data.notes || null,
+      current_step: 2,
     };
 
     try {
@@ -546,9 +666,12 @@ export default function Consultation() {
   };
 
   const handleSaveProcedure = async () => {
+    if (!canEditStep(2)) return;
     if (!consultationId) return;
     setIsSaving(true);
     try {
+      // Persist step transition in DB so cross-system continuation starts from Step 3.
+      await updateConsultation(consultationId, { current_step: 3 });
       // Refresh consultation data from MongoDB
       const response = await getConsultationById(consultationId);
       if (response.data && response.data.success && response.data.data) {
@@ -581,6 +704,7 @@ export default function Consultation() {
   };
 
   const handleSavePostProcedure = async (data: PostProcedureData[]) => {
+    if (!canEditStep(3)) return;
     if (!consultationId) return;
     setIsSaving(true);
     try {
@@ -601,6 +725,7 @@ export default function Consultation() {
       await updateConsultation(consultationId, {
         post_procedure: primaryItem,
         post_procedure_items: normalizedItems,
+        current_step: 4,
       });
 
       const freshResponse = await getConsultationById(consultationId);
@@ -626,41 +751,57 @@ export default function Consultation() {
   };
 
   const handleSavePrescription = async (data: PrescriptionRow[]) => {
-    if (!consultationId || !consultationData?.clinic_id) return;
+    if (!canEditStep(4)) return;
+    const resolvedClinicId = consultationData?.clinic_id || appointment?.clinic_id || '';
+    if (!consultationId || !resolvedClinicId) {
+      setError('Unable to save prescription: missing consultation or clinic ID.');
+      return;
+    }
     setIsSaving(true);
     try {
-      // 1. Delete all existing prescriptions for this consultation
-      await prescriptionAPI.deleteByConsultation(consultationId);
-      // 2. Prepare valid rows for saving
+      // Prepare valid rows for saving.
       const validRows = data
         .filter((row) => row.medicineName && row.medicineName.trim() !== '')
         .map((row) => ({
           consultation_id: consultationId,
-          clinic_id: consultationData.clinic_id,
+          clinic_id: resolvedClinicId,
           medicine_name: row.medicineName.trim(),
           times: row.times,
           quantity: row.quantity,
           days: row.days,
           note: row.note,
         }));
+
+      // Backend bulk endpoint already replaces existing rows atomically.
       if (validRows.length > 0) {
         await prescriptionAPI.saveForConsultation(consultationId, validRows);
+      } else {
+        await prescriptionAPI.deleteByConsultation(consultationId);
       }
+
+      // Refresh local state from DB so Step 4 completion status reflects immediately.
+      const savedRows = await prescriptionAPI.getByConsultation(consultationId);
+      const normalizedSavedRows = Array.isArray(savedRows) ? savedRows : (savedRows as any)?.data || [];
+      setPrescriptions(normalizedSavedRows);
+
+      await updateConsultation(consultationId, { current_step: 5 });
       // Move to next step (Billing)
       setCurrentStep(5);
       saveDraft({
         currentStep: 5,
         consultationId,
+        prescriptions: normalizedSavedRows,
       });
     } catch (e: any) {
       console.error('Failed to save prescription:', e.message);
-      // Optionally: show error message
+      setError(extractApiErrorMessage(e, 'Failed to save prescription.'));
     } finally {
       setIsSaving(false);
     }
   };
 
   const handleSaveBilling = async (data: BillingData) => {
+    if (!canEditStep(5)) return;
     if (
       !consultationId ||
       !consultationData?.clinic_id ||
@@ -677,6 +818,7 @@ export default function Consultation() {
         other_amount: data.otherAmount ?? 0,
         discount: data.discount ?? 0,
         previous_outstanding_balance: data.previousOutstandingBalance ?? 0,
+        current_step: 6,
       });
 
       if (updateResponse.data && updateResponse.data.success) {
@@ -718,6 +860,11 @@ export default function Consultation() {
   };
 
   const handleCompleteConsultation = async (data: FollowUpData) => {
+    if (!canEditStep(6)) return;
+    if (!step5Complete) {
+      setStepAccessMessage('Complete Step 5 (Billing) before finishing consultation.');
+      return;
+    }
     if (!consultationId || !consultationData || !appointment) {
       console.error('Missing data to complete consultation.');
       return;
@@ -734,6 +881,7 @@ export default function Consultation() {
         status: 'Completed',
         follow_up_date: selectedFollowUpDate,
         follow_up_time: selectedFollowUpTime,
+        current_step: 6,
       });
       if (!statusResponse.data || !statusResponse.data.success) {
         console.error('Failed to update consultation status');
@@ -746,28 +894,12 @@ export default function Consultation() {
         } as ConsultationRow));
       }
 
-      // 2️⃣ Mark the *appointment* as completed
-      try {
-        const { error: appointmentStatusError } = await supabase
-          .from('appointments')
-          .update({ status: 'completed' })
-          .eq('id', appointment.id);
-        if (appointmentStatusError) {
-          console.warn('Failed to update appointment status in Supabase:', appointmentStatusError);
-        } else {
-          setAppointment((prev) => prev ? { ...prev, status: 'completed' } : prev);
-        }
-      } catch (supErr) {
-        console.warn('Supabase update error (non-fatal):', supErr);
-      }
-
-      // Optional but nice: keep local state in sync so if you ever stay
-      // on this page or show status, it's correct in memory too
+      // Keep local appointment state in sync for current UI session.
       setAppointment((prev) =>
         prev ? { ...prev, status: 'completed' } : prev
       );
 
-      // 3️⃣ Create follow-up appointment via backend API if user picked a date
+      // 2️⃣ Create follow-up appointment via backend API if user picked a date
       if (data.followUpDate) {
         const existingFileNumber =
           patient?.file_number ||
@@ -1028,6 +1160,10 @@ export default function Consultation() {
 
   const handleGoBackStep = () => {
     if (currentStep <= 1) return;
+    if (isReceptionistRole && allFirst4Complete && currentStep <= 5) {
+      setStepAccessMessage('Receptionist starts from Step 5 after doctor/admin completes Steps 1-4.');
+      return;
+    }
     const prevStep = Math.max(1, currentStep - 1);
     setCurrentStep(prevStep);
     saveDraft({
@@ -1035,6 +1171,73 @@ export default function Consultation() {
       consultationId,
       consultationData: consultationData || undefined,
     });
+    if (consultationId) {
+      updateConsultation(consultationId, { current_step: prevStep }).catch(() => {
+        // non-blocking: local state already saved
+      });
+    }
+  };
+
+  const handleStepChange = (step: number) => {
+    if ((isDoctorRole || isAdminRole) && step > 4) {
+      setStepAccessMessage('Steps 5-6 are handled by receptionist after doctor/admin complete Steps 1-4.');
+      return;
+    }
+    if (isReceptionistRole) {
+      if (!allFirst4Complete && step >= 5) {
+        setStepAccessMessage('Complete Steps 1-4 first. Receptionist can continue from Step 5 once doctor/admin finishes previous steps.');
+        return;
+      }
+      if (allFirst4Complete && step < 5) {
+        setStepAccessMessage('Receptionist starts from Step 5 after doctor/admin completes Steps 1-4.');
+        return;
+      }
+      if (step >= 6 && !step5Complete) {
+        setStepAccessMessage('Complete Step 5 (Billing) before moving to Step 6.');
+        return;
+      }
+    }
+    setStepAccessMessage(null);
+    setCurrentStep(step);
+    saveDraft({
+      currentStep: step,
+      consultationId,
+      consultationData: consultationData || undefined,
+      procedures: procedures || undefined,
+    });
+    if (consultationId) {
+      updateConsultation(consultationId, { current_step: step }).catch(() => {
+        // non-blocking: local state already saved
+      });
+    }
+  };
+
+  const handleSaveAndExit = async () => {
+    saveDraft({
+      currentStep,
+      consultationId,
+      consultationData: consultationData || undefined,
+      procedures: procedures || undefined,
+      prescriptions: prescriptions || undefined,
+      followUpDate: followUpSelection.followUpDate
+        ? format(followUpSelection.followUpDate, 'yyyy-MM-dd')
+        : null,
+      followUpTime: followUpSelection.followUpTime || null,
+    });
+    if (consultationId) {
+      try {
+        await updateConsultation(consultationId, {
+          current_step: currentStep,
+          follow_up_date: followUpSelection.followUpDate
+            ? format(followUpSelection.followUpDate, 'yyyy-MM-dd')
+            : null,
+          follow_up_time: followUpSelection.followUpTime || null,
+        });
+      } catch {
+        // non-blocking: local draft remains as fallback
+      }
+    }
+    navigate('/appointments');
   };
 
 
@@ -1127,8 +1330,21 @@ export default function Consultation() {
             <div className="flex items-center gap-3">
               <button
                 type="button"
+                onClick={handleSaveAndExit}
+                className="inline-flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium rounded-xl border border-emerald-300 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 active:bg-emerald-200 transition-all w-full sm:w-auto"
+              >
+                Save & Exit
+              </button>
+              <button
+                type="button"
                 onClick={() => navigate(`/consultation/${appointment.id || appointmentId}/preview`)}
-                className="inline-flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium rounded-xl border border-slate-300 text-slate-700 hover:bg-slate-50 active:bg-slate-100 transition-all w-full sm:w-auto"
+                disabled={currentStep !== 6}
+                title={currentStep !== 6 ? 'Preview is available at Step 6' : 'Open preview'}
+                className={`inline-flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium rounded-xl border transition-all w-full sm:w-auto ${
+                  currentStep === 6
+                    ? 'border-slate-300 text-slate-700 hover:bg-slate-50 active:bg-slate-100'
+                    : 'border-slate-200 text-slate-400 bg-slate-100 cursor-not-allowed'
+                }`}
               >
                 Preview
               </button>
@@ -1229,6 +1445,8 @@ export default function Consultation() {
                   : [];
                 const clinicName =
                   (appointment as any)?.clinic_name ||
+                  (appointment as any)?.clinics?.name ||
+                  (appointment as any)?.clinics?.clinic_name ||
                   (appointment as any)?.clinic?.name ||
                   'Clinic Name';
                 const pdfLogoUrl = `${window.location.origin}/src/assets/spai.jpeg`;
@@ -1758,10 +1976,18 @@ export default function Consultation() {
           );
         })()}
 
+        {isReceptionistRole && (
+          <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+            <p>Steps 1-4 are read-only for receptionist.</p>
+            <p>Step 5 unlocks after doctor/admin completes Steps 1-4.</p>
+          </div>
+        )}
+
         {/* Progress Bar */}
         <ProgressBar
           currentStep={currentStep}
-          onStepChange={setCurrentStep} // <-- This is the only line I added
+          onStepChange={handleStepChange}
+          getStepState={getStepState}
         />
 
         {/* Step Content */}
@@ -1777,7 +2003,23 @@ export default function Consultation() {
             </button>
           </div>
         )}
-        <div className="mt-6">{renderStepContent()}</div>
+        <div className={`mt-6 ${isCurrentStepReadOnly ? 'pointer-events-none opacity-80' : ''}`}>
+          {renderStepContent()}
+        </div>
+        {isCurrentStepReadOnly && (
+          <div className="mt-3 rounded-lg border border-orange-200 bg-orange-50 px-3 py-2 text-xs text-orange-800">
+            {isDoctorRole
+              ? 'Read-only for doctor from Step 5 onward. Receptionist continues from Step 5.'
+              : isAdminRole
+                ? 'Read-only for admin from Step 5 onward. Receptionist continues from Step 5.'
+                : 'Read-only mode for this step.'}
+          </div>
+        )}
+        {stepAccessMessage && (
+          <div className="mt-3 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-800">
+            {stepAccessMessage}
+          </div>
+        )}
       </div>
     </div>
   );

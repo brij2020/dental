@@ -82,6 +82,27 @@ export default function UserManagementPanel() {
     profile_pic: '',
   });
 
+  const extractApiErrorInfo = (err: any): { message: string; status?: number; key?: string } => {
+    const status = err?.response?.status;
+    const key = err?.response?.data?.key as string | undefined;
+    const serverMessage =
+      err?.response?.data?.message ||
+      err?.message ||
+      'Unknown error';
+
+    if (status === 409) {
+      if (key === 'email' || /email/i.test(serverMessage)) {
+        return { message: 'Email already exists', status, key: 'email' };
+      }
+      if (key === 'mobile_number' || /mobile|phone|number/i.test(serverMessage)) {
+        return { message: 'Mobile number already exists', status, key: 'mobile_number' };
+      }
+      return { message: 'Conflict: this email or mobile number already exists', status, key };
+    }
+
+    return { message: serverMessage, status, key };
+  };
+
 
   const fetchActivePlan = useCallback(async () => {
     if (!adminUser?.clinic_id) return;
@@ -180,31 +201,24 @@ export default function UserManagementPanel() {
       newUserPayload.qualification = newUserPayload.role === 'doctor' ? qualificationVal : '';
       newUserPayload.specialization = newUserPayload.role === 'doctor' ? specializationVal : '';
 
-      const newUser = async () => {
-        const response = await createProfile(newUserPayload);
-        return response.data;
-      };
-
-      // Show pending/success/error toasts automatically
-      await toast.promise(
-        newUser(),
-        {
-          pending: 'Creating user...',
-          success: 'User created successfully!',
-          error: {
-            render({ data }: any) {
-              return `Failed to create user: ${data?.message ?? 'Unknown error'}`;
-            },
-          },
-        }
-      );
+      await createProfile(newUserPayload);
+      toast.success('User created successfully!');
 
       // Success: reset, close, refresh
       formEl.reset();
       setIsModalOpen(false);
       void fetchStaff();
-    } catch (err) {
-      // toast.promise already showed the error toast
+    } catch (err: any) {
+      const info = extractApiErrorInfo(err);
+      if (info.status === 409) {
+        const nextErrors: { [k: string]: string } = {};
+        if (info.key === 'email') nextErrors.email = info.message;
+        if (info.key === 'mobile_number') nextErrors.mobile_number = info.message;
+        if (Object.keys(nextErrors).length > 0) {
+          setFieldErrors((prev) => ({ ...prev, ...nextErrors }));
+        }
+      }
+      toast.error(`Failed to create user: ${info.message}`);
       console.error(err);
     } finally {
       setFormLoading(false);
@@ -334,22 +348,22 @@ export default function UserManagementPanel() {
         payload.specialization = editFormData.specialization.trim();
       }
 
-      await toast.promise(
-        updateProfile(editUserId, payload),
-        {
-          pending: 'Updating user...',
-          success: 'User updated successfully!',
-          error: {
-            render({ data }: any) {
-              return `Failed to update user: ${data?.message ?? 'Unknown error'}`;
-            },
-          },
-        }
-      );
+      await updateProfile(editUserId, payload);
+      toast.success('User updated successfully!');
 
       closeEditModal();
       void fetchStaff();
-    } catch (err) {
+    } catch (err: any) {
+      const info = extractApiErrorInfo(err);
+      if (info.status === 409) {
+        const nextErrors: { [k: string]: string } = {};
+        if (info.key === 'email') nextErrors.email = info.message;
+        if (info.key === 'mobile_number') nextErrors.mobile_number = info.message;
+        if (Object.keys(nextErrors).length > 0) {
+          setEditFieldErrors((prev) => ({ ...prev, ...nextErrors }));
+        }
+      }
+      toast.error(`Failed to update user: ${info.message}`);
       console.error(err);
     } finally {
       setEditLoading(false);

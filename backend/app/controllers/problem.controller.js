@@ -22,7 +22,11 @@ exports.getAllProblems = async (req, res) => {
       });
     }
 
-    const query = { clinic_id };
+    // Return clinic-specific problems + shared system-level problems.
+    const query =
+      clinic_id === "system"
+        ? { clinic_id: "system" }
+        : { clinic_id: { $in: [clinic_id, "system"] } };
     const hasPagination = page !== undefined || limit !== undefined;
 
     if (hasPagination) {

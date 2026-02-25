@@ -5,6 +5,7 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const crypto = require("crypto")
 const JWT_SECRET = process.env.JWT_SECRET || "secret123";
+const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || "10m";
 const { logger } = require("../config/logger");
 const emailService = require('../services/email.service');
 const otpService = require("../services/otp.service");
@@ -127,7 +128,7 @@ exports.login = async (req, res) => {
         const token = jwt.sign(
             { id: user._id, role: user.role, clinic_id: user.clinic_id, full_name: user.full_name },
             JWT_SECRET,
-            { expiresIn: "1d", issuer: JWT_ISSUER }
+            { expiresIn: JWT_EXPIRES_IN, issuer: JWT_ISSUER }
         );
 
         logger.info({ userId: user._id, email }, 'Login successful');
@@ -252,7 +253,7 @@ exports.verifyMobileOtp = async (req, res) => {
         const token = jwt.sign(
             { id: user._id, role: user.role, clinic_id: user.clinic_id, full_name: user.full_name },
             JWT_SECRET,
-            { expiresIn: "1d", issuer: JWT_ISSUER }
+            { expiresIn: JWT_EXPIRES_IN, issuer: JWT_ISSUER }
         );
 
         logger.info({
@@ -324,7 +325,7 @@ exports.patientLogin = async (req, res) => {
         const token = jwt.sign(
             { id: patient._id, patient_id: patient._id, email: patient.email, full_name: patient.full_name, role: "patient" },
             JWT_SECRET,
-            { expiresIn: "7d", issuer: JWT_ISSUER }
+            { expiresIn: JWT_EXPIRES_IN, issuer: JWT_ISSUER }
         );
 
         logger.info({ patientId: patient._id, email }, 'Patient login successful');
@@ -457,7 +458,7 @@ exports.verifyPatientLoginOtp = async (req, res) => {
         const token = jwt.sign(
             { id: patient._id, patient_id: patient._id, email: patient.email, full_name: patient.full_name, role: "patient" },
             JWT_SECRET,
-            { expiresIn: "7d", issuer: JWT_ISSUER }
+            { expiresIn: JWT_EXPIRES_IN, issuer: JWT_ISSUER }
         );
 
         logger.info({ patientId: patient._id }, "Patient OTP login successful");
@@ -537,7 +538,7 @@ exports.patientRegister = async (req, res) => {
         const token = jwt.sign(
             { id: patient._id, patient_id: patient._id, email: patient.email, full_name: patient.full_name, role: "patient" },
             JWT_SECRET,
-            { expiresIn: "7d", issuer: JWT_ISSUER }
+            { expiresIn: JWT_EXPIRES_IN, issuer: JWT_ISSUER }
         );
 
         logger.info({ patientId: patient._id, email: normalizedEmail }, 'Patient registered successfully');

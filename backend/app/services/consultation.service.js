@@ -34,7 +34,8 @@ const createConsultation = async (consultationData) => {
         instruction: null
       },
       post_procedure_items: consultationData.post_procedure_items || [],
-      status: consultationData.status || "Draft"
+      status: consultationData.status || "Draft",
+      current_step: consultationData.current_step || 1
     });
 
     const savedConsultation = await consultation.save();
@@ -131,7 +132,8 @@ const getOrCreateConsultation = async (appointmentId, consultationData) => {
         status: "Scheduled",
         instruction: null
       },
-      post_procedure_items: []
+      post_procedure_items: [],
+      current_step: consultationData.current_step || 1
     });
 
     const savedConsultation = await newConsultation.save();
